@@ -1,0 +1,19 @@
+# Deploy com 1 clique no Render (https://render.com) — "New > Blueprint" apontando para este repositório.
+# Sobe o servidor Node (jogo + WebSocket) com disco persistente para os perfis.
+services:
+  - type: web
+    name: abismo-de-sucata
+    runtime: node
+    plan: starter          # o plano gratuito não tem disco persistente (perfis seriam apagados a cada deploy)
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /saude
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: NODE_VERSION
+        value: "20"
+    disk:
+      name: perfis
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,171 @@
+:root { --amb: #f0a23a; --amb2: #ffcf7a; --bg: rgba(14, 22, 26, 0.82); --bd: rgba(255, 210, 140, 0.25); --tx: #f2ece0; --ok: #6fd18d; --ruim: #ff6b5b; --azul: #6cc6e8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #071014; color: var(--tx); font-family: system-ui, 'Segoe UI', Roboto, sans-serif; -webkit-user-select: none; user-select: none; }
+canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+canvas#tinta { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+#vinheta { position: fixed; inset: 0; pointer-events: none; z-index: 1; box-shadow: inset 0 0 160px rgba(0,0,0,0.55); }
+button { font: inherit; cursor: pointer; border: 1px solid var(--bd); background: #213038; color: var(--tx); border-radius: 8px; padding: 8px 14px; transition: background .15s, transform .05s; }
+button:hover { background: #2c414c; } button:active { transform: translateY(1px); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.grande { background: linear-gradient(180deg, #f3a940, #c97716); color: #1b1206; font-weight: 800; border: none; font-size: 1.1rem; }
+input { font: inherit; background: #0f1a1f; color: var(--tx); border: 1px solid var(--bd); border-radius: 8px; padding: 8px 10px; }
+[hidden] { display: none !important; }
+
+/* ---------- menu ---------- */
+#menu { position: fixed; inset: 0; display: grid; place-items: center; z-index: 10; background: radial-gradient(ellipse at 50% 120%, #0a3a46 0%, #04121a 55%, #02080c 100%); }
+.menu-box { width: min(620px, 94vw); padding: 28px 30px; background: var(--bg); border: 1px solid var(--bd); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.2rem); letter-spacing: .06em; color: var(--amb); text-shadow: 0 3px 0 #5a3108, 0 0 30px rgba(240,162,58,.35); }
+h1 span { color: var(--azul); font-size: .55em; vertical-align: middle; }
+.sub { opacity: .85; margin: 6px 0 18px; }
+.linha { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
+.linha label { display: grid; gap: 4px; font-size: .85rem; opacity: .9; }
+.cores { display: flex; gap: 8px; }
+.cores button { width: 34px; height: 34px; border-radius: 50%; padding: 0; border: 3px solid transparent; }
+.cores button.sel { border-color: #fff; }
+.botoes { display: grid; gap: 10px; margin: 18px 0 10px; }
+.entrar { display: flex; gap: 8px; } .entrar input { flex: 1; text-transform: uppercase; letter-spacing: .25em; font-weight: 700; }
+.status { font-size: .85rem; opacity: .85; min-height: 1.2em; }
+.status.ok { color: var(--ok); } .status.ruim { color: #ffb48a; }
+.ajuda { font-size: .85rem; opacity: .9; margin-top: 8px; } .ajuda .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; line-height: 1.5; }
+.rodape { font-size: .75rem; opacity: .55; margin: 14px 0 0; }
+#carregando { position: fixed; inset: 0; display: grid; place-items: center; align-content: center; gap: 12px; z-index: 11; background: #03090c; }
+.spin { width: 48px; height: 48px; border: 4px solid #234; border-top-color: var(--amb); border-radius: 50%; animation: gira 1s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+.painel-mini { position: absolute; background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 8px 12px; font-size: .88rem; line-height: 1.45; }
+#topoEsq { top: 10px; left: 10px; min-width: 210px; }
+#topoEsq .din { font-size: 1.25rem; font-weight: 800; color: var(--amb2); }
+#topoEsq .comps { display: flex; flex-wrap: wrap; gap: 4px 10px; opacity: .9; font-size: .8rem; }
+#topoDir { top: 10px; right: 10px; text-align: right; }
+#contrato { top: 120px; left: 10px; max-width: 260px; font-size: .8rem; }
+#avisos { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; }
+.aviso { background: var(--bg); border: 1px solid var(--bd); padding: 8px 16px; border-radius: 10px; animation: entra .25s ease-out; font-weight: 600; max-width: 80vw; text-align: center; }
+.aviso.ok { border-color: rgba(111,209,141,.5); } .aviso.ruim { border-color: rgba(255,107,91,.6); color: #ffd2c8; } .aviso.info { border-color: rgba(108,198,232,.5); }
+@keyframes entra { from { opacity: 0; transform: translateY(-8px); } }
+#prompt { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--bd); padding: 8px 16px; border-radius: 10px; font-weight: 600; }
+#prompt kbd, .k { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin-right: 6px; border-radius: 5px; background: var(--amb); color: #1b1206; font-weight: 800; text-align: center; }
+#mira { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; opacity: .55; }
+#subHud { position: absolute; bottom: 10px; left: 10px; display: grid; grid-template-columns: repeat(3, 150px); gap: 8px; background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 10px; }
+#subHud .g span { display: block; font-size: .72rem; opacity: .75; text-transform: uppercase; letter-spacing: .05em; }
+#subHud .g b { font-size: 1.05rem; }
+.barra { position: relative; height: 7px; background: #0b1418; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+.barra i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); width: 50%; transition: width .2s; }
+.barra em { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ruim); }
+.barra.larga { width: 320px; height: 14px; }
+#subHud small { font-size: .7rem; opacity: .75; }
+#sonar { position: absolute; bottom: 10px; right: 10px; border-radius: 50%; background: rgba(4, 20, 14, 0.85); border: 2px solid rgba(80, 220, 140, 0.45); }
+#pescaUi { position: absolute; bottom: 26%; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 10px 14px; display: grid; gap: 4px; justify-items: center; }
+#pescaUi .rot { font-size: .75rem; opacity: .8; }
+#maoUi { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 10px 14px; pointer-events: auto; display: grid; gap: 8px; justify-items: center; }
+#maoUi .bt { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+#maoUi button { padding: 6px 10px; font-size: .85rem; }
+#acertado { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; background: radial-gradient(circle, rgba(255,240,120,.18), rgba(0,0,0,0) 60%); }
+#acertado .t { font-size: clamp(1.6rem, 5vw, 3.4rem); font-weight: 900; color: #ffe066; text-shadow: 0 4px 0 #6b3b00, 0 0 18px #000; animation: treme .12s infinite alternate; text-align: center; padding: 0 12px; }
+#acertado .s { font-size: 1.2rem; font-weight: 700; margin-top: 10px; text-shadow: 0 2px 4px #000; }
+@keyframes treme { from { transform: rotate(-2deg) scale(1.02); } to { transform: rotate(2deg) scale(.98); } }
+#alertaTinta { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(60, 10, 70, .85); border: 1px solid #c58cff; padding: 8px 14px; border-radius: 10px; font-weight: 700; }
+
+/* ---------- painéis ---------- */
+#painel { position: fixed; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(0,0,0,.35); }
+.painel-box { width: min(880px, 96vw); max-height: 88vh; display: flex; flex-direction: column; background: rgba(14,22,26,.96); border: 1px solid var(--bd); border-radius: 14px; overflow: hidden; }
+.painel-box header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--bd); }
+.painel-box h2 { margin: 0; font-size: 1.2rem; color: var(--amb2); }
+#abas { display: flex; gap: 4px; padding: 8px 12px 0; flex-wrap: wrap; }
+#abas button { border-radius: 8px 8px 0 0; border-bottom: none; font-size: .9rem; }
+#abas button.sel { background: #33505d; }
+#painelCorpo { padding: 12px 16px 16px; overflow: auto; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--bd); border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,.03); display: grid; gap: 6px; align-content: start; }
+.card h3 { margin: 0; font-size: 1rem; }
+.card .nv { font-size: .78rem; opacity: .75; }
+.card .val { font-size: .85rem; } .card .val b { color: var(--ok); }
+.card .custo { font-size: .85rem; color: var(--amb2); }
+.card .falta { font-size: .78rem; color: #ffb48a; }
+.lista { display: grid; gap: 6px; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--bd); border-radius: 8px; padding: 6px 10px; }
+.item .acoes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
+.item .acoes button { padding: 4px 9px; font-size: .82rem; }
+.rar-comum { color: #ddd; } .rar-incomum { color: #8fe08f; } .rar-raro { color: #79c3ff; } .rar-lendário { color: #ffcf55; }
+.nota { font-size: .82rem; opacity: .8; }
+.convite { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.convite code { background: #0b1418; padding: 6px 10px; border-radius: 6px; font-size: 1.1rem; letter-spacing: .2em; color: var(--amb2); }
+.convite input { flex: 1; min-width: 220px; }
+.jog { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.slotTag { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; color: #111; }
+
+/* ---------- medidor de profundidade ---------- */
+#medidor { position: absolute; right: 14px; top: 120px; width: 112px; background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 8px; display: grid; gap: 6px; justify-items: center; }
+#medidor .tit { font-size: .7rem; letter-spacing: .06em; opacity: .8; }
+#medidor .escala { position: relative; width: 26px; height: 260px; border-radius: 6px; overflow: visible; background: #0b1418; }
+#medidor .zona { position: absolute; left: 0; right: 0; border-radius: 4px; }
+#medidor .zona.ok { background: linear-gradient(#3fb877, #1f6f48); } #medidor .zona.at { background: #e0a43a; } #medidor .zona.pe { background: linear-gradient(#d4503c, #5a1410); }
+#medidor .lim { position: absolute; left: -8px; right: -8px; height: 2px; background: #fff; }
+#medidor .ponteiro { position: absolute; left: -10px; right: -10px; height: 0; transition: top .15s; }
+#medidor .ponteiro::before { content: ''; position: absolute; left: -2px; top: -6px; border: 6px solid transparent; border-left-color: #fff; }
+#medidor .ponteiro span { position: absolute; left: 44px; top: -9px; font-weight: 800; font-size: .85rem; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+#medidor .estado { font-weight: 800; font-size: .8rem; text-align: center; }
+#legendaSub { position: absolute; bottom: 205px; left: 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: 470px; background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 6px 10px; font-size: .82rem; }
+#legendaSub kbd, #topoEsq kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; margin-right: 4px; border-radius: 4px; background: var(--amb); color: #1b1206; font-weight: 800; text-align: center; font-family: inherit; }
+
+/* ---------- roda de emotes (estilo roda de armas) ---------- */
+#rodaEmotes { position: fixed; left: 50%; top: 50%; width: 340px; height: 340px; margin: -170px 0 0 -170px; z-index: 6; pointer-events: none; }
+#rodaEmotes .anel { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(8,14,18,.35) 0 34%, rgba(8,14,18,.72) 35% 100%); border: 2px solid rgba(255,255,255,.18); box-shadow: 0 0 30px rgba(0,0,0,.45); }
+#rodaEmotes .fatia { position: absolute; width: 86px; height: 86px; margin: -43px 0 0 -43px; border-radius: 50%; display: grid; place-items: center; text-align: center; font-size: 2rem; line-height: 1; background: rgba(255,255,255,.06); border: 2px solid transparent; transition: transform .12s, background .12s, border-color .12s; }
+#rodaEmotes .fatia small { display: block; font-size: .7rem; font-weight: 700; margin-top: 4px; color: #e6edf0; }
+#rodaEmotes .fatia.sel { background: rgba(240,162,58,.85); border-color: #ffd38a; transform: scale(1.14); }
+#rodaEmotes .fatia.sel small { color: #1b1206; }
+#rodaEmotes .centro { position: absolute; left: 50%; top: 50%; width: 120px; margin-left: -60px; transform: translateY(-50%); text-align: center; }
+#rodaEmotes .centro b { display: block; font-size: 1.05rem; }
+#rodaEmotes .centro small { display: block; font-size: .62rem; opacity: .75; margin-top: 4px; }
+#rodaEmotes .seta { position: absolute; left: 50%; top: 50%; width: 4px; height: 70px; margin-left: -2px; background: linear-gradient(#ffd38a, transparent); transform-origin: 50% 0; border-radius: 2px; }
+
+/* ---------- toque ---------- */
+#toque { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+#stick { position: absolute; left: 26px; bottom: 26px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.2); pointer-events: auto; }
+#stick-k { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(240,162,58,.6); }
+#toque .tb { position: absolute; right: 14px; bottom: 240px; display: grid; grid-template-columns: repeat(3, 54px); gap: 8px; pointer-events: auto; }
+#toque .tb button { height: 54px; border-radius: 50%; font-size: 1.2rem; background: rgba(30,45,52,.75); }
+@media (max-width: 760px) { #subHud { grid-template-columns: repeat(2, 130px); } #sonar { width: 150px; height: 150px; } #topoEsq { min-width: 0; font-size: .78rem; } }
+
+#topoEsq b.mult { color: #ffd35a; }
+/* luneta da sniper */
+#luneta { position: fixed; inset: 0; pointer-events: none; z-index: 3; background: radial-gradient(circle at 50% 50%, transparent 0 31vh, rgba(0,0,0,.96) 31.5vh); }
+#luneta::before, #luneta::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(0,0,0,.85); }
+#luneta::before { width: 62vh; height: 1px; transform: translate(-50%, -50%); }
+#luneta::after { width: 1px; height: 62vh; transform: translate(-50%, -50%); }
+#hudArma { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 5px 12px; font-size: .9rem; z-index: 4; }
+#hudArma b { color: #ffb36a; }
+#miraArma { position: fixed; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; z-index: 4; }
+#miraArma::before, #miraArma::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+#miraArma::before { left: 10px; top: 0; width: 2px; height: 22px; }
+#miraArma::after { top: 10px; left: 0; height: 2px; width: 22px; }
+#zerou { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; z-index: 7; pointer-events: none; padding: 18px 30px; border-radius: 16px; background: linear-gradient(180deg, rgba(60,42,8,.92), rgba(30,20,4,.92)); border: 2px solid #ffd35a; box-shadow: 0 0 40px rgba(255,200,60,.45); }
+#zerou .t { font-size: 2rem; font-weight: 900; color: #ffd35a; letter-spacing: .02em; }
+#zerou .s { margin-top: 6px; font-size: 1rem; color: #fff3d0; }
+
+#topoEsq .missoes { margin-top: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 5px; }
+#topoEsq .missao { font-size: .8rem; line-height: 1.45; }
+#topoEsq .missao b { color: #9fe3c8; }
+#topoEsq .missao .premio { color: #ffd35a; font-weight: 700; margin-left: 4px; }
+
+/* ---------- lista de salas ---------- */
+#salasBox { margin-top: 12px; text-align: left; }
+#salasBox h3 { margin: 0 0 4px; }
+.salaItem { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+.salaItem .tit { font-weight: 800; font-size: 1.05rem; }
+.salaItem .tit code { font-size: .95rem; background: rgba(0,0,0,.35); padding: 2px 7px; border-radius: 6px; margin-left: 6px; letter-spacing: .08em; }
+.salaItem .info { font-size: .8rem; opacity: .8; }
+.salaItem .barra { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+.salaItem .barra i { display: block; height: 100%; background: linear-gradient(90deg, #4fd1a5, #ffd35a); }
+.salaItem .acoes { display: flex; gap: 6px; }
+button.fraco { background: transparent; border: 1px solid rgba(255,255,255,.25); }
+
+/* marca LDC Studio no menu inicial */
+.ldc-marca{display:flex;flex-direction:column;align-items:center;gap:8px;margin:0 auto 14px}
+.ldc-marca img{width:96px;height:96px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #000,0 0 22px rgba(255,40,25,.55);animation:ldcBrilho 3.2s ease-in-out infinite}
+.ldc-marca span{font:800 12px/1 system-ui,sans-serif;letter-spacing:.45em;color:#9fb0c4;padding-left:.45em}
+.ldc-marca span b{color:#ff2a1c}
+@keyframes ldcBrilho{0%,100%{box-shadow:0 0 0 2px #000,0 0 16px rgba(255,40,25,.45)}50%{box-shadow:0 0 0 2px #000,0 0 30px rgba(255,40,25,.8)}}
+@media (max-height:640px){.ldc-marca img{width:64px;height:64px}.ldc-marca{margin-bottom:8px}}

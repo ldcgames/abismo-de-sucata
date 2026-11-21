@@ -1,0 +1,39 @@
+# Publica o CLIENTE no GitHub Pages (opcional).
+# O GitHub Pages só hospeda arquivos estáticos: o modo solo funciona direto,
+# mas o multiplayer precisa do servidor rodando em outro lugar (Render, Fly, VPS…).
+# Depois de subir o servidor, defina a variável do repositório ABISMO_SERVIDOR
+# (Settings > Secrets and variables > Actions > Variables), ex.: https://abismo-de-sucata.onrender.com
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Monta o site (client + shared)
+        run: |
+          mkdir -p _site
+          cp -r client/* _site/
+          cp -r shared _site/shared
+          if [ -n "${{ vars.ABISMO_SERVIDOR }}" ]; then
+            echo "window.ABISMO_SERVIDOR = '${{ vars.ABISMO_SERVIDOR }}';" > _site/config.js
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

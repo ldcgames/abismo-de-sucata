@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ABISMO DE SUCATA</title>
+<meta name="description" content="Jogo 3D cooperativo de 1 a 5 amigos: recupere sucata, pesque e desça até o fundo de um lago abissal.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23123'/><ellipse cx='32' cy='36' rx='20' ry='9' fill='%23e8952b'/><circle cx='44' cy='35' r='5' fill='%239cd'/></svg>">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="tinta" hidden></canvas>
+<div id="vinheta"></div>
+
+<!-- ======================= MENU INICIAL ======================= -->
+<section id="menu">
+  <div class="menu-box">
+    <div class="ldc-marca"><img src="ldc-logo.jpg" alt="LDC Studio" width="96" height="96"><span><b>LDC</b> STUDIO APRESENTA</span></div>
+    <h1>ABISMO <span>DE</span> SUCATA</h1>
+    <p class="sub">Recupere sucata, pesque, melhore seu submarino e desça até o fundo do lago — sozinho ou com até 4 amigos.</p>
+    <div class="linha">
+      <label>Seu nome <input id="nome" maxlength="18" placeholder="Explorador"></label>
+      <div class="cores" id="cores" aria-label="Cor do jogador"></div>
+    </div>
+    <div class="botoes">
+      <button id="btSolo" class="grande">▶ Jogar sozinho</button>
+      <button id="btSalas" class="grande">👥 Jogar com amigos — minhas salas</button>
+    </div>
+    <div id="salasBox" hidden>
+      <h3>Minhas salas</h3>
+      <p class="nota">Cada sala é um jogo salvo separado. O código nunca muda: o líder entra e os amigos digitam o mesmo código para continuar de onde pararam.</p>
+      <div id="salasLista"><p class="nota">Carregando…</p></div>
+      <div class="botoes">
+        <button id="btCriar">＋ Criar nova sala</button>
+        <div class="entrar">
+          <input id="codigo" maxlength="8" placeholder="CÓDIGO" autocomplete="off">
+          <button id="btEntrar">Entrar com código</button>
+        </div>
+        <button id="btVoltar" class="fraco">← Voltar</button>
+      </div>
+    </div>
+    <p id="srvStatus" class="status">Verificando servidor…</p>
+    <details class="ajuda">
+      <summary>Controles</summary>
+      <div class="cols">
+        <div><b>A pé</b><br>WASD andar · Shift correr · Espaço pular<br>Mouse olhar · E interagir · F vara (perto da água)<br>Clique: lançar/puxar · G pegar para arremessar · X soltar<br>Z mochila · I inventário · Tab sala/convite · M mapa</div>
+        <div><b>Submarino</b><br>W/S avançar/ré · A/D virar<br>Q subir · C afundar<br>L faróis · R sonar · E garra/guindaste<br>B bolsa de tinta · V câmera perto/longe · Q sair (no berço)</div>
+        <div><b>Armas e estátua</b><br>1–5 equipar arma · H guardar · clique atira · botão direito: luneta da sniper<br>E na margem: catar lixo · E na estátua: colocar peças</div>
+      </div>
+    </details>
+    <p class="rodape">Feito com WebGL2 próprio, sem assets externos. Salvamento: solo no navegador; online no servidor.</p>
+  </div>
+</section>
+<section id="carregando" hidden><div class="spin"></div><p id="carregandoTxt">Carregando…</p></section>
+
+<!-- ======================= HUD ======================= -->
+<section id="hud" hidden>
+  <div id="topoEsq" class="painel-mini"></div>
+  <div id="topoDir" class="painel-mini"></div>
+  <div id="contrato" class="painel-mini" hidden></div>
+  <div id="avisos"></div>
+  <div id="prompt" hidden></div>
+  <div id="mira">+</div>
+  <div id="subHud" hidden>
+    <div class="g"><span>Profundidade</span><b id="hProf">0 m</b><div class="barra"><i id="bProf"></i><em id="mLim"></em></div><small id="hLim"></small></div>
+    <div class="g"><span>Bateria</span><b id="hBat"></b><div class="barra"><i id="bBat"></i></div></div>
+    <div class="g"><span>Oxigênio</span><b id="hOx"></b><div class="barra"><i id="bOx"></i></div></div>
+    <div class="g"><span>Casco</span><b id="hEst"></b><div class="barra"><i id="bEst"></i></div></div>
+    <div class="g"><span>Carga</span><b id="hCarga"></b></div>
+    <div class="g"><span>Velocidade</span><b id="hVel"></b></div>
+  </div>
+  <canvas id="sonar" width="220" height="220" hidden></canvas>
+  <div id="medidor" hidden><div class="tit">PROFUNDIDADE</div><div class="escala"><div class="zona ok"></div><div class="zona at"></div><div class="zona pe"></div><div class="lim"></div><div class="ponteiro"><span></span></div></div><div class="estado"></div></div>
+  <div id="luneta" hidden></div>
+  <div id="miraArma" hidden></div>
+  <div id="hudArma" hidden></div>
+  <div id="zerou" hidden><div class="t">ESTÁTUA COMPLETA!</div><div class="s">Você zerou o ABISMO DE SUCATA — multiplicador de dinheiro ×10.<br>Continue jogando o quanto quiser.</div></div>
+  <div id="rodaEmotes" hidden><div class="anel"></div><div class="centro"><b></b><small>mova o mouse ou role · clique para fazer</small></div></div>
+  <div id="legendaSub" hidden><span><kbd>L</kbd>faróis</span><span><kbd>V</kbd>câmera</span><span><kbd>C</kbd>afundar</span><span><kbd>Q</kbd>subir</span><span><kbd>R</kbd>sonar</span><span><kbd>B</kbd>bolsa</span><span><kbd>E</kbd>garra</span></div>
+  <div id="pescaUi" hidden><div class="rot">Tensão da linha</div><div class="barra larga"><i id="bTensao"></i></div><div class="rot">Distância do peixe</div><div class="barra larga"><i id="bDist"></i></div><small>Segure clique/Espaço para recolher · solte para aliviar</small></div>
+  <div id="maoUi" hidden></div>
+  <div id="acertado" hidden><div class="t">VOCÊ FOI ACERTADO POR UM PEIXE!</div><div class="s" id="acertadoSub"></div></div>
+  <div id="alertaTinta" hidden>VIDRO COBERTO DE TINTA DE LULA — suba até a superfície para lavar</div>
+</section>
+
+<!-- ======================= PAINÉIS ======================= -->
+<section id="painel" hidden>
+  <div class="painel-box">
+    <header><h2 id="painelTitulo"></h2><button id="painelFechar" title="Fechar (Esc)">✕</button></header>
+    <nav id="abas"></nav>
+    <div id="painelCorpo"></div>
+  </div>
+</section>
+
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

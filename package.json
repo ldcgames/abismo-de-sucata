@@ -1,0 +1,16 @@
+{
+  "name": "abismo-de-sucata",
+  "version": "0.1.0",
+  "description": "Jogo 3D cooperativo (1-4 jogadores) de exploração e recuperação de sucata num lago abissal. WebGL2 + servidor WebSocket autoritativo.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test tests/rules.test.mjs tests/server.test.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
