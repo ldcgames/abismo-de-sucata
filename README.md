@@ -32,10 +32,10 @@ O link só funciona se o servidor estiver acessível pela internet. Escolha uma 
 
 ### Opção A — Render (recomendado, um clique)
 1. Suba este repositório para o seu GitHub (seção 3).
-2. Em [render.com](https://render.com): **New → Blueprint** → escolha o repositório. O arquivo `render.yaml` já configura tudo (servidor + disco de 1 GB para os perfis).
+2. Em [render.com](https://render.com): **New → Blueprint** → escolha o repositório. O arquivo `render.yaml` já configura tudo no **plano grátis** (sem cartão).
 3. Quando terminar, abra `https://SEU-APP.onrender.com`, clique em **Jogar com amigos → Criar nova sala** e mande o código (ou o link de convite) para os amigos.
 
-> O plano gratuito do Render não tem disco persistente: os perfis seriam apagados a cada novo deploy ou reinício. Por isso o `render.yaml` usa o plano `starter`. Se quiser testar de graça, troque para `free` sabendo disso.
+> No plano grátis o servidor dorme depois de 15 min sem jogadores (a primeira entrada demora ~1 min) e as salas se apagam quando ele reinicia. Para salvar para sempre, troque `plan: free` por `starter` no `render.yaml` e ative o bloco `disk` (pago).
 
 ### Opção B — Túnel temporário a partir do seu PC (rápido para uma noite de jogo)
 ```bash

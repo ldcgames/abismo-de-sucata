@@ -1,19 +1,21 @@
-# Deploy com 1 clique no Render (https://render.com) — "New > Blueprint" apontando para este repositório.
-# Sobe o servidor Node (jogo + WebSocket) com disco persistente para os perfis.
+# Deploy no Render (https://render.com) — "New > Blueprint" apontando para este repositório.
+# Plano GRATUITO: sobe o servidor Node (jogo + multiplayer) sem cartão.
+# Atenção no plano grátis: o servidor dorme após 15 min sem jogadores (a 1ª entrada demora ~1 min)
+# e as salas salvas se apagam quando ele reinicia ou recebe um novo deploy.
+# Para salvar as salas para sempre: troque plan para "starter" e descomente o bloco "disk".
 services:
   - type: web
     name: abismo-de-sucata
     runtime: node
-    plan: starter          # o plano gratuito não tem disco persistente (perfis seriam apagados a cada deploy)
+    plan: free
     buildCommand: npm install --omit=dev
     startCommand: npm start
     healthCheckPath: /saude
     envVars:
-      - key: DATA_DIR
-        value: /var/data
       - key: NODE_VERSION
         value: "20"
-    disk:
-      name: perfis
-      mountPath: /var/data
-      sizeGB: 1
+    # disk:
+    #   name: perfis
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # (com o disco, adicione também a variável DATA_DIR=/var/data)
