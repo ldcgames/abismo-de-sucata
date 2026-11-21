@@ -1,6 +1,7 @@
 // ABISMO DE SUCATA — servidor autoritativo (HTTP estático + WebSocket).
 //   npm install && npm start      → http://localhost:8080
-// Variáveis: PORT (padrão 8080), DATA_DIR (padrão ./data), ORIGENS (lista separada por vírgula, opcional)
+// Variáveis: PORT (padrão 8080), DATA_DIR (padrão ./data), ORIGENS (lista separada por vírgula, opcional),
+//   SEGREDO (opcional; assina as cópias das salas guardadas nos aparelhos dos jogadores — o render.yaml gera um)
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,8 +9,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Room } from '../shared/room.js';
-import { Store } from './store.js';
-import { progresso } from '../shared/rules.js';
+import { Store, assinar, copiaValida } from './store.js';
+import { progresso, migrateProfile } from '../shared/rules.js';
 import { CORES_JOGADOR } from '../shared/data.js';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,7 @@ const PORT = +process.env.PORT || 8080;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const ORIGENS = (process.env.ORIGENS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const PROTO = 1;
+const SEGREDO = process.env.SEGREDO || '';
 
 const store = new Store(DATA_DIR);
 const rooms = new Map(); // salas abertas agora: code -> { room, clients:Set, vaziaDesde, meta }
@@ -94,9 +96,53 @@ async function entrar(ws, meta, pref) {
   meta.membros[conta.id] = { nome: conta.nome, slot: r.slot, cor: conta.cor, visto: Date.now() };
   if (!conta.salas.includes(meta.code)) { conta.salas.push(meta.code); store.salvarConta(conta.id); }
   await salvar(ws);
+  agendarCopia(entry, 300);
   send(ws, { t: 'sala', code: meta.code, nome: meta.nome, slot: r.slot, reconectou: !!r.reconectou, mundo: entry.room.worldSnapshot(), snap: entry.room.snapshot(), perfil: profile, host: meta.dono === conta.id });
   broadcast(entry, { t: 'ev', ev: [{ t: 'entrou', slot: r.slot, nome: conta.nome }] }, ws);
   console.log(`[sala ${meta.code}] ${conta.nome} entrou na ${r.slot} (${entry.room.players.size}/5)`);
+}
+
+// ---------- cópia da sala nos aparelhos (para o servidor sem disco que esquece tudo ao dormir) ----------
+async function copiaDaSala(code) {
+  const meta = await store.carregarSala(code); if (!meta) return null;
+  const perfis = {}, contas = {};
+  for (const id of Object.keys(meta.membros)) {
+    const p = await store.espiarPerfil(code, id); if (p) perfis[id] = p;
+    const r = await store.contaRec(id); if (r) contas[id] = { tokenHash: r.tokenHash, nome: r.conta.nome, cor: r.conta.cor };
+  }
+  const dados = { v: 1, code, ts: Date.now(), meta: { ...meta, tempoJogo: rooms.get(code)?.room.worldTime(Date.now()) ?? meta.tempoJogo }, perfis, contas };
+  return { dados, sig: assinar(dados, SEGREDO) };
+}
+async function enviarCopia(entry) {
+  if (!entry.clients.size) return;
+  const copia = await copiaDaSala(entry.room.code); if (!copia) return;
+  broadcast(entry, { t: 'copia', copia });
+}
+function agendarCopia(entry, ms = 2000) {
+  if (entry.copiaTimer) return;
+  entry.copiaTimer = setTimeout(() => { entry.copiaTimer = null; enviarCopia(entry).catch((e) => console.error('[copia]', e.message)); }, ms);
+}
+// recria a sala a partir da cópia de um jogador (só se o servidor não a conhece, ou se a que ele tem também veio de uma cópia mais velha e ninguém jogou ainda)
+async function restaurarSala(ws, copia) {
+  const erro = copiaValida(copia, SEGREDO); if (erro) return { ok: false, msg: erro };
+  const d = copia.dados, code = d.code;
+  if (!d.meta.membros?.[ws.conta.id]) return { ok: false, msg: 'Você não faz parte dessa sala' };
+  if (await store.salaExiste(code)) {
+    const atual = await store.carregarSala(code);
+    if (!(atual?.restaurada && !rooms.has(code) && d.ts > atual.restaurada)) return { ok: true, code, ja: true };
+  }
+  const meta = { ...d.meta, code, restaurada: d.ts };
+  store.salas.set(code, meta); await store.salvarSala(code);
+  for (const [id, p] of Object.entries(d.perfis)) { store.perfis.set(code + '/' + id, migrateProfile(p)); await store.salvarPerfil(code, id); }
+  for (const id of Object.keys(meta.membros)) {
+    const c = d.contas[id];
+    const rec = await store.contaRec(id);
+    if (rec) { if (!rec.conta.salas.includes(code)) { rec.conta.salas.push(code); await store.salvarConta(id); } }
+    else if (c && typeof c.tokenHash === 'string' && /^[0-9a-f]{64}$/.test(c.tokenHash)) await store.recriarConta(id, c.tokenHash, String(c.nome || '').slice(0, 18), Number.isInteger(c.cor) ? c.cor : 0, [code]);
+  }
+  if (!ws.conta.salas.includes(code)) { ws.conta.salas.push(code); await store.salvarConta(ws.conta.id); }
+  console.log(`[sala ${code}] restaurada pela cópia de ${ws.conta.nome}`);
+  return { ok: true, code };
 }
 
 function sairDaSala(ws, definitivo) {
@@ -112,7 +158,7 @@ function sairDaSala(ws, definitivo) {
 }
 
 // ------------------------------------------------------------ WebSocket
-const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 });
 wss.on('connection', (ws, req) => {
   if (ORIGENS.length && !ORIGENS.includes(req.headers.origin)) { ws.close(1008, 'origem'); return; }
   ws.ok = false; ws.balde = 60; ws.ultimoBalde = Date.now(); ws.vivo = true;
@@ -124,7 +170,9 @@ wss.on('connection', (ws, req) => {
     if (ws.balde < 1) return; ws.balde -= 1;
     let m; try { m = JSON.parse(buf); } catch { return; }
     if (!m || typeof m.t !== 'string') return;
-    try { await handle(ws, m); } catch (e) { console.error('[ws] erro', e); send(ws, { t: 'erro', msg: 'Erro interno no servidor' }); }
+    if (m.t !== 'restaurar_sala' && buf.length > 64 * 1024) return; // só a cópia da sala pode ser grande
+    // uma mensagem por vez, na ordem em que chegaram (a restauração termina antes do "entrar na sala")
+    ws.fila = (ws.fila || Promise.resolve()).then(() => handle(ws, m)).catch((e) => { console.error('[ws] erro', e); send(ws, { t: 'erro', msg: 'Erro interno no servidor' }); });
   });
   ws.on('close', () => { if (ws.entry) sairDaSala(ws, false); });
 });
@@ -136,6 +184,8 @@ async function handle(ws, m) {
     if (typeof id === 'string' && typeof token === 'string') { try { conta = await store.carregarConta(id, token); } catch { conta = null; } }
     const nome = typeof m.nome === 'string' && m.nome.trim() ? m.nome.trim().slice(0, 18) : null;
     const cor = Number.isInteger(m.cor) && m.cor >= 0 && m.cor < CORES_JOGADOR.length ? m.cor : null;
+    // servidor acordou sem os arquivos (plano grátis): a conta volta com o mesmo id e o mesmo token
+    if (!conta && typeof id === 'string' && /^[a-z0-9]{16,40}$/.test(id) && typeof token === 'string' && token.length >= 16 && !(await store.existeConta(id))) conta = await store.recriarConta(id, Store.hash(token), nome, cor);
     if (!conta) { const c = await store.criarConta(nome, cor); conta = c.conta; id = c.id; token = c.token; }
     if (nome) conta.nome = nome;
     if (cor !== null) conta.cor = cor;
@@ -160,6 +210,11 @@ async function handle(ws, m) {
       if (!meta) return send(ws, { t: 'erro', msg: `Sala ${code} não existe. Confira o código.`, codigo: 'sem_sala' });
       return entrar(ws, meta, m.pref);
     }
+    case 'restaurar_sala': {
+      if (ws.entry) return send(ws, { t: 'restaurada', ok: false, msg: 'Você já está numa sala' });
+      const r = await restaurarSala(ws, m.copia);
+      return send(ws, { t: 'restaurada', ...r });
+    }
     case 'esquecer_sala': {
       // tira a sala da SUA lista (ela continua existindo para os amigos)
       const code = String(m.code || '').toUpperCase();
@@ -179,7 +234,7 @@ async function handle(ws, m) {
     case 'acao': {
       if (!ws.entry) return send(ws, { t: 'res', req: m.req, res: { ok: false, msg: 'Fora de uma sala' } });
       const { res, events, dirty } = ws.entry.room.action(ws.slot, m.a, Date.now());
-      if (dirty) await salvar(ws); // confirma só depois de gravado
+      if (dirty) { await salvar(ws); agendarCopia(ws.entry); } // confirma só depois de gravado
       const pub = { ...res }; delete pub.events;
       send(ws, { t: 'res', req: m.req, res: pub, perfil: ws.profile });
       if (events.length) {
@@ -206,6 +261,7 @@ async function handle(ws, m) {
     }
     case 'sair': {
       if (!ws.entry) return;
+      { const c = await copiaDaSala(ws.entry.room.code); if (c) send(ws, { t: 'copia', copia: c }); }
       sairDaSala(ws, true);
       return send(ws, { t: 'saiu_ok' });
     }
@@ -233,6 +289,7 @@ setInterval(() => {
 // heartbeat: derruba conexões mortas
 setInterval(() => {
   for (const ws of wss.clients) { if (!ws.vivo) { ws.terminate(); continue; } ws.vivo = false; ws.ping(); if (ws.entry) salvar(ws); } // salvamento automático
+  for (const entry of rooms.values()) if (entry.clients.size) agendarCopia(entry, 500); // cópia atualizada nos aparelhos
 }, 15000);
 
 // ao desligar o servidor (deploy/reinício), grava tudo antes de sair

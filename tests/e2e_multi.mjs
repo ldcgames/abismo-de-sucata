@@ -128,7 +128,21 @@ const dinA = await A.evaluate(() => 0);
 await A.click(`[data-entrar="${code}"]`);
 await pronto(A);
 check(await A.evaluate(() => __jogo.slot) === sa && await A.evaluate(() => __jogo.net.code) === code, 'líder volta para a mesma sala (mesmo código) e mesma estação');
-check(erros.length === 0, 'sem erros de JS nos dois navegadores', erros.slice(0, 4).join(' | '));
+// servidor grátis "dormindo": reinicia sem nenhum arquivo e os jogadores voltam sozinhos pela cópia guardada no aparelho
+// (só roda se E2E_REINICIAR tiver o comando que reinicia o servidor com uma pasta de dados vazia)
+if (process.env.E2E_REINICIAR) {
+  await sleep(2500); // dá tempo de chegar a cópia mais nova
+  const antes = await A.evaluate(() => ({ d: __jogo.perfil.dinheiro, deco: __jogo.perfil.estacao.decoracao, copia: Object.keys(localStorage).filter((k) => k.startsWith('abismo_copia_')).length }));
+  const { execSync } = await import('node:child_process');
+  execSync(process.env.E2E_REINICIAR, { stdio: 'ignore' });
+  await A.waitForFunction((c) => __jogo.net.ws?.readyState === 1 && __jogo.net.code === c && /Online/.test(__jogo.net.status), code, { timeout: 40000 }).catch(() => {});
+  await sleep(1500);
+  const depois = await A.evaluate(() => ({ d: __jogo.perfil.dinheiro, deco: __jogo.perfil.estacao.decoracao, code: __jogo.net.code, slot: __jogo.slot, st: __jogo.net.status }));
+  check(antes.copia >= 1 && depois.code === code && depois.slot === sa && depois.d === antes.d && depois.deco === antes.deco && /Online/.test(depois.st), 'servidor reiniciou sem arquivos: A volta sozinho para a mesma sala, estação e dinheiro (cópia do aparelho)', JSON.stringify({ antes, depois }));
+  await B2.waitForFunction((c) => __jogo.net.ws?.readyState === 1 && __jogo.net.code === c && /Online/.test(__jogo.net.status), code, { timeout: 40000 }).catch(() => {});
+  check(await B2.evaluate(() => __jogo.slot) === sb && await B2.evaluate(() => __jogo.perfil.dinheiro) === dinB, 'B também volta com a mesma estação e o mesmo dinheiro');
+}
+{ const reais = erros.filter((e) => !(process.env.E2E_REINICIAR && /ERR_CONNECTION_REFUSED/.test(e))); check(reais.length === 0, 'sem erros de JS nos dois navegadores', reais.slice(0, 4).join(' | ')); }
 console.log(`\nE2E multiplayer: ${ok} ok, ${falhas} falha(s)`);
 await browser.close();
 process.exit(falhas ? 1 : 0);

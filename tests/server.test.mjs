@@ -58,8 +58,8 @@ test('HTTP serve o cliente e a rota de saúde', async () => {
   assert.notEqual(trav.status, 200);
 });
 
-function subir() {
-  const pr = spawn(process.execPath, ['server/server.js'], { env: { ...process.env, PORT: String(PORT), DATA_DIR: DATA }, stdio: ['ignore', 'pipe', 'pipe'] });
+function subir(env = {}) {
+  const pr = spawn(process.execPath, ['server/server.js'], { env: { ...process.env, PORT: String(PORT), DATA_DIR: DATA, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   return new Promise((r) => pr.stdout.on('data', (d) => { if (String(d).includes('servidor em')) r(pr); }));
 }
 async function ola(c, extra) { c.send({ t: 'ola', v: 1, ...extra }); return c.wait((m) => m.t === 'bemvindo'); }
@@ -184,4 +184,52 @@ test('pesca + arremesso entre dois clientes reais: alvo recebe atordoamento de 3
   const corr = await b.wait((m) => m.t === 'ev' && m.ev.some((e) => e.t === 'corrigir'), 2000);
   assert.ok(corr);
   b.close(); a.close();
+});
+
+test('servidor grátis sem disco: acorda vazio e a sala volta pela cópia guardada no aparelho dos jogadores', { timeout: 40000 }, async () => {
+  const apagarTudo = () => { for (const f of fs.readdirSync(DATA)) fs.rmSync(path.join(DATA, f), { recursive: true, force: true }); };
+  proc.kill(); await new Promise((r) => setTimeout(r, 400)); apagarTudo();
+  proc = await subir({ SEGREDO: 'segredo-de-teste' });
+  const a = client(); await a.open(); const ida = await ola(a, { nome: 'Dono', cor: 1 });
+  a.send({ t: 'criar_sala' }); const s1 = await a.wait((m) => m.t === 'sala');
+  const b = client(); await b.open(); const idb = await ola(b, { nome: 'Parceiro', cor: 4 });
+  b.send({ t: 'entrar_sala', code: s1.code }); await b.wait((m) => m.t === 'sala');
+  a.send({ t: 'acao', req: 1, a: { tipo: 'comprar', cat: 'estacao', chave: 'decoracao', aid: 'deco-1' } });
+  const r1 = await a.wait((m) => m.t === 'res' && m.req === 1); assert.equal(r1.res.ok, true, r1.res.msg);
+  // o servidor manda a cópia sozinho para os aparelhos (depois da compra)
+  const cb = await b.wait((m) => m.t === 'copia' && m.copia.dados.perfis[ida.id]?.estacao.decoracao, 8000);
+  a.send({ t: 'sair' });
+  const ca = await a.wait((m) => m.t === 'copia' && m.copia.dados.perfis[ida.id]?.estacao.decoracao, 8000);
+  await a.wait((m) => m.t === 'saiu_ok'); a.close(); b.close();
+  assert.ok(ca.copia.sig, 'cópia assinada');
+  assert.ok(!JSON.stringify(ca.copia).includes(ida.token), 'a cópia não leva o token em texto');
+  // servidor "dorme": some tudo do disco
+  proc.kill(); await new Promise((r) => setTimeout(r, 400)); apagarTudo();
+  proc = await subir({ SEGREDO: 'segredo-de-teste' });
+  const a2 = client(); await a2.open();
+  const bv = await ola(a2, { id: ida.id, token: ida.token });
+  assert.equal(bv.id, ida.id, 'a conta volta com o mesmo id'); assert.deepEqual(bv.salas, []);
+  // cópia editada (mais dinheiro) é recusada
+  const falsa = JSON.parse(JSON.stringify(ca.copia)); falsa.dados.perfis[ida.id].dinheiro = 999999;
+  a2.send({ t: 'restaurar_sala', copia: falsa }); const rf = await a2.wait((m) => m.t === 'restaurada');
+  assert.equal(rf.ok, false); assert.match(rf.msg, /assinatura/);
+  // a cópia de verdade traz a sala de volta, com o mesmo código
+  a2.send({ t: 'restaurar_sala', copia: ca.copia }); const rv = await a2.wait((m) => m.t === 'restaurada');
+  assert.equal(rv.ok, true, rv.msg);
+  a2.send({ t: 'minhas_salas' }); const lista = await a2.wait((m) => m.t === 'salas');
+  assert.deepEqual(lista.salas.map((x) => x.code), [s1.code]);
+  a2.send({ t: 'entrar_sala', code: s1.code }); const v = await a2.wait((m) => m.t === 'sala');
+  assert.equal(v.slot, 'N'); assert.equal(v.perfil.estacao.decoracao, true); assert.equal(v.perfil.dinheiro, r1.perfil.dinheiro, 'mesmo dinheiro');
+  // a cópia mais velha do amigo não apaga a sala que já está aberta
+  const b2 = client(); await b2.open(); const bvb = await ola(b2, { id: idb.id, token: idb.token });
+  assert.equal(bvb.id, idb.id); assert.deepEqual(bvb.salas.map((x) => x.code), [s1.code], 'a sala já aparece na lista do amigo');
+  b2.send({ t: 'restaurar_sala', copia: cb.copia }); assert.equal((await b2.wait((m) => m.t === 'restaurada')).ja, true);
+  b2.send({ t: 'entrar_sala', code: s1.code }); assert.equal((await b2.wait((m) => m.t === 'sala')).slot, 'L');
+  // quem não é da sala não consegue restaurar, e token errado não entra na conta recriada
+  const x = client(); await x.open(); await ola(x, { nome: 'Estranho', cor: 6 });
+  const outra = JSON.parse(JSON.stringify(ca.copia)); outra.dados.code = 'QQQQQQ'; outra.dados.meta.code = 'QQQQQQ';
+  x.send({ t: 'restaurar_sala', copia: outra }); assert.equal((await x.wait((m) => m.t === 'restaurada')).ok, false);
+  const intruso = client(); await intruso.open(); const bi = await ola(intruso, { id: idb.id, token: 'token-errado-123456' });
+  assert.notEqual(bi.id, idb.id);
+  [a2, b2, x, intruso].forEach((c) => c.close());
 });

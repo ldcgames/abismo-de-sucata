@@ -95,6 +95,39 @@ export async function servidorDisponivel() {
   } catch { return false; }
 }
 
+// ---------- cópia das salas neste aparelho ----------
+// O servidor grátis esquece tudo quando dorme. Cada jogador guarda aqui a última cópia de cada sala
+// (o servidor manda sozinho, a cada poucos segundos) e devolve ao servidor quando ele não conhece mais a sala.
+const prefCopia = (url) => 'abismo_copia_' + url + '_';
+export function guardarCopia(url, copia) {
+  try {
+    const code = copia?.dados?.code; if (!code) return;
+    const k = prefCopia(url) + code;
+    const velha = JSON.parse(localStorage.getItem(k) || 'null');
+    if (velha?.dados?.ts > copia.dados.ts) return;
+    localStorage.setItem(k, JSON.stringify(copia));
+  } catch { /* sem espaço: segue sem cópia */ }
+}
+export function copiasLocais(url) {
+  const out = [];
+  try {
+    const p = prefCopia(url);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(p)) { try { const c = JSON.parse(localStorage.getItem(k)); if (c?.dados?.code) out.push(c); } catch { /* */ } }
+    }
+  } catch { /* */ }
+  return out;
+}
+export function apagarCopia(url, code) { try { localStorage.removeItem(prefCopia(url) + code); } catch { /* */ } }
+// manda de volta as salas que o servidor não lista mais; devolve quantas mandou
+function restaurarFaltando(ws, url, salas) {
+  const tem = new Set((salas || []).map((s) => s.code));
+  let n = 0;
+  for (const c of copiasLocais(url)) if (!tem.has(c.dados.code)) { ws.send(JSON.stringify({ t: 'restaurar_sala', copia: c })); n++; }
+  return n;
+}
+
 export class OnlineNet extends Emitter {
   constructor({ nome, cor, pref, code, criar }) {
     super();
@@ -137,6 +170,7 @@ export class OnlineNet extends Emitter {
     switch (m.t) {
       case 'bemvindo':
         localStorage.setItem(this.credKey, JSON.stringify({ id: m.id, token: m.token }));
+        if (this.ws?.readyState === 1) restaurarFaltando(this.ws, this.url, m.salas); // o servidor processa em ordem: restaura antes de entrar
         if (this.slot && this.code) this.enviar(({ t: 'entrar_sala', code: this.code, pref: this.slot }));
         else if (this.criar && !this.code) this.enviar(({ t: 'criar_sala' }));
         else this.enviar(({ t: 'entrar_sala', code: this.code, pref: this.pref }));
@@ -156,6 +190,7 @@ export class OnlineNet extends Emitter {
         if (this.primeiro) { const p = this.primeiro; this.primeiro = null; this.fechado = true; this.ws.close(); p.reject(new Error(m.msg)); }
         else this.emit('erro', m.msg);
         break;
+      case 'copia': guardarCopia(this.url, m.copia); break;
       case 'snap': this.emit('snap', m.snap, m.proj || []); break;
       case 'ev': this.emit('ev', m.ev); break;
       case 'perfil': this.perfil = m.perfil; this.emit('perfil', m.perfil); break;
@@ -195,7 +230,9 @@ export function listarSalas({ nome, cor, esquecer } = {}) {
       const m = JSON.parse(e.data);
       if (m.t === 'bemvindo') {
         localStorage.setItem(credKey, JSON.stringify({ id: m.id, token: m.token }));
-        if (esquecer) { ws.send(JSON.stringify({ t: 'esquecer_sala', code: esquecer })); return; }
+        if (esquecer) { apagarCopia(url, esquecer); ws.send(JSON.stringify({ t: 'esquecer_sala', code: esquecer })); return; }
+        // o servidor acordou sem alguma sala: devolve a cópia deste aparelho e pede a lista de novo
+        if (restaurarFaltando(ws, url, m.salas)) { ws.send(JSON.stringify({ t: 'minhas_salas' })); return; }
         clearTimeout(t); ws.close(); resolve(m.salas || []);
       } else if (m.t === 'salas') { clearTimeout(t); ws.close(); resolve(m.salas); }
       else if (m.t === 'erro') { clearTimeout(t); ws.close(); reject(new Error(m.msg)); }

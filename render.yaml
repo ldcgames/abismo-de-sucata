@@ -1,7 +1,8 @@
 # Deploy no Render (https://render.com) — "New > Blueprint" apontando para este repositório.
 # Plano GRATUITO: sobe o servidor Node (jogo + multiplayer) sem cartão.
 # Atenção no plano grátis: o servidor dorme após 15 min sem jogadores (a 1ª entrada demora ~1 min)
-# e as salas salvas se apagam quando ele reinicia ou recebe um novo deploy.
+# e os arquivos se apagam quando ele reinicia. As salas NÃO se perdem: cada jogador guarda uma cópia
+# assinada da sala no navegador, e o jogo devolve essa cópia quando o servidor acorda vazio.
 # Para salvar as salas para sempre: troque plan para "starter" e descomente o bloco "disk".
 services:
   - type: web
@@ -14,6 +15,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: SEGREDO           # assina as cópias das salas guardadas nos aparelhos (o Render gera sozinho)
+        generateValue: true
     # disk:
     #   name: perfis
     #   mountPath: /var/data

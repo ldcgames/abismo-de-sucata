@@ -35,7 +35,7 @@ O link só funciona se o servidor estiver acessível pela internet. Escolha uma 
 2. Em [render.com](https://render.com): **New → Blueprint** → escolha o repositório. O arquivo `render.yaml` já configura tudo no **plano grátis** (sem cartão).
 3. Quando terminar, abra `https://SEU-APP.onrender.com`, clique em **Jogar com amigos → Criar nova sala** e mande o código (ou o link de convite) para os amigos.
 
-> No plano grátis o servidor dorme depois de 15 min sem jogadores (a primeira entrada demora ~1 min) e as salas se apagam quando ele reinicia. Para salvar para sempre, troque `plan: free` por `starter` no `render.yaml` e ative o bloco `disk` (pago).
+> No plano grátis o servidor dorme depois de 15 min sem jogadores (a primeira entrada demora ~1 min) e apaga os arquivos ao reiniciar. **As salas não se perdem:** o servidor manda a cada jogador uma cópia assinada da sala (a cada poucos segundos), o navegador guarda e, quando o servidor acorda vazio, o jogo devolve a cópia sozinho — mesmo código, mesma estação, mesmo dinheiro. Só se perde se todos daquela sala apagarem os dados do navegador ou trocarem de aparelho. Para salvar no servidor para sempre, use o plano `starter` com o bloco `disk` (pago).
 
 ### Opção B — Túnel temporário a partir do seu PC (rápido para uma noite de jogo)
 ```bash

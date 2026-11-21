@@ -69,6 +69,19 @@ export class Store {
     if (rec.tokenHash !== Store.hash(token)) return null;
     return rec.conta;
   }
+  // a conta existe (na memória ou em disco)?
+  async existeConta(id) {
+    if (this.contas.has(id)) return true;
+    try { await fs.access(this.fConta(id)); return true; } catch { try { await fs.access(this.fConta(id) + '.bak'); return true; } catch { return false; } }
+  }
+  // recria uma conta com o MESMO id e o mesmo hash de token (servidor reiniciou sem disco e o jogador tinha a credencial)
+  async recriarConta(id, tokenHash, nome, cor, salas = []) {
+    const conta = { id, nome: nome || 'Explorador', cor: cor || 0, salas: [...salas], criadaEm: Date.now(), recriada: true };
+    this.contas.set(id, { tokenHash, conta });
+    await this.salvarConta(id);
+    return conta;
+  }
+  async contaRec(id) { if (!(await this.existeConta(id))) return null; if (!this.contas.has(id)) await this.carregarConta(id, ''); return this.contas.get(id) || null; }
   salvarConta(id) { return this.gravar(this.fConta(id), () => { const r = this.contas.get(id); return r && { tokenHash: r.tokenHash, conta: r.conta }; }); }
 
   // ---------- salas ----------
@@ -93,6 +106,10 @@ export class Store {
     if (meta) this.salas.set(code, meta);
     return meta;
   }
+  async salaExiste(code) {
+    if (this.salas.has(code)) return true;
+    try { await fs.access(this.fSala(code)); return true; } catch { return false; }
+  }
   salvarSala(code) { return this.gravar(this.fSala(code), () => this.salas.get(code)); }
 
   // ---------- progresso de um jogador numa sala ----------
@@ -111,4 +128,25 @@ export class Store {
     try { const p = await this.lerJson(this.fPerfil(code, id)); return p ? migrateProfile(p) : null; } catch { return null; }
   }
   salvarPerfil(code, id) { return this.gravar(this.fPerfil(code, id), () => this.perfis.get(code + '/' + id)); }
+}
+
+// ---------- cópia da sala guardada nos aparelhos dos jogadores ----------
+// O servidor grátis (sem disco) perde os arquivos ao dormir/reiniciar. Por isso ele manda a cada jogador
+// uma cópia da sala (sala + progresso de todos + hash dos tokens) e, quando acorda vazio, aceita a cópia
+// de volta. Com a variável SEGREDO definida, a cópia é assinada (HMAC) e uma cópia editada é recusada.
+export function assinar(dados, segredo) {
+  return segredo ? crypto.createHmac('sha256', segredo).update(JSON.stringify(dados)).digest('base64url') : '';
+}
+export function copiaValida(copia, segredo) {
+  if (!copia || typeof copia !== 'object' || !copia.dados || typeof copia.dados !== 'object') return 'Cópia inválida';
+  const d = copia.dados;
+  if (d.v !== 1 || !CODE_OK.test(String(d.code)) || !d.meta || d.meta.code !== d.code || typeof d.perfis !== 'object' || typeof d.contas !== 'object') return 'Cópia inválida';
+  if (Object.keys(d.perfis).length > 8 || Object.keys(d.contas).length > 8) return 'Cópia inválida';
+  for (const id of [...Object.keys(d.perfis), ...Object.keys(d.contas), ...Object.keys(d.meta.membros || {})]) if (!ID_OK.test(id)) return 'Cópia inválida';
+  if (segredo) {
+    const esperado = assinar(d, segredo);
+    const a = Buffer.from(String(copia.sig || '')), b = Buffer.from(esperado);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return 'Cópia da sala com assinatura inválida';
+  }
+  return null;
 }
