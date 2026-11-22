@@ -1,4 +1,8 @@
-# ABISMO DE SUCATA — status da v0.8 (21/11/2026)
+# ABISMO DE SUCATA — status da v0.9 (22/11/2026)
+
+## Novidades da v0.9
+Chat de voz por distância (M liga/desliga, WebRTC com sinalização pelo servidor, alcance 3× a base da estátua ≈ 69 m; mapa foi para J). Ranking top 3 de dinheiro no canto. 18 espécies de peixe e preços maiores; o dobro de peças no fundo, 100 lixos, tudo reaparece em segundos. Estilingue de lixo (S$ 400, 1ª arma; E cata para a mão, E guarda, Q mira com o arco do peixe, 1 s no chão). Queda mole ao ser acertado (armas de fogo empurram para longe). Breakdance. Kraken do abismo (a cada 20 min, 1 min, vida 3.000 balanceada pelo dano das armas, S$ 1.000 para todos). Corrida de submarino (barraca com troféus, convite Y/N, largada lado a lado, 5 palitos sobre a água, 200 ou 250 dividido, volta para onde estava).
+Testes: npm test 32/32 · e2e_solo 50/50 · e2e_multi 36/36 (voz testada com microfone falso do Chrome: conexão e áudio chegando; o som real não dá para ouvir aqui).
 
 ## Novidades da v0.8
 8 varas (bambu → lendária do abismo), 9 aquários (Nano grátis, Redondo S$ 40, de Mesa S$ 90… Panorâmico S$ 5.000; estilos redondo/plantado/corais) e 5 tanques de peixe evolutivos (Lona → Concreto → Concreto Duplo → Abissal → Oceânico), com visual próprio e colisão do tamanho real. Pode comprar qualquer vara/aquário melhor direto. Mochila guarda até 5 peixes (Z guarda/tira, G arremessa no amigo). No computador, a aba virou só "Vender": peixes da mão, mochila, caixa térmica, aquário e tanque (com Vender e Pegar na mão), lixo catado e carga do sub. Perfis antigos são convertidos (níveis antigos de vara/aquário/tanque mapeados para os novos).
@@ -23,9 +27,9 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 ## Resultados dos testes (última execução)
 | Comando | Resultado |
 |---|---|
-| `npm test` (regras + servidor WebSocket real) | **27/27** |
-| `node tests/e2e_solo.mjs` (Chrome real) | **42/42** |
-| `node tests/e2e_multi.mjs` (dois navegadores no mesmo servidor) | **23/23** |
+| `npm test` (regras + servidor WebSocket real) | **32/32** |
+| `node tests/e2e_solo.mjs` (Chrome real) | **50/50** |
+| `node tests/e2e_multi.mjs` (dois navegadores no mesmo servidor) | **36/36** |
 | `node tools/tour.mjs` | 18 capturas de tela reais em `docs/capturas/` |
 
 ### O que os testes cobrem de verdade

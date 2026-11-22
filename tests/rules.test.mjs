@@ -227,7 +227,7 @@ import { ARMAS, ESTATUA_PECAS } from '../shared/data.js';
 import { multDinheiro, landTrashSpot, premioMissao, progresso } from '../shared/rules.js';
 import { ESTATUA } from '../shared/world.js';
 
-test('lixo da margem: cata a pé (perto), vai para o saco e vende com o multiplicador', () => {
+test('lixo da margem: cata a pé (perto), fica na mão, E guarda no saco e vende com o multiplicador', () => {
   const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'); const p = pl.profile;
   const it = Object.values(r.world.items).find((x) => x.tipo === 'garrafa_pet');
   assert.ok(it, 'há garrafas PET na margem');
@@ -237,14 +237,17 @@ test('lixo da margem: cata a pé (perto), vai para o saco e vende com o multipli
   pl.pos = [it.x + 1, it.y, it.z];
   const res = r.action('N', { tipo: 'catar', item: it.id }, T0).res;
   assert.equal(res.ok, true, res.msg);
-  assert.equal(p.saco.length, 1); assert.ok(!r.world.items[it.id], 'some do mundo para todos');
+  assert.equal(p.lixoMao?.tipo, 'garrafa_pet', 'com as mãos livres o lixo fica na mão'); assert.ok(!r.world.items[it.id], 'some do mundo para todos');
+  assert.equal(r.action('N', { tipo: 'lixo_guardar' }, T0).res.ok, true);
+  assert.equal(p.saco.length, 1); assert.equal(p.lixoMao, null);
   // vender na estação
   const st = STATIONS.find((s) => s.id === 'N'); pl.pos = [st.pad[0], 1.6, st.pad[1]];
   const d0 = p.dinheiro;
   assert.equal(r.action('N', { tipo: 'vender_saco' }, T0).res.ok, true);
-  assert.equal(p.dinheiro, d0 + 4); assert.equal(p.saco.length, 0);
-  // respawn programado
-  assert.ok(r.world.respawn.some((x) => x.terra));
+  assert.equal(p.dinheiro, d0 + SUCATA.garrafa_pet.valor); assert.equal(p.saco.length, 0);
+  // respawn programado: outro lixo nasce em poucos segundos em outro lugar
+  const rs = r.world.respawn.find((x) => x.terra);
+  assert.ok(rs && rs.em - T0 <= 8000 && rs.em - T0 >= 3000, 'reaparece em 3–8 s');
   assert.ok(landTrashSpot(Math.random), 'acha lugar para novo lixo');
 });
 
@@ -254,8 +257,9 @@ test('armas: compra em ordem, munição, tiro derruba 2 s (pistola) e empurra; b
   const st = STATIONS.find((s) => s.id === 'N');
   A.modo = 'terra'; A.pos = [st.pad[0], 1.6, st.pad[1]]; A.profile.dinheiro = 200000;
   assert.equal(r.action('N', { tipo: 'arma_comprar', arma: 'metralhadora' }, T0).res.ok, false, 'precisa da pistola antes');
-  for (const k of ['pistola', 'metralhadora', 'fuzil', 'sniper', 'bazuca']) assert.equal(r.action('N', { tipo: 'arma_comprar', arma: k }, T0).res.ok, true, k);
-  assert.equal(A.profile.dinheiro, 200000 - 900 - 3500 - 9000 - 20000 - 45000);
+  assert.match(r.action('N', { tipo: 'arma_comprar', arma: 'pistola' }, T0).res.msg, /Estilingue/, 'a pistola pede o estilingue antes');
+  for (const k of ['estilingue', 'pistola', 'metralhadora', 'fuzil', 'sniper', 'bazuca']) assert.equal(r.action('N', { tipo: 'arma_comprar', arma: k }, T0).res.ok, true, k);
+  assert.equal(A.profile.dinheiro, 200000 - 400 - 900 - 3500 - 9000 - 20000 - 45000);
   const m0 = A.profile.municao.pistola;
   assert.equal(r.action('N', { tipo: 'municao_comprar', arma: 'pistola' }, T0).res.ok, true);
   assert.equal(A.profile.municao.pistola, m0 + 12);
@@ -302,7 +306,7 @@ test('estátua: peças em ordem, guardar a que não encaixa, multiplicador até 
   // peças não se vendem; o resto vende ×10
   const st = STATIONS.find((s) => s.id === 'N'); pl.pos = [st.pad[0], 1.6, st.pad[1]];
   p.carga.push({ uid: 'lt', tipo: 'lata' }); const d0 = p.dinheiro;
-  r.action('N', { tipo: 'vender', uid: 'lt' }, T0); assert.equal(p.dinheiro, d0 + 60);
+  r.action('N', { tipo: 'vender', uid: 'lt' }, T0); assert.equal(p.dinheiro, d0 + SUCATA.lata.valor * 10);
 });
 
 test('peça da estátua é pessoal: um jogador pega e continua no mundo para o amigo', () => {
@@ -408,4 +412,139 @@ test('mais varas, aquários e tanques; dá para pular direto para um aquário/va
   const velho = migrateProfile({ ...np('v'), inventVer: undefined, vara: 2, aquario: { nivel: 1, peixes: [] }, tanque: { nivel: 0, peixes: [] }, mochila: { uid: 'm', esp: 'tilapia', cm: 20 } });
   assert.equal(VARA[velho.vara - 1].nome, 'Vara de fibra'); assert.equal(AQUARIOS[velho.aquario.nivel].nome, 'Aquário Pequeno'); assert.equal(TANQUES[velho.tanque.nivel].nome, 'Tanque de Concreto');
   assert.deepEqual(velho.mochila.map((f) => f.uid), ['m']);
+});
+
+// ---------------- v0.9: estilingue, Kraken, corrida, economia ----------------
+import { KRAKEN, CORRIDA, ESPECIES, divisaoCorrida, LIXO } from '../shared/data.js';
+import { estacaoParaMundo, BARRACA_CORRIDA, krakenPos } from '../shared/world.js';
+
+test('economia: o dobro de peças no fundo, 100 lixos na margem, peixes e sucata mais caros', () => {
+  const r = mkRoom();
+  const itens = Object.values(r.world.items);
+  assert.ok(itens.filter((x) => SUCATA[x.tipo].zona).length > 320, 'mais de 320 peças no fundo (antes ~165)');
+  assert.ok(itens.filter((x) => SUCATA[x.tipo].terra).length >= 95, '~100 lixos na margem');
+  assert.ok(ESPECIES.tucunare.valor >= 150 && Object.keys(ESPECIES).length >= 18, 'tucunaré mais caro e mais espécies');
+  assert.ok(SUCATA.pneu.valor > 22 && SUCATA.garrafa_pet.valor > 4);
+  // pegar uma peça no fundo: outra nasce em segundos
+  r.join(np('a'), 'N', T0); const pl = noSub(r, 'N');
+  const alvo = itens.find((x) => SUCATA[x.tipo].zona && SUCATA[x.tipo].kg < 20 && Math.hypot(x.x - pl.sub.pos[0], x.z - pl.sub.pos[2]) < 200);
+  pl.sub.pos = [alvo.x, alvo.y + 1, alvo.z];
+  assert.equal(r.action('N', { tipo: 'coletar', item: alvo.id }, T0).res.ok, true);
+  const rs = r.world.respawn.at(-1); assert.ok(rs.em - T0 <= 12000, 'reaparece em até 12 s');
+  const n0 = Object.keys(r.world.items).length;
+  const ev = r.tick(T0 + 13000, 0.05);
+  assert.ok(ev.some((e) => e.t === 'item_novo') && Object.keys(r.world.items).length === n0 + 1, 'nasceu outra peça');
+});
+
+test('estilingue de lixo: 400, Q joga o lixo da mão ou do saco, derruba só 1 s', () => {
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0);
+  const A = r.players.get('N'), B = r.players.get('L'); const st = STATIONS.find((s) => s.id === 'N');
+  A.modo = 'terra'; A.pos = [st.pad[0], 1.6, st.pad[1]];
+  A.profile.lixoMao = { uid: 'l1', tipo: 'latinha' };
+  assert.match(r.action('N', { tipo: 'estilingue_atirar', dir: [1, 0, 0] }, T0).res.msg, /Estilingue/, 'precisa comprar');
+  A.profile.dinheiro = 1000;
+  assert.equal(r.action('N', { tipo: 'arma_comprar', arma: 'estilingue' }, T0).res.ok, true);
+  assert.equal(A.profile.dinheiro, 600);
+  assert.equal(r.action('N', { tipo: 'municao_comprar', arma: 'estilingue' }, T0).res.ok, false, 'não tem bala: usa lixo');
+  B.modo = 'terra'; B.pos = [A.pos[0] + 9, A.pos[1], A.pos[2]];
+  const tiro = r.action('N', { tipo: 'estilingue_atirar', dir: [1, 0.05, 0] }, T0).res;
+  assert.equal(tiro.ok, true, tiro.msg); assert.equal(A.profile.lixoMao, null, 'gastou o lixo da mão');
+  let ev = []; for (let k = 1; k < 40 && !ev.some((e) => e.t === 'atordoado'); k++) ev.push(...r.tick(T0 + k * 50, 0.05));
+  const at = ev.find((e) => e.t === 'atordoado'); assert.ok(at, 'acertou'); assert.equal(at.ms, 1000); assert.equal(at.lixo, 'latinha');
+  // sem lixo na mão, usa o do saco
+  A.profile.saco.push({ uid: 's1', tipo: 'sacola' });
+  assert.equal(r.action('N', { tipo: 'estilingue_atirar', dir: [1, 0.1, 0] }, T0 + 5000).res.ok, true);
+  assert.equal(A.profile.saco.length, 0);
+  assert.match(r.action('N', { tipo: 'estilingue_atirar', dir: [1, 0.1, 0] }, T0 + 9000).res.msg, /Sem lixo/);
+});
+
+test('Kraken: aviso, surge a cada 20 min por 1 min, vida pelo dano das armas e S$ 1.000 para todos', () => {
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0);
+  r.tick(T0, 0.05);
+  assert.equal(r.world.kraken.proximo, T0 + KRAKEN.intervaloMs);
+  assert.ok(r.tick(T0 + KRAKEN.intervaloMs - 59000, 0.05).some((e) => e.t === 'kraken_aviso'), 'avisa 1 min antes');
+  const t1 = T0 + KRAKEN.intervaloMs;
+  assert.ok(r.tick(t1, 0.05).some((e) => e.t === 'kraken_surgiu'));
+  assert.equal(r.snapshot(t1).kraken.vivo, true);
+  // referência de dano: N jogadores com a arma, atirando na cadência máxima, matam bem antes de 1 min
+  const dps = (k) => (ARMAS[k].danoKraken * 1000) / ARMAS[k].cdMs;
+  for (const [k, n] of [['pistola', 5], ['metralhadora', 4], ['fuzil', 3], ['sniper', 2], ['bazuca', 1]]) {
+    const t = KRAKEN.hp / (dps(k) * n);
+    assert.ok(t > 20 && t < 45, `${n}× ${k}: ${t.toFixed(0)} s atirando sem parar`);
+  }
+  assert.equal(ARMAS.estilingue.danoKraken, 0, 'estilingue não machuca');
+  // tiro de pistola de um píer na direção do Kraken
+  const A = r.players.get('N'); A.modo = 'terra'; A.profile.armas.pistola = true; A.profile.municao.pistola = 50;
+  const tk = t1 + 5000, c = krakenPos(5, r.world.kraken.a0).pos;
+  const ang = Math.atan2(c[2], c[0]); A.pos = [c[0] + Math.cos(ang) * 20, 1.6, c[2] + Math.sin(ang) * 20];
+  const d = [c[0] - A.pos[0], 2.2 - (A.pos[1] + 1.45), c[2] - A.pos[2]];
+  const hp0 = r.world.kraken.hp;
+  const res = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: d }, tk).res;
+  assert.equal(res.events.find((e) => e.t === 'tiro').acertou, 'kraken'); assert.equal(r.world.kraken.hp, hp0 - ARMAS.pistola.danoKraken);
+  // morre: os dois ganham o prêmio
+  const din = ['N', 'L'].map((s) => r.players.get(s).profile.dinheiro);
+  r.world.kraken.hp = 5;
+  const fim = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: d }, tk + 500).res.events.find((e) => e.t === 'kraken_morto');
+  assert.ok(fim, 'derrotado'); assert.deepEqual(fim.perfis.sort(), ['L', 'N']);
+  assert.deepEqual(['N', 'L'].map((s) => r.players.get(s).profile.dinheiro), din.map((v) => v + KRAKEN.premio));
+  assert.equal(r.world.kraken.proximo, tk + 500 + KRAKEN.intervaloMs, 'volta em 20 min');
+  // se ninguém matar, some depois de 1 min
+  const r2 = mkRoom(); r2.join(np('c'), 'N', T0); r2.tick(T0, 0.05); r2.tick(T0 + KRAKEN.intervaloMs, 0.05);
+  assert.ok(r2.tick(T0 + KRAKEN.intervaloMs + KRAKEN.duracaoMs, 0.05).some((e) => e.t === 'kraken_fugiu'));
+});
+
+test('corrida de submarino: convite, aceitar, 5 palitos, prêmio 200 (2) e 250 dividido (3+)', () => {
+  assert.deepEqual(divisaoCorrida(2), { premio: 200, perda: [200] });
+  const d5 = divisaoCorrida(5); assert.equal(d5.premio, 250); assert.equal(d5.perda.reduce((a, b) => a + b, 0), 250);
+  const d4 = divisaoCorrida(4); assert.equal(d4.perda.reduce((a, b) => a + b, 0), 250);
+  const r = mkRoom(); for (const [id, s] of [['a', 'N'], ['b', 'L'], ['c', 'SE']]) r.join(np(id), s, T0);
+  const A = r.players.get('N'), B = r.players.get('L'), C = r.players.get('SE');
+  for (const o of [A, B, C]) o.profile.dinheiro = 1000;
+  assert.match(r.action('N', { tipo: 'corrida_convidar', slots: ['L', 'SE'] }, T0).res.msg, /barraca/, 'precisa estar na barraca');
+  const h = estacaoParaMundo(stationById('N'), BARRACA_CORRIDA.x, BARRACA_CORRIDA.z);
+  A.modo = 'terra'; A.pos = [h[0], 1.6, h[1]];
+  const cv = r.action('N', { tipo: 'corrida_convidar', slots: ['L', 'SE'] }, T0).res;
+  assert.equal(cv.ok, true, cv.msg);
+  const id = cv.events[0].id;
+  assert.equal(r.action('SE', { tipo: 'corrida_responder', id, aceitar: false }, T0 + 100).res.ok, true);
+  const ac = r.action('L', { tipo: 'corrida_responder', id, aceitar: true }, T0 + 200).res;
+  const ini = ac.events.find((e) => e.t === 'corrida_inicio');
+  assert.ok(ini, 'todos responderam: largada'); assert.deepEqual(ini.participantes, ['N', 'L'], 'só quem aceitou corre');
+  assert.equal(ini.checkpoints.length, CORRIDA.checkpoints);
+  // teletransporte para a largada é aceito pela sala
+  r.setState('L', { pos: ini.largada.L, modo: 'sub', sub: { pos: ini.largada.L } }, T0 + 300);
+  assert.deepEqual(B.pos, ini.largada.L);
+  // antes da largada não vale
+  B.modo = 'sub'; B.sub.pos = [ini.checkpoints[0][0], -0.5, ini.checkpoints[0][2]];
+  assert.equal(r.action('L', { tipo: 'corrida_checkpoint', id, i: 0 }, T0 + 1000).res.ok, false);
+  // longe do palito não vale
+  const tl = T0 + 200 + CORRIDA.largadaMs + 10;
+  B.sub.pos = [0, -0.5, 0];
+  assert.equal(r.action('L', { tipo: 'corrida_checkpoint', id, i: 0 }, tl).res.ok, false);
+  let fim = null;
+  ini.checkpoints.forEach((cp, i) => {
+    B.sub.pos = [cp[0] + 1, -0.5, cp[2]];
+    const res = r.action('L', { tipo: 'corrida_checkpoint', id, i }, tl + i * 1000).res;
+    assert.equal(res.ok, true, res.msg);
+    fim = res.events.find((e) => e.t === 'corrida_fim') || fim;
+  });
+  assert.ok(fim, 'pegou os 5'); assert.equal(fim.vencedor, 'L');
+  assert.deepEqual(fim.ganhos, { N: -200, L: 200 });
+  assert.equal(A.profile.dinheiro, 800); assert.equal(B.profile.dinheiro, 1200); assert.equal(C.profile.dinheiro, 1000, 'quem recusou não paga');
+  assert.equal(r.corrida, null);
+  // 3 corredores: 250 divididos entre os 2 que perderam
+  const cv2 = r.action('N', { tipo: 'corrida_convidar', slots: ['L', 'SE'] }, tl + 9000).res; const id2 = cv2.events[0].id;
+  r.action('L', { tipo: 'corrida_responder', id: id2, aceitar: true }, tl + 9100);
+  const ini2 = r.action('SE', { tipo: 'corrida_responder', id: id2, aceitar: true }, tl + 9200).res.events.find((e) => e.t === 'corrida_inicio');
+  assert.deepEqual(ini2.participantes, ['N', 'L', 'SE']);
+  const t2 = tl + 9200 + CORRIDA.largadaMs + 10; let fim2;
+  A.modo = 'sub';
+  ini2.checkpoints.forEach((cp, i) => { A.sub.pos = [cp[0], -0.4, cp[2]]; fim2 = r.action('N', { tipo: 'corrida_checkpoint', id: id2, i }, t2 + i).res.events.find((e) => e.t === 'corrida_fim') || fim2; });
+  assert.equal(fim2.vencedor, 'N'); assert.equal(fim2.ganhos.N, 250); assert.equal(fim2.ganhos.L + fim2.ganhos.SE, -250);
+  // convite sem resposta expira e é cancelado
+  const cv3 = r.action('N', { tipo: 'corrida_convidar', slots: ['L'] }, t2 + 20000).res;
+  A.modo = 'terra'; A.pos = [h[0], 1.6, h[1]];
+  const cv4 = cv3.ok ? cv3 : r.action('N', { tipo: 'corrida_convidar', slots: ['L'] }, t2 + 20000).res;
+  assert.equal(cv4.ok, true, cv4.msg);
+  assert.ok(r.tick(t2 + 20000 + CORRIDA.conviteMs + 10, 0.05).some((e) => e.t === 'corrida_cancelada'));
 });

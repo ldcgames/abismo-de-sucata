@@ -146,6 +146,7 @@ export class Character {
     const ph = this.phase;
     const run = clamp((sp - 2.5) / 2.5, 0, 1), walk = clamp(sp / 1.6, 0, 1);
     const breathe = Math.sin(this.t * 2.2) * 0.02;
+    let spin = 0;
     let hipsY = 0.92, hipsPitch = 0, hipsRoll = 0, spineP = 0, chestP = 0, chestY = 0, headP = 0, headY = 0;
     let thigh = [0, 0], knee = [0, 0], shP = [0, 0], shR = [0, 0], elb = [0, 0], shY = [0, 0];
     const mode = st.mode;
@@ -226,23 +227,34 @@ export class Character {
           shP[1] = -2.75; shR[1] = 0.25 + w * 0.35; elb[1] = -0.35 + w * 0.25; headY = 0.15; break;
         case 4: // dança do robô
           chestY = Math.round(w2 * 2) / 2 * 0.5; shR = [1.4, 1.4]; elb = [-1.5 * (w > 0 ? 1 : 0.3), -1.5 * (w < 0 ? 1 : 0.3)]; shP = [-0.2, -0.2]; headY = -chestY * 0.6; knee = [0.2, 0.2]; break;
+        case 5: { // breakdance: entra agachado (0,6 s) e vira de cabeça para baixo girando (headspin)
+          if (t < 0.6) { hipsY = 0.55; knee = [1.6, 1.6]; thigh = [1.3, 1.3]; shP = [-0.9, -0.9]; elb = [-0.4, -0.4]; spineP = 0.5; break; }
+          hipsPitch = Math.PI; hipsY = 0.93; spin = (t - 0.6) * 9;
+          thigh = [0.5 + Math.sin(t * 9) * 0.25, -0.5 - Math.sin(t * 9) * 0.25]; knee = [0.15, 0.15];
+          shP = [-2.9, -2.9]; shR = [0.55, 0.55]; elb = [-0.2, -0.2]; headP = 0.25; break;
+        }
       }
     }
-    // atordoado: cambaleio cômico
+    // atordoado: cai mole de costas no chão (sem ficar "dançando" em pé); no ar, braços e pernas soltos
     const stun = st.atordoado > 0;
+    this.caido = stun ? (this.caido || 0) + dt : 0;
     if (stun) {
-      const w = Math.sin(this.t * 7);
-      hipsRoll = w * 0.18; chestY = Math.sin(this.t * 5) * 0.4; headP = Math.sin(this.t * 9) * 0.25; headY = Math.cos(this.t * 6) * 0.4;
-      shR = [1.2 + w * 0.6, 1.2 - w * 0.6]; shP = [-0.5 + Math.sin(this.t * 11) * 0.8, -0.5 - Math.sin(this.t * 11) * 0.8]; elb = [-0.6, -0.6];
-      knee = [0.35 + w * 0.2, 0.35 - w * 0.2]; thigh = [-0.2 + w * 0.15, -0.2 - w * 0.15];
-      if (st.tubarao) { spineP = -0.25; hipsY = 0.82; }
+      const noAr = st.grounded === false && mode === 'terra';
+      hipsPitch = -1.45; hipsY = 0.2; hipsRoll = 0.08; spineP = 0.05; chestY = 0; headP = -0.25; headY = 0.35;
+      shP = [-2.4, -1.9]; shR = [1.05, 0.85]; elb = [-0.35, -0.6];
+      thigh = [0.25, -0.05]; knee = [0.55, 0.25];
+      if (noAr) { hipsY = 0.75; hipsPitch = -0.9; shP = [-2.8, -2.5]; shR = [1.3, 1.2]; thigh = [0.6, 0.1]; knee = [0.9, 0.4]; }
+      if (st.tubarao) { hipsRoll = -0.15; }
     }
+    // a queda é rápida (gravidade); levantar é um pouco mais lento
+    const rQueda = stun ? 9 : 6;
     this.xEyes.visible = stun; this.stars.visible = stun;
     if (stun) this.stars.rot(0, this.t * 6, 0);
     // aplica com suavização
     const r = 14;
-    this.hips.at(0, P('hy', hipsY, r), 0);
-    this.hips.rot(P('hp', hipsPitch, 8), 0, P('hr', hipsRoll, r));
+    this.hips.at(0, P('hy', hipsY, stun ? rQueda : r), 0);
+    // giro do breakdance (direto, sem suavizar para não "desenrolar" o ângulo)
+    this.hips.rot(P('hp', hipsPitch, stun ? rQueda : st.emote?.i === 5 ? 10 : 8), spin, P('hr', hipsRoll, r));
     this.spine.rot(P('sp', spineP, r), P('cy', chestY, r) * 0.5, 0);
     this.chest.rot(P('cp', chestP, r), P('cy2', chestY, r) * 0.5, 0);
     this.head.rot(P('hdp', headP, r), P('hdy', headY, r), 0);

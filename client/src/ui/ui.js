@@ -2,7 +2,7 @@
 // Todo botão envia uma AÇÃO para o servidor (ou servidor local); nada muda saldo/inventário só na tela.
 import {
   SUB_UP, SUB_ORDEM, VARA, PESADO, AQUARIOS, TANQUES, ESTACAO, DEPOSITO, EXTRAS, CONTRATOS, SUCATA, RESTAURO, ESPECIES,
-  COMPONENTES, CORES_JOGADOR, valorPeixe, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
+  COMPONENTES, CORES_JOGADOR, valorPeixe, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
 } from '../../shared/data.js';
 import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, depositoVagas, multDinheiro } from '../../shared/rules.js';
 import { STATIONS } from '../../shared/world.js';
@@ -37,7 +37,7 @@ export class UI {
     const html = `<div class="din">S$ ${fmt(p.dinheiro)}</div><div class="comps">${comps}</div>${moc}${extra}<div class="missoes">${mis}</div>`;
     if ($('topoEsq')._h !== html) { $('topoEsq').innerHTML = html; $('topoEsq')._h = html; }
     const h = Math.floor(info.hora), m = Math.floor((info.hora % 1) * 60);
-    const dir = `<div>${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${info.noite ? '🌙' : '☀️'}</div><div>${esc(info.zona)}</div><div class="nota">${esc(info.rede)}</div>${info.fps ? `<div class="nota">${info.fps} FPS</div>` : ''}`;
+    const dir = `<div>${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${info.noite ? '🌙' : '☀️'}</div><div>${esc(info.zona)}</div>${info.ranking ? `<div class="ranking">${info.ranking}</div>` : ''}<div class="nota">${esc(info.rede)}</div>${info.fps ? `<div class="nota">${info.fps} FPS</div>` : ''}`;
     if ($('topoDir')._h !== dir) { $('topoDir').innerHTML = dir; $('topoDir')._h = dir; }
     // contratos ativos
     const ativos = p.contratos.ativos.map((id) => CONTRATOS.find((c) => c.id === id)).filter(Boolean);
@@ -152,6 +152,10 @@ export class UI {
       $('painelTitulo').textContent = 'Loja de armas';
       abas.innerHTML = '';
       html = this.lojaArmas(p);
+    } else if (this.aberto === 'corrida') {
+      $('painelTitulo').textContent = '🏁 Corrida de submarino';
+      abas.innerHTML = '';
+      html = this.g.painelCorridaHtml();
     } else if (this.aberto === 'sala') {
       $('painelTitulo').textContent = 'Sala e convite';
       abas.innerHTML = '';
@@ -166,6 +170,8 @@ export class UI {
       this.render();
     }));
     corpo.querySelectorAll('[data-sair]').forEach((b) => (b.onclick = () => this.g.sairParaMenu()));
+    corpo.querySelectorAll('[data-escolher]').forEach((b) => (b.onclick = () => { const s = b.dataset.escolher, sel = this.g.corridaSel; if (sel.has(s)) sel.delete(s); else sel.add(s); this.render(); }));
+    corpo.querySelectorAll('[data-chamar]').forEach((b) => (b.onclick = async () => { b.disabled = true; await this.g.chamarCorrida(); if (this.aberto) this.render(); }));
     corpo.querySelectorAll('[data-copiar]').forEach((b) => (b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copiar).then(() => this.aviso('Copiado!', 'ok')).catch(() => this.aviso('Copie manualmente o texto acima', 'info')); }));
   }
   btn(label, a, disabled = false, title = '') { return `<button data-acao='${esc(JSON.stringify(a))}' ${disabled ? 'disabled' : ''} title="${esc(title)}">${label}</button>`; }
@@ -320,11 +326,18 @@ export class UI {
     return h;
   }
   lojaArmas(p) {
-    let h = `<p class="nota">Cada tiro derruba o amigo no chão e joga ele para longe (só vale contra quem está a pé). Equipe com as teclas <kbd>1</kbd>–<kbd>5</kbd>, guarde com <kbd>H</kbd>, atire com o botão esquerdo. A sniper mira com o botão direito.</p><div class="grade">`;
-    ARMAS_ORDEM.forEach((k, i) => {
+    let h = `<p class="nota">Compre em ordem: primeiro o estilingue, depois a pistola e assim por diante. Cada acerto derruba o amigo no chão; as armas de fogo ainda jogam ele para longe (só vale contra quem está a pé). Armas: teclas <kbd>1</kbd>–<kbd>5</kbd>, <kbd>H</kbd> guarda, botão esquerdo atira, a sniper mira com o botão direito. O Kraken só leva dano das armas de fogo.</p><div class="grade">`;
+    ARMAS_LOJA.forEach((k) => {
       const A = ARMAS[k], tem = !!p.armas[k], bloqueada = A.requer && !p.armas[A.requer];
       const bal = p.municao[k] || 0;
-      h += `<div class="card"><h3>${i + 1}. ${esc(A.nome)}</h3>
+      const tecla = A.lixo ? 'Q' : String(ARMAS_ORDEM.indexOf(k) + 1);
+      if (A.lixo) {
+        h += `<div class="card"><h3>${esc(A.nome)} <span class="nota">(tecla Q)</span></h3>
+          <div class="nv">Munição: o <b>lixo</b> que você cata na margem. Cate com <kbd>E</kbd>, aperte <kbd>Q</kbd> para mirar (mesmo arco do peixe) e clique para atirar. Sem lixo na mão, usa o do saco. Derruba o amigo por <b>${A.stunMs / 1000} s</b> · alcance ${A.alcance} m · não machuca o Kraken.</div>
+          ${tem ? `<div class="val"><b>Você tem</b> · lixo no saco: ${p.saco.length}${p.lixoMao ? ' + 1 na mão' : ''}</div>` : `<div class="custo">S$ ${fmt(A.preco)}</div>${this.btn('Comprar estilingue', { tipo: 'arma_comprar', arma: k }, p.dinheiro < A.preco, p.dinheiro < A.preco ? `Faltam S$ ${fmt(A.preco - p.dinheiro)}` : '')}`}</div>`;
+        return;
+      }
+      h += `<div class="card"><h3>${tecla}. ${esc(A.nome)}</h3>
         <div class="nv">No chão: <b>${A.stunMs / 1000} s</b> por tiro · empurrão ${A.empurrao[0] < 5 ? 'pequeno' : A.empurrao[0] < 9 ? 'médio' : A.empurrao[0] < 14 ? 'forte' : 'voa longe'} · alcance ${A.alcance} m${A.auto ? ' · automática' : ''}${A.foguete ? ' · explode' : ''}</div>
         ${tem ? `<div class="val">Você tem · <b>${bal}/${MUNICAO_MAX[k]}</b> ${A.foguete ? 'foguetes' : 'balas'}</div>${this.btn(`Comprar ${A.municao.n} ${A.foguete ? 'foguete' : 'balas'} — S$ ${fmt(A.municao.preco)}`, { tipo: 'municao_comprar', arma: k }, p.dinheiro < A.municao.preco || bal + A.municao.n > MUNICAO_MAX[k])}`
           : `<div class="custo">S$ ${fmt(A.preco)} (vem com ${A.municao.n} ${A.foguete ? 'foguete' : 'balas'})</div>${bloqueada ? `<div class="falta">Primeiro compre: ${esc(ARMAS[A.requer].nome)}</div>` : this.btn('Comprar arma', { tipo: 'arma_comprar', arma: k }, p.dinheiro < A.preco, p.dinheiro < A.preco ? `Faltam S$ ${fmt(A.preco - p.dinheiro)}` : '')}`}</div>`;

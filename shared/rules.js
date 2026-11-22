@@ -6,11 +6,11 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
-  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS,
+  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS, krakenPos,
 } from './world.js';
 
 // ------------------------------------------------------------------ util
@@ -44,6 +44,7 @@ function newProfileBase(id, nome = 'Explorador') {
     carga: [],          // itens dentro do submarino [{uid, tipo}]
     deposito: [],       // itens guardados na estação
     mao: null,          // peixe na mão {uid, esp, cm}
+    lixoMao: null,      // lixo catado na mão {uid, tipo}: E guarda no saco · Q joga com o estilingue
     mochila: [],        // até 5 peixes guardados (para arremessar ou vender depois)
     inventVer: 2,
     caixaTermica: [],   // peixes guardados temporariamente
@@ -127,6 +128,7 @@ export function migrateProfile(p) {
     out.inventVer = 2;
   }
   out.saco = Array.isArray(p.saco) ? p.saco : [];
+  out.lixoMao = p.lixoMao && typeof p.lixoMao === 'object' && SUCATA[p.lixoMao.tipo]?.terra ? p.lixoMao : null;
   out.armas = p.armas && typeof p.armas === 'object' ? p.armas : {};
   out.municao = p.municao && typeof p.municao === 'object' ? p.municao : {};
   out.estatua = { achadas: [...(p.estatua?.achadas || [])], colocadas: [...(p.estatua?.colocadas || [])] };
@@ -269,7 +271,7 @@ function randomBedSpot(rnd, zona) {
 
 export function createWorld(seed = 1) {
   const rnd = makeRng(seed);
-  const w = { seed, items: {}, seq: 0, respawn: [], projeteis: [], pseq: 0 };
+  const w = { seed, items: {}, seq: 0, respawn: [], projeteis: [], pseq: 0, kraken: { vivo: false, proximo: 0, hp: 0 } };
   const tipos = Object.entries(SUCATA).filter(([, t]) => t.zona);
   const sorteia = (prof) => {
     const cand = tipos.filter(([, t]) => prof >= t.zona[0] && prof <= t.zona[1]);
@@ -280,13 +282,13 @@ export function createWorld(seed = 1) {
   };
   // distribuição por faixa
   // mais peças no fundo (pedido): o lago menor fica cheio de achados
-  const faixas = [[3, 40, 55], [40, 100, 55], [100, 500, 45], [500, 1500, 35], [1500, 4000, 30], [4000, 5000, 18]];
+  const faixas = [[3, 40, 110], [40, 100, 110], [100, 500, 90], [500, 1500, 70], [1500, 4000, 60], [4000, 5000, 36]]; // o dobro de peças
   for (const [a, b, n] of faixas) {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0, tent = 0; i < n && tent < n * 4; tent++) {
       const pos = randomBedSpot(rnd, [a, b]);
       if (!pos) continue;
       const tipo = sorteia(-pos[1]);
-      addItem(w, tipo, pos, rnd);
+      addItem(w, tipo, pos, rnd); i++;
     }
   }
   // itens especiais fixos (contratos)
@@ -537,7 +539,7 @@ const ACOES = {
     if (t.coop) p.carga[p.carga.length - 1].coop = true; // pendurado no cabo: não ocupa porão
     // reaparecimento
     if (it.id.endsWith('_fixa')) world.respawn.push({ em: ctx.now + 8 * 60e3, fixo: it.id, tipo: it.tipo, pos: [it.x, it.y, it.z] });
-    else if (t.zona) world.respawn.push({ em: ctx.now + (4 + ctx.rnd() * 5) * 60e3, zona: t.zona });
+    else if (t.zona) world.respawn.push({ em: ctx.now + (SUCATA_RESPAWN_S[0] + ctx.rnd() * (SUCATA_RESPAWN_S[1] - SUCATA_RESPAWN_S[0])) * 1000, zona: t.zona });
     p.xp += 2;
     return okR(`Recolhido: ${t.nome} (${t.kg} kg)` + (ajudantes.length ? ' — içado em equipe!' : ''), [{ t: 'item_removido', id: it.id, por: player.slot, ajudantes }]);
   },
@@ -776,11 +778,45 @@ const ACOES = {
     if (!t.terra) return fail('Esse item não está na margem');
     if (player.modo !== 'terra') return fail('Cate o lixo a pé');
     if (d2(player.pos, [it.x, 0, it.z]) > 2.8) return fail('Chegue mais perto');
-    if (p.saco.length >= LIXO.saco) return fail(`Saco cheio (${p.saco.length}/${LIXO.saco}). Venda no terminal da estação.`);
+    // com as mãos livres o lixo fica na mão (E guarda · Q estilingue); com peixe/lixo na mão vai direto para o saco
+    const naMao = !p.mao && !p.lixoMao;
+    if (!naMao && p.saco.length >= LIXO.saco) return fail(`Saco cheio (${p.saco.length}/${LIXO.saco}). Venda no computador da estação.`);
     delete world.items[it.id];
-    p.saco.push({ uid: uid(ctx.rnd), tipo: it.tipo }); p.xp += 1;
-    world.respawn.push({ em: ctx.now + (LIXO.respawnMin + ctx.rnd() * (LIXO.respawnMax - LIXO.respawnMin)) * 60e3, terra: true });
-    return okR(`Catou: ${t.nome} [saco ${p.saco.length}/${LIXO.saco}]`, [{ t: 'item_removido', id: it.id, por: player.slot }]);
+    const obj = { uid: uid(ctx.rnd), tipo: it.tipo };
+    if (naMao) p.lixoMao = obj; else p.saco.push(obj);
+    p.xp += 1;
+    world.respawn.push({ em: ctx.now + (LIXO.respawnMinS + ctx.rnd() * (LIXO.respawnMaxS - LIXO.respawnMinS)) * 1000, terra: true });
+    const ev = [{ t: 'item_removido', id: it.id, por: player.slot }];
+    if (naMao) return okR(`${t.nome} na mão`, ev);
+    return okR(`Catou: ${t.nome} [saco ${p.saco.length}/${LIXO.saco}]`, ev);
+  },
+  lixo_guardar(p) {
+    if (!p.lixoMao) return fail('Nenhum lixo na mão');
+    if (p.saco.length >= LIXO.saco) return fail(`Saco cheio (${p.saco.length}/${LIXO.saco}). Venda no computador da estação.`);
+    p.saco.push(p.lixoMao); p.lixoMao = null;
+    return okR(`Guardado no saco [${p.saco.length}/${LIXO.saco}]`);
+  },
+  // estilingue de lixo: mesma trajetória em arco do peixe; derruba por 1 s; não machuca o Kraken
+  estilingue_atirar(p, a, ctx) {
+    const { player, world, now } = ctx;
+    if (!p.armas.estilingue) return fail('Compre o Estilingue de lixo na loja de armas (S$ 400)');
+    if (!emTerra(player)) return fail('Use o estilingue a pé');
+    if (player.stunUntil > now) return fail('Você está no chão');
+    if ((player.cdEstilingue || 0) > now + 30) return fail('Recarregando o estilingue');
+    const dir = normDir(a.dir); if (!dir) return fail('Direção inválida');
+    let lixo = p.lixoMao;
+    if (lixo) p.lixoMao = null;
+    else if (p.saco.length) lixo = p.saco.pop();
+    else return fail('Sem lixo: cate um lixo na margem (E)');
+    player.cdEstilingue = now + ARMAS.estilingue.cdMs;
+    const v = TROLL.peixeVelocidade;
+    const pr = {
+      id: 'p' + (++world.pseq), tipo: 'lixo', lixo: lixo.tipo, dono: player.slot,
+      pos: [player.pos[0] + dir[0] * 0.8, player.pos[1] + 1.4, player.pos[2] + dir[2] * 0.8],
+      vel: [dir[0] * v, dir[1] * v + 2.0, dir[2] * v], nasc: now, ini: [player.pos[0], 0, player.pos[2]], alcance: ARMAS.estilingue.alcance,
+    };
+    world.projeteis.push(pr);
+    return okR('', [{ t: 'projetil', pr }]);
   },
   vender_saco(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
@@ -800,6 +836,7 @@ const ACOES = {
     if (A.requer && !p.armas[A.requer]) return fail(`Primeiro compre: ${ARMAS[A.requer].nome}`);
     if (p.dinheiro < A.preco) return fail(`Faltam S$ ${A.preco - p.dinheiro}`);
     p.dinheiro -= A.preco; p.armas[k] = true;
+    if (!A.municao) return okR(`Comprou: ${A.nome}! Cate lixo na margem (E) e aperte Q para mirar e atirar`);
     p.municao[k] = (p.municao[k] || 0) + A.municao.n; // vem com 1 pente
     return okR(`Comprou: ${A.nome} (+${A.municao.n} balas)`);
   },
@@ -807,6 +844,7 @@ const ACOES = {
     const e = precisaEstacao(ctx); if (e) return e;
     const k = a.arma, A = ARMAS[k];
     if (!A || !p.armas[k]) return fail('Compre a arma primeiro');
+    if (!A.municao) return fail('O estilingue usa o lixo catado na margem como munição');
     if ((p.municao[k] || 0) + A.municao.n > MUNICAO_MAX[k]) return fail(`Máximo de ${MUNICAO_MAX[k]} balas para ${A.nome}`);
     if (p.dinheiro < A.municao.preco) return fail(`Faltam S$ ${A.municao.preco - p.dinheiro}`);
     p.dinheiro -= A.municao.preco; p.municao[k] = (p.municao[k] || 0) + A.municao.n;
@@ -816,6 +854,7 @@ const ACOES = {
     const { player, world, now, players } = ctx;
     const k = a.arma, A = ARMAS[k];
     if (!A || !p.armas[k]) return fail('Você não tem essa arma');
+    if (A.lixo) return fail('O estilingue atira lixo: use Q');
     if (player.modo !== 'terra') return fail('Atire a pé');
     if (player.stunUntil > now) return fail('Você está no chão');
     if ((p.municao[k] || 0) <= 0) return fail(`Sem munição de ${A.nome}: compre na barraca de armas`);
@@ -845,6 +884,14 @@ const ACOES = {
     }
     const evs = [];
     let ponto = fim;
+    // o Kraken é um alvo enorme: acerta se a linha passar pela "esfera" dele antes de um jogador
+    const tk = raioKraken(world.kraken, now, boca, dir, tMax);
+    if (tk !== null && (!melhor || tk < melhor.s * tMax)) {
+      ponto = [boca[0] + dir[0] * tk, boca[1] + dir[1] * tk, boca[2] + dir[2] * tk];
+      evs.push(...danoKraken(world.kraken, A.danoKraken || 0, player.slot, now));
+      evs.unshift({ t: 'tiro', de: player.slot, arma: k, a: boca, b: ponto, acertou: 'kraken' });
+      return okR('', evs, { municao: p.municao[k] });
+    }
     if (melhor) {
       ponto = [boca[0] + (fim[0] - boca[0]) * melhor.s, boca[1] + (fim[1] - boca[1]) * melhor.s, boca[2] + (fim[2] - boca[2]) * melhor.s];
       evs.push(...acertoArma(players.get(melhor.slot), melhor.slot, player.slot, k, dir, now));
@@ -965,11 +1012,14 @@ export function stepProjectiles(world, players, dt, now) {
         if (slot === pr.dono || (o.modo !== 'terra' && o.modo !== 'nadando')) continue;
         if (segSegDist(prev, pr.pos, o.pos, [o.pos[0], o.pos[1] + 1.75, o.pos[2]]).dist < 0.7) { bateu = 'jogador'; break; }
       }
+      const kc = centroKraken(world.kraken, now);
+      if (!bateu && kc && d3(pr.pos, kc) < KRAKEN.raio + 0.8) bateu = 'kraken';
       const h = terrainHeight(pr.pos[0], pr.pos[2]);
       if (!bateu && (pr.pos[1] < Math.max(h, 0) || now - pr.nasc > 5000 || Math.hypot(pr.pos[0] - pr.ini[0], pr.pos[2] - pr.ini[2]) > pr.alcance)) bateu = 'chao';
       if (!bateu) continue;
       world.projeteis.splice(i, 1);
       ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'explosao', agua: h < 0 });
+      if (kc && d3(pr.pos, kc) < KRAKEN.raio + (ARMAS[pr.arma] || ARMAS.bazuca).raio) ev.push(...danoKraken(world.kraken, (ARMAS[pr.arma] || ARMAS.bazuca).danoKraken || 0, pr.dono, now));
       // explosão: derruba e arremessa quem estiver perto (mais forte no centro)
       const A = ARMAS[pr.arma] || ARMAS.bazuca;
       for (const [slot, o] of players) {
@@ -1031,11 +1081,11 @@ export function stepProjectiles(world, players, dt, now) {
         ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'imune', alvo: fim.alvo });
         continue;
       }
-      const ms = pr.tipo === 'tubarao' ? TROLL.tubaraoStunMs : TROLL.peixeStunMs;
+      const ms = pr.tipo === 'tubarao' ? TROLL.tubaraoStunMs : pr.tipo === 'lixo' ? ARMAS.estilingue.stunMs : TROLL.peixeStunMs;
       alvo.stunUntil = now + ms;
-      alvo.imuneUntil = now + ms + TROLL.imunidadeMs;
+      alvo.imuneUntil = now + ms + (pr.tipo === 'lixo' ? 800 : TROLL.imunidadeMs);
       ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'acerto' });
-      ev.push({ t: 'atordoado', alvo: fim.alvo, por: pr.dono, ms, ate: alvo.stunUntil, tubarao: pr.tipo === 'tubarao', esp: pr.peixe?.esp });
+      ev.push({ t: 'atordoado', alvo: fim.alvo, por: pr.dono, ms, ate: alvo.stunUntil, tubarao: pr.tipo === 'tubarao', esp: pr.peixe?.esp, lixo: pr.lixo || null });
     } else if (fim.t === 'balao_acerto') {
       const alvo = players.get(fim.alvo);
       if (alvo.tinta || (alvo.tintaProt || 0) > now) {
@@ -1079,6 +1129,51 @@ export function checkDiscovery(p, player) {
   const prof = -pos[1];
   if (prof > p.profMax) p.profMax = Math.round(prof);
   return null;
+}
+
+// ------------------------------------------------------------------ Kraken do abismo
+export function centroKraken(k, now) {
+  if (!k?.vivo) return null;
+  const t = (now - k.ini) / 1000;
+  const { pos } = krakenPos(t, k.a0);
+  return [pos[0], 2.2, pos[2]];
+}
+// distância ao longo do raio (origem o, direção unitária d) até a esfera do Kraken, ou null
+function raioKraken(k, now, o, d, tMax) {
+  const c = centroKraken(k, now); if (!c) return null;
+  const oc = [o[0] - c[0], o[1] - c[1], o[2] - c[2]];
+  const b = oc[0] * d[0] + oc[1] * d[1] + oc[2] * d[2], cc = oc[0] ** 2 + oc[1] ** 2 + oc[2] ** 2 - KRAKEN.raio ** 2;
+  const disc = b * b - cc; if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  return t > 0 && t <= tMax ? t : null;
+}
+export function danoKraken(k, dano, slot, now) {
+  if (!k?.vivo || dano <= 0) return [];
+  k.hp = Math.max(0, k.hp - dano);
+  k.dano[slot] = (k.dano[slot] || 0) + dano;
+  if (k.hp > 0) return [];
+  k.vivo = false; k.proximo = now + KRAKEN.intervaloMs; k.avisado = false;
+  return [{ t: 'kraken_morto', por: slot, pos: centroKraken({ ...k, vivo: true }, now) }];
+}
+// nasce a cada 20 min (aviso 1 min antes), fica 1 min e volta para o abismo
+export function tickKraken(w, now, rnd = Math.random) {
+  const k = w.kraken || (w.kraken = { vivo: false, proximo: 0, hp: 0 });
+  const ev = [];
+  if (!k.proximo) k.proximo = now + KRAKEN.intervaloMs;
+  if (!k.vivo && !k.avisado && now >= k.proximo - KRAKEN.avisoMs) { k.avisado = true; ev.push({ t: 'kraken_aviso', em: Math.max(0, k.proximo - now) }); }
+  if (!k.vivo && now >= k.proximo) {
+    Object.assign(k, { vivo: true, ini: now, fim: now + KRAKEN.duracaoMs, hp: KRAKEN.hp, hpMax: KRAKEN.hp, a0: rnd() * Math.PI * 2, dano: {} });
+    ev.push({ t: 'kraken_surgiu', fim: KRAKEN.duracaoMs });
+  } else if (k.vivo && now >= k.fim) {
+    k.vivo = false; k.proximo = now + KRAKEN.intervaloMs; k.avisado = false;
+    ev.push({ t: 'kraken_fugiu' });
+  }
+  return ev;
+}
+export function krakenPublico(k, now) {
+  if (!k) return null;
+  if (!k.vivo) return { vivo: false, em: Math.max(0, (k.proximo || 0) - now) };
+  return { vivo: true, t: (now - k.ini) / 1000, resta: Math.max(0, k.fim - now), hp: k.hp, hpMax: k.hpMax, a0: k.a0 };
 }
 
 // tiro acertou: derruba (stun) e empurra o alvo; respeita a imunidade curta depois de levantar

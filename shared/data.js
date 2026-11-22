@@ -10,40 +10,40 @@ export const COMPONENTES = {
 // zona: profundidade mínima/máxima (m) em que aparece no mundo.
 // Raso = sucata ruim (latas, garrafas, pneus); quanto mais fundo, melhores as peças.
 export const SUCATA = {
-  lata:            { nome: 'Lata amassada', kg: 0.3, L: 1, rar: 'comum', valor: 6, recicla: { metal: 1 }, zona: [0, 150], peso: 10 },
-  garrafa:         { nome: 'Garrafa antiga', kg: 0.6, L: 1.5, rar: 'comum', valor: 7, recicla: { vidro: 1 }, zona: [0, 150], peso: 8 },
-  pneu:            { nome: 'Pneu velho', kg: 9, L: 40, rar: 'comum', valor: 22, recicla: { borracha: 3 }, zona: [0, 500], peso: 7 },
-  cano:            { nome: 'Cano de cobre', kg: 6, L: 12, rar: 'comum', valor: 18, recicla: { metal: 1, cobre: 2 }, zona: [0, 500], peso: 7 },
-  corrente:        { nome: 'Corrente enferrujada', kg: 14, L: 10, rar: 'comum', valor: 30, recicla: { metal: 4 }, zona: [25, 700], peso: 6 },
-  bateria_velha:   { nome: 'Bateria velha', kg: 12, L: 8, rar: 'comum', valor: 28, recicla: { metal: 1, cobre: 2, eletronica: 1 }, zona: [25, 700], peso: 5 },
-  radio:           { nome: 'Rádio valvulado', kg: 3, L: 8, rar: 'incomum', valor: 45, recicla: { eletronica: 2, metal: 1 }, restaura: 'radio_ok', zona: [55, 900], peso: 4 },
-  caixa_ferramentas: { nome: 'Caixa de ferramentas', kg: 8, L: 18, rar: 'incomum', valor: 60, recicla: { metal: 3 }, restaura: 'ferramentas_ok', zona: [55, 900], peso: 4 },
-  helice:          { nome: 'Hélice de barco', kg: 18, L: 25, rar: 'incomum', valor: 55, recicla: { metal: 4, cobre: 2 }, zona: [75, 1200], peso: 4 },
-  motor_popa:      { nome: 'Motor de popa', kg: 35, L: 60, rar: 'incomum', valor: 90, recicla: { metal: 6, cobre: 2, borracha: 1 }, restaura: 'motor_ok', zona: [90, 1500], peso: 3 },
-  ancora:          { nome: 'Âncora', kg: 60, L: 40, rar: 'incomum', valor: 110, recicla: { metal: 10 }, zona: [300, 1500], peso: 3 },
-  sino_navio:      { nome: 'Sino de navio', kg: 25, L: 20, rar: 'raro', valor: 260, recicla: { metal: 3, cobre: 6 }, restaura: 'sino_polido', zona: [450, 2500], peso: 2 },
-  cofre:           { nome: 'Cofre lacrado', kg: 80, L: 50, rar: 'raro', valor: 400, recicla: { metal: 14 }, restaura: 'cofre_aberto', zona: [500, 4300], peso: 2 },
-  minerio:         { nome: 'Minério de cobalto', kg: 20, L: 10, rar: 'incomum', valor: 150, recicla: { metal: 2, cristal: 1 }, zona: [500, 4300], peso: 4 },
-  sonda:           { nome: 'Sonda antiga', kg: 40, L: 45, rar: 'raro', valor: 700, recicla: { eletronica: 6, metal: 4 }, restaura: 'sonda_ok', zona: [1400, 4500], peso: 2 },
-  cristal:         { nome: 'Cristal abissal', kg: 6, L: 6, rar: 'raro', valor: 900, recicla: { cristal: 4 }, zona: [1400, 4500], peso: 3 },
-  reliquia:        { nome: 'Relíquia do Abismo', kg: 15, L: 15, rar: 'lendário', valor: 3500, recicla: { cristal: 12 }, restaura: 'reliquia_viva', zona: [3950, 5000], peso: 2 },
+  lata:            { nome: 'Lata amassada', kg: 0.3, L: 1, rar: 'comum', valor: 10, recicla: { metal: 1 }, zona: [0, 150], peso: 10 },
+  garrafa:         { nome: 'Garrafa antiga', kg: 0.6, L: 1.5, rar: 'comum', valor: 11, recicla: { vidro: 1 }, zona: [0, 150], peso: 8 },
+  pneu:            { nome: 'Pneu velho', kg: 9, L: 40, rar: 'comum', valor: 35, recicla: { borracha: 3 }, zona: [0, 500], peso: 7 },
+  cano:            { nome: 'Cano de cobre', kg: 6, L: 12, rar: 'comum', valor: 29, recicla: { metal: 1, cobre: 2 }, zona: [0, 500], peso: 7 },
+  corrente:        { nome: 'Corrente enferrujada', kg: 14, L: 10, rar: 'comum', valor: 48, recicla: { metal: 4 }, zona: [25, 700], peso: 6 },
+  bateria_velha:   { nome: 'Bateria velha', kg: 12, L: 8, rar: 'comum', valor: 45, recicla: { metal: 1, cobre: 2, eletronica: 1 }, zona: [25, 700], peso: 5 },
+  radio:           { nome: 'Rádio valvulado', kg: 3, L: 8, rar: 'incomum', valor: 72, recicla: { eletronica: 2, metal: 1 }, restaura: 'radio_ok', zona: [55, 900], peso: 4 },
+  caixa_ferramentas: { nome: 'Caixa de ferramentas', kg: 8, L: 18, rar: 'incomum', valor: 96, recicla: { metal: 3 }, restaura: 'ferramentas_ok', zona: [55, 900], peso: 4 },
+  helice:          { nome: 'Hélice de barco', kg: 18, L: 25, rar: 'incomum', valor: 88, recicla: { metal: 4, cobre: 2 }, zona: [75, 1200], peso: 4 },
+  motor_popa:      { nome: 'Motor de popa', kg: 35, L: 60, rar: 'incomum', valor: 144, recicla: { metal: 6, cobre: 2, borracha: 1 }, restaura: 'motor_ok', zona: [90, 1500], peso: 3 },
+  ancora:          { nome: 'Âncora', kg: 60, L: 40, rar: 'incomum', valor: 176, recicla: { metal: 10 }, zona: [300, 1500], peso: 3 },
+  sino_navio:      { nome: 'Sino de navio', kg: 25, L: 20, rar: 'raro', valor: 416, recicla: { metal: 3, cobre: 6 }, restaura: 'sino_polido', zona: [450, 2500], peso: 2 },
+  cofre:           { nome: 'Cofre lacrado', kg: 80, L: 50, rar: 'raro', valor: 640, recicla: { metal: 14 }, restaura: 'cofre_aberto', zona: [500, 4300], peso: 2 },
+  minerio:         { nome: 'Minério de cobalto', kg: 20, L: 10, rar: 'incomum', valor: 240, recicla: { metal: 2, cristal: 1 }, zona: [500, 4300], peso: 4 },
+  sonda:           { nome: 'Sonda antiga', kg: 40, L: 45, rar: 'raro', valor: 1120, recicla: { eletronica: 6, metal: 4 }, restaura: 'sonda_ok', zona: [1400, 4500], peso: 2 },
+  cristal:         { nome: 'Cristal abissal', kg: 6, L: 6, rar: 'raro', valor: 1440, recicla: { cristal: 4 }, zona: [1400, 4500], peso: 3 },
+  reliquia:        { nome: 'Relíquia do Abismo', kg: 15, L: 15, rar: 'lendário', valor: 5600, recicla: { cristal: 12 }, restaura: 'reliquia_viva', zona: [3950, 5000], peso: 2 },
   // lixo espalhado na margem (catado a pé, vai para o saco de recicláveis)
-  garrafa_pet:     { nome: 'Garrafa PET', kg: 0.05, L: 2, rar: 'comum', valor: 4, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
-  latinha:         { nome: 'Latinha de refrigerante', kg: 0.02, L: 0.5, rar: 'comum', valor: 3, recicla: { metal: 1 }, zona: null, peso: 0, terra: true },
-  sacola:          { nome: 'Sacola plástica', kg: 0.01, L: 0.5, rar: 'comum', valor: 2, zona: null, peso: 0, terra: true },
-  saco_lixo:       { nome: 'Saco de lixo', kg: 2, L: 20, rar: 'comum', valor: 7, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
-  vidro_quebrado:  { nome: 'Pote de vidro', kg: 0.3, L: 1, rar: 'comum', valor: 5, recicla: { vidro: 1 }, zona: null, peso: 0, terra: true },
+  garrafa_pet:     { nome: 'Garrafa PET', kg: 0.05, L: 2, rar: 'comum', valor: 10, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
+  latinha:         { nome: 'Latinha de refrigerante', kg: 0.02, L: 0.5, rar: 'comum', valor: 8, recicla: { metal: 1 }, zona: null, peso: 0, terra: true },
+  sacola:          { nome: 'Sacola plástica', kg: 0.01, L: 0.5, rar: 'comum', valor: 5, zona: null, peso: 0, terra: true },
+  saco_lixo:       { nome: 'Saco de lixo', kg: 2, L: 20, rar: 'comum', valor: 18, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
+  vidro_quebrado:  { nome: 'Pote de vidro', kg: 0.3, L: 1, rar: 'comum', valor: 12, recicla: { vidro: 1 }, zona: null, peso: 0, terra: true },
   // itens especiais (só por contrato/evento)
-  caixa_preta:     { nome: 'Caixa-preta', kg: 10, L: 12, rar: 'raro', valor: 120, recicla: { eletronica: 3 }, zona: null, peso: 0 },
-  ancora_gigante:  { nome: 'Âncora gigante', kg: 320, L: 200, rar: 'raro', valor: 950, recicla: { metal: 45 }, zona: null, peso: 0, coop: true },
+  caixa_preta:     { nome: 'Caixa-preta', kg: 10, L: 12, rar: 'raro', valor: 156, recicla: { eletronica: 3 }, zona: null, peso: 0 },
+  ancora_gigante:  { nome: 'Âncora gigante', kg: 320, L: 200, rar: 'raro', valor: 1235, recicla: { metal: 45 }, zona: null, peso: 0, coop: true },
   // itens restaurados (só via bancada de restauro)
-  radio_ok:        { nome: 'Rádio restaurado', kg: 3, L: 8, rar: 'incomum', valor: 140, restaurado: true },
-  ferramentas_ok:  { nome: 'Jogo de ferramentas', kg: 8, L: 18, rar: 'incomum', valor: 190, restaurado: true },
-  motor_ok:        { nome: 'Motor de popa revisado', kg: 35, L: 60, rar: 'raro', valor: 320, restaurado: true },
-  sino_polido:     { nome: 'Sino de navio polido', kg: 25, L: 20, rar: 'raro', valor: 650, restaurado: true },
-  cofre_aberto:    { nome: 'Cofre aberto (moedas antigas)', kg: 80, L: 50, rar: 'raro', valor: 1150, restaurado: true },
-  sonda_ok:        { nome: 'Sonda recuperada', kg: 40, L: 45, rar: 'raro', valor: 1600, restaurado: true },
-  reliquia_viva:   { nome: 'Relíquia desperta', kg: 15, L: 15, rar: 'lendário', valor: 9000, restaurado: true },
+  radio_ok:        { nome: 'Rádio restaurado', kg: 3, L: 8, rar: 'incomum', valor: 196, restaurado: true },
+  ferramentas_ok:  { nome: 'Jogo de ferramentas', kg: 8, L: 18, rar: 'incomum', valor: 266, restaurado: true },
+  motor_ok:        { nome: 'Motor de popa revisado', kg: 35, L: 60, rar: 'raro', valor: 448, restaurado: true },
+  sino_polido:     { nome: 'Sino de navio polido', kg: 25, L: 20, rar: 'raro', valor: 910, restaurado: true },
+  cofre_aberto:    { nome: 'Cofre aberto (moedas antigas)', kg: 80, L: 50, rar: 'raro', valor: 1610, restaurado: true },
+  sonda_ok:        { nome: 'Sonda recuperada', kg: 40, L: 45, rar: 'raro', valor: 2240, restaurado: true },
+  reliquia_viva:   { nome: 'Relíquia desperta', kg: 15, L: 15, rar: 'lendário', valor: 12600, restaurado: true },
 };
 export const RESTAURO = {
   radio_ok: { dinheiro: 20, comps: { eletronica: 1 }, s: 3 },
@@ -58,17 +58,24 @@ export const RESTAURO = {
 // ---------------- PEIXES E FAUNA PESCÁVEL ----------------
 // cm: [mín, máx]; prof: profundidade de linha [mín, máx] em m; hora: 'dia' | 'noite' | 'qualquer'
 export const ESPECIES = {
-  tetra:     { nome: 'Tetra-de-vidro', cm: [3, 6], prof: [0, 6], hora: 'dia', chance: 14, valor: 12, cor: [0.55, 0.85, 0.95], forca: 0.3, forma: 'peixe', cardume: true },
-  barrigudo: { nome: 'Barrigudinho-do-lago', cm: [3, 8], prof: [0, 8], hora: 'qualquer', chance: 14, valor: 10, cor: [0.95, 0.6, 0.25], forca: 0.3, forma: 'peixe', cardume: true },
-  lambari:   { nome: 'Lambari', cm: [7, 14], prof: [0, 12], hora: 'dia', chance: 18, valor: 9, cor: [0.8, 0.82, 0.78], forca: 0.5, forma: 'peixe', cardume: true },
-  tilapia:   { nome: 'Tilápia', cm: [15, 45], prof: [1, 20], hora: 'dia', chance: 14, valor: 28, cor: [0.55, 0.6, 0.55], forca: 1.2, forma: 'peixe' },
-  tucunare:  { nome: 'Tucunaré', cm: [25, 75], prof: [2, 30], hora: 'dia', chance: 9, valor: 65, cor: [0.85, 0.75, 0.25], forca: 2.2, forma: 'peixe' },
-  carpa:     { nome: 'Carpa-espelho', cm: [30, 90], prof: [2, 35], hora: 'qualquer', chance: 8, valor: 55, cor: [0.75, 0.55, 0.3], forca: 2.0, forma: 'peixe' },
-  bagre:     { nome: 'Bagre-do-lodo', cm: [30, 110], prof: [4, 60], hora: 'noite', chance: 10, valor: 75, cor: [0.35, 0.33, 0.3], forca: 2.6, forma: 'bagre' },
-  lula:      { nome: 'Lula-de-lago', cm: [25, 60], prof: [6, 80], hora: 'noite', chance: 12, valor: 40, cor: [0.85, 0.45, 0.55], forca: 1.6, forma: 'lula', tinta: true },
-  enguia:    { nome: 'Enguia-elétrica', cm: [60, 150], prof: [8, 80], hora: 'noite', chance: 4, valor: 190, cor: [0.25, 0.3, 0.22], forca: 3.2, forma: 'enguia' },
-  pirarucu:  { nome: 'Pirarucu', cm: [120, 250], prof: [10, 80], hora: 'dia', chance: 3, valor: 480, cor: [0.4, 0.35, 0.3], forca: 5.5, forma: 'peixe' },
-  tubarao:   { nome: 'Tubarão-touro-do-lago', cm: [250, 420], prof: [25, 150], hora: 'noite', chance: 2.2, valor: 1900, cor: [0.42, 0.46, 0.5], forca: 9, forma: 'tubarao', pesado: true },
+  tetra:     { nome: 'Tetra-de-vidro', cm: [3, 6], prof: [0, 6], hora: 'dia', chance: 13, valor: 20, cor: [0.55, 0.85, 0.95], forca: 0.3, forma: 'peixe', cardume: true },
+  barrigudo: { nome: 'Barrigudinho-do-lago', cm: [3, 8], prof: [0, 8], hora: 'qualquer', chance: 12, valor: 18, cor: [0.95, 0.6, 0.25], forca: 0.3, forma: 'peixe', cardume: true },
+  lambari:   { nome: 'Lambari', cm: [7, 14], prof: [0, 12], hora: 'dia', chance: 15, valor: 16, cor: [0.8, 0.82, 0.78], forca: 0.5, forma: 'peixe', cardume: true },
+  piranha:   { nome: 'Piranha-vermelha', cm: [12, 30], prof: [0, 15], hora: 'qualquer', chance: 10, valor: 45, cor: [0.62, 0.36, 0.3], forca: 1.0, forma: 'peixe', cardume: true },
+  tilapia:   { nome: 'Tilápia', cm: [15, 45], prof: [1, 20], hora: 'dia', chance: 13, valor: 60, cor: [0.55, 0.6, 0.55], forca: 1.2, forma: 'peixe' },
+  traira:    { nome: 'Traíra', cm: [20, 60], prof: [1, 22], hora: 'noite', chance: 9, valor: 95, cor: [0.33, 0.36, 0.25], forca: 1.8, forma: 'peixe' },
+  pacu:      { nome: 'Pacu', cm: [20, 70], prof: [2, 30], hora: 'dia', chance: 8, valor: 120, cor: [0.42, 0.46, 0.5], forca: 1.9, forma: 'peixe' },
+  tucunare:  { nome: 'Tucunaré', cm: [25, 75], prof: [2, 30], hora: 'dia', chance: 9, valor: 170, cor: [0.85, 0.75, 0.25], forca: 2.2, forma: 'peixe' },
+  carpa:     { nome: 'Carpa-espelho', cm: [30, 90], prof: [2, 35], hora: 'qualquer', chance: 8, valor: 130, cor: [0.75, 0.55, 0.3], forca: 2.0, forma: 'peixe' },
+  tambaqui:  { nome: 'Tambaqui', cm: [40, 110], prof: [4, 45], hora: 'qualquer', chance: 5, valor: 230, cor: [0.28, 0.29, 0.27], forca: 3.0, forma: 'peixe' },
+  dourado:   { nome: 'Dourado', cm: [40, 100], prof: [3, 40], hora: 'dia', chance: 5, valor: 280, cor: [0.97, 0.72, 0.18], forca: 3.1, forma: 'peixe' },
+  bagre:     { nome: 'Bagre-do-lodo', cm: [30, 110], prof: [4, 60], hora: 'noite', chance: 10, valor: 160, cor: [0.35, 0.33, 0.3], forca: 2.6, forma: 'bagre' },
+  pintado:   { nome: 'Pintado (surubim)', cm: [50, 140], prof: [8, 70], hora: 'noite', chance: 4, valor: 360, cor: [0.72, 0.73, 0.76], forca: 3.6, forma: 'bagre' },
+  lula:      { nome: 'Lula-de-lago', cm: [25, 60], prof: [6, 80], hora: 'noite', chance: 12, valor: 75, cor: [0.85, 0.45, 0.55], forca: 1.6, forma: 'lula', tinta: true },
+  enguia:    { nome: 'Enguia-elétrica', cm: [60, 150], prof: [8, 80], hora: 'noite', chance: 4, valor: 340, cor: [0.25, 0.3, 0.22], forca: 3.2, forma: 'enguia' },
+  pirarucu:  { nome: 'Pirarucu', cm: [120, 250], prof: [10, 80], hora: 'dia', chance: 3, valor: 850, cor: [0.4, 0.35, 0.3], forca: 5.5, forma: 'peixe' },
+  peixe_lua: { nome: 'Peixe-lua-dourado (lendário)', cm: [80, 180], prof: [30, 110], hora: 'noite', chance: 1, valor: 1600, cor: [1.0, 0.84, 0.32], forca: 5.0, forma: 'peixe' },
+  tubarao:   { nome: 'Tubarão-touro-do-lago', cm: [250, 420], prof: [25, 150], hora: 'noite', chance: 2.2, valor: 3000, cor: [0.42, 0.46, 0.5], forca: 9, forma: 'tubarao', pesado: true },
 };
 // massa aproximada (kg) a partir do comprimento
 export function massaPeixe(esp, cm) {
@@ -246,20 +253,49 @@ export const CORES_JOGADOR = [
 export const PERFIL_VERSAO = 1;
 
 // ---------------- LIXO DA MARGEM ----------------
-export const LIXO = { tipos: ['garrafa_pet', 'garrafa_pet', 'garrafa_pet', 'latinha', 'latinha', 'saco_lixo', 'saco_lixo', 'sacola', 'vidro_quebrado'], quantidade: 90, saco: 15, respawnMin: 2, respawnMax: 4 };
+export const LIXO = { tipos: ['garrafa_pet', 'garrafa_pet', 'garrafa_pet', 'latinha', 'latinha', 'saco_lixo', 'saco_lixo', 'sacola', 'vidro_quebrado'], quantidade: 100, saco: 15, respawnMinS: 3, respawnMaxS: 8 };
+// sucata do fundo do lago: quando alguém pega, nasce outra em outro lugar em poucos segundos
+export const SUCATA_RESPAWN_S = [5, 12];
 
 // ---------------- ARMAS (barraca de armas, ao lado da casinha de tinta) ----------------
 // Cada tiro derruba o alvo (como o peixe) e o empurra para longe. Compra em ordem: pistola → … → bazuca.
 // stunMs: tempo no chão; empurrao: velocidade horizontal (m/s) e salto (m/s) aplicados no alvo.
 export const ARMAS = {
-  pistola:      { nome: 'Pistola', preco: 900, requer: null, alcance: 45, cdMs: 420, stunMs: 2000, empurrao: [3, 2.5], dispersao: 0.012, municao: { n: 12, preco: 20 }, ordem: 1 },
-  metralhadora: { nome: 'Submetralhadora', preco: 3500, requer: 'pistola', alcance: 45, cdMs: 110, stunMs: 3000, empurrao: [4.5, 3], dispersao: 0.035, municao: { n: 40, preco: 45 }, ordem: 2, auto: true },
-  fuzil:        { nome: 'Fuzil', preco: 9000, requer: 'metralhadora', alcance: 85, cdMs: 170, stunMs: 4000, empurrao: [7, 4], dispersao: 0.016, municao: { n: 30, preco: 80 }, ordem: 3, auto: true },
-  sniper:       { nome: 'Sniper', preco: 20000, requer: 'fuzil', alcance: 220, cdMs: 1400, stunMs: 5500, empurrao: [11, 6], dispersao: 0, municao: { n: 5, preco: 90 }, ordem: 4, mira: true },
-  bazuca:       { nome: 'Bazuca', preco: 45000, requer: 'sniper', alcance: 110, cdMs: 2600, stunMs: 7000, empurrao: [16, 11], dispersao: 0, municao: { n: 1, preco: 180 }, ordem: 5, foguete: true, raio: 4.5, velocidade: 38 },
+  // estilingue: a munição é o lixo catado na margem (E cata · Q mira e atira). Não machuca o Kraken.
+  estilingue:   { nome: 'Estilingue de lixo', preco: 400, requer: null, alcance: 32, cdMs: 1200, stunMs: 1000, empurrao: [0, 0], dispersao: 0, municao: null, ordem: 0, lixo: true, danoKraken: 0 },
+  pistola:      { nome: 'Pistola', preco: 900, requer: 'estilingue', alcance: 45, cdMs: 420, stunMs: 2000, empurrao: [3, 2.5], dispersao: 0.012, municao: { n: 12, preco: 20 }, danoKraken: 8, ordem: 1 },
+  metralhadora: { nome: 'Submetralhadora', preco: 3500, requer: 'pistola', alcance: 45, cdMs: 110, stunMs: 3000, empurrao: [4.5, 3], dispersao: 0.035, municao: { n: 40, preco: 45 }, danoKraken: 3, ordem: 2, auto: true },
+  fuzil:        { nome: 'Fuzil', preco: 9000, requer: 'metralhadora', alcance: 85, cdMs: 170, stunMs: 4000, empurrao: [7, 4], dispersao: 0.016, municao: { n: 30, preco: 80 }, danoKraken: 6, ordem: 3, auto: true },
+  sniper:       { nome: 'Sniper', preco: 20000, requer: 'fuzil', alcance: 220, cdMs: 1400, stunMs: 5500, empurrao: [11, 6], dispersao: 0, municao: { n: 5, preco: 90 }, danoKraken: 70, ordem: 4, mira: true },
+  bazuca:       { nome: 'Bazuca', preco: 45000, requer: 'sniper', alcance: 110, cdMs: 2600, stunMs: 7000, empurrao: [16, 11], dispersao: 0, municao: { n: 1, preco: 180 }, danoKraken: 300, ordem: 5, foguete: true, raio: 4.5, velocidade: 38 },
 };
-export const ARMAS_ORDEM = ['pistola', 'metralhadora', 'fuzil', 'sniper', 'bazuca'];
-export const MUNICAO_MAX = { pistola: 120, metralhadora: 400, fuzil: 300, sniper: 40, bazuca: 12 };
+export const ARMAS_ORDEM = ['pistola', 'metralhadora', 'fuzil', 'sniper', 'bazuca']; // teclas 1–5
+export const ARMAS_LOJA = ['estilingue', ...ARMAS_ORDEM]; // ordem de compra na barraca
+
+// ---------------- KRAKEN DO ABISMO ----------------
+// Aparece no meio do lago a cada 20 min e fica 1 min rondando perto dos píeres.
+// Vida calculada pelo dano das armas: 5 pistolas, 4 submetralhadoras, 3 fuzis, 2 snipers ou 1 bazuca
+// conseguem derrubar em 1 minuto atirando bastante. O estilingue não faz dano.
+export const KRAKEN = { intervaloMs: 20 * 60e3, duracaoMs: 60e3, avisoMs: 60e3, hp: 3000, premio: 1000, raio: 6.2, tamanho: 5 };
+
+// ---------------- CORRIDA DE SUBMARINO ----------------
+// 2 jogadores: vencedor ganha S$ 200 e o perdedor paga S$ 200.
+// 3 a 5: vencedor ganha S$ 250, divididos entre os que perderam.
+export const CORRIDA = { checkpoints: 5, premio2: 200, premioN: 250, conviteMs: 25000, largadaMs: 4000, limiteMs: 240000, raioCheck: 5.5, minDinheiro: 200 };
+export function divisaoCorrida(n) {
+  if (n < 2) return { premio: 0, perda: [] };
+  if (n === 2) return { premio: CORRIDA.premio2, perda: [CORRIDA.premio2] };
+  const base = Math.floor(CORRIDA.premioN / (n - 1)), perda = Array(n - 1).fill(base);
+  for (let i = 0; i < CORRIDA.premioN - base * (n - 1); i++) perda[i]++;
+  return { premio: CORRIDA.premioN, perda };
+}
+export function textoPremioCorrida(n) {
+  if (n < 2) return 'Escolha pelo menos 1 amigo.';
+  if (n === 2) return `Quem vencer ganha S$ ${CORRIDA.premio2}. Quem perder paga S$ ${CORRIDA.premio2}.`;
+  const d = divisaoCorrida(n);
+  return `${n} corredores: quem vencer ganha S$ ${CORRIDA.premioN}, pagos pelos ${n - 1} que perderem (cerca de S$ ${d.perda[d.perda.length - 1]} cada).`;
+}
+export const MUNICAO_MAX = { estilingue: 0, pistola: 120, metralhadora: 400, fuzil: 300, sniper: 40, bazuca: 12 };
 
 // ---------------- ESTÁTUA (peças espalhadas no fundo do lago) ----------------
 // requer: peças que já precisam estar colocadas. mult: quanto soma ao multiplicador de dinheiro.

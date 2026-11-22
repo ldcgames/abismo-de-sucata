@@ -7,7 +7,7 @@ import { stationById, terrainHeight, noise3, PAD_R, CRADLE_R, LAUNCH_R, DOCK_END
 import { AQUARIOS, TANQUES, CORES_JOGADOR, ESPECIES } from '../../shared/data.js';
 import { makeFishGeo } from '../world/fauna.js';
 import { weaponMesh } from './weapons.js';
-import { BARRACA_ARMAS } from '../../shared/world.js';
+import { BARRACA_ARMAS, BARRACA_CORRIDA } from '../../shared/world.js';
 import { ARMAS_ORDEM } from '../../shared/data.js';
 
 const CONC0 = [0.42, 0.41, 0.38];
@@ -46,8 +46,9 @@ export function textQuad(R, lines, w = 4, h = 1.4, opts = {}) {
 // posição do tanque de peixes no plano local: a janela fica sempre em z = -6.5 (atrás da loja de armas)
 // e o lado esquerdo nunca passa de x = 8.6, para não invadir o caminho
 export function tanqueLayout(nivel) {
+  // fica atrás da barraca da corrida: janela em z = -10.1, lado esquerdo em x = 8.6
   const t = TANQUES[nivel]; const [w, , d] = t.dims;
-  return { x: Math.max(12, 8.6 + w / 2 + 0.45), z: -6.5 - d / 2, w, d, t };
+  return { x: 8.6 + 0.45 + w / 2, z: -10.1 - d / 2, w, d, t };
 }
 function casinha(g, hx, hz, cor) {
   // piso
@@ -176,7 +177,7 @@ export class Station {
     g.put(rbox(1.0, 0.7, 0.1, 0.04), [-4, 3.4, 9.15], [-0.25, 0.4, 0], 1, [0.15, 0.16, 0.18]);
     // caixa d'água/postes
     g.k = MAT.MADEIRA;
-    g.put(cylinder(0.12, 0.12, 6, 8), [14, 4.5, -10], [0, 0, 0], 1, WOOD_DK);
+    g.put(cylinder(0.12, 0.12, 6, 8), [-15.5, 4.5, -11.5], [0, 0, 0], 1, WOOD_DK);
     // carregador do cais
     g.k = MAT.PINTADO;
     g.put(rbox(0.8, 1.3, 0.5, 0.06), [3.2, 2.2, this.zCradle - 1], [0, 0, 0], 1, [0.95, 0.75, 0.15]);
@@ -214,6 +215,25 @@ export class Station {
       g.put(box(0.06, 1.3, 2.8), [hx + 1.99, 3.85, hz + 0.35], [0, 0, 0], 1, [0.3, 0.2, 0.12]); // painel de exposição na parede
       for (let i = 0; i < 5; i++) g.put(box(0.12, 0.025, 2.6), [hx + 1.9, 4.18 - i * 0.24, hz + 0.35], [0, 0, 0], 1, [0.25, 0.16, 0.1]); // prateleiras
     }
+    // barraca da corrida de submarino (ao lado da loja de armas): troféus na parede e uma bola brilhante no meio
+    {
+      const hx = BARRACA_CORRIDA.x, hz = BARRACA_CORRIDA.z;
+      casinha(g, hx, hz, [0.22, 0.34, 0.44]);
+      g.k = MAT.MADEIRA;
+      g.put(box(0.12, 0.05, 3.2), [hx + 1.92, 3.05, hz], [0, 0, 0], 1, [0.3, 0.2, 0.12]); // prateleira dos troféus
+      g.put(box(0.12, 0.05, 3.2), [hx + 1.92, 3.95, hz], [0, 0, 0], 1, [0.3, 0.2, 0.12]);
+      g.k = MAT.METAL;
+      const ouro = [0.95, 0.76, 0.22], prata = [0.8, 0.82, 0.86], bronze = [0.72, 0.45, 0.25];
+      [[3.08, -1.1, ouro, 1.25], [3.08, -0.35, prata, 1], [3.08, 0.4, bronze, 0.9], [3.08, 1.1, ouro, 0.8], [3.98, -0.8, ouro, 0.9], [3.98, 0.1, prata, 1.1], [3.98, 0.95, bronze, 0.85]].forEach(([y, z, c, k]) => {
+        g.put(cylinder(0.07 * k, 0.1 * k, 0.08 * k, 10), [hx + 1.88, y + 0.04 * k, hz + z], [0, 0, 0], 1, [0.2, 0.15, 0.1]); // base
+        g.put(cylinder(0.025 * k, 0.025 * k, 0.12 * k, 8), [hx + 1.88, y + 0.14 * k, hz + z], [0, 0, 0], 1, c);
+        g.put(cylinder(0.12 * k, 0.05 * k, 0.2 * k, 14), [hx + 1.88, y + 0.3 * k, hz + z], [0, 0, 0], 1, c); // taça
+        for (const s2 of [-1, 1]) g.put(torus(0.05 * k, 0.012 * k, 10, 5), [hx + 1.88, y + 0.32 * k, hz + z + s2 * 0.13 * k], [Math.PI / 2, 0, 0], 1, c); // alças
+      });
+      // bandeira quadriculada na parede do fundo
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) g.put(box(0.03, 0.2, 0.2), [hx + 2.05, 4.35 + j * 0.2 - 0.2, hz - 0.7 + i * 0.2], [0, 0, 0], 1, (i + j) % 2 ? [0.95, 0.95, 0.95] : [0.08, 0.08, 0.08]);
+      g.put(cylinder(0.32, 0.4, 0.9, 16), [hx + 0.2, 2.0, hz], [0, 0, 0], 1, [0.18, 0.2, 0.24]); // pedestal da bola
+    }
     const sn = new Node('estrutura'); sn.mesh = R.createMesh(g, { rough: 0.85, metal: 0.05, rust: 0.45 });
     this.root.add(sn);
     // tela do terminal (emissiva)
@@ -237,10 +257,20 @@ export class Station {
       });
       const tela = new Geo(); tela.put(box(0.02, 0.42, 0.66), [hx + 1.65, 3.2, hz - 1.35], [0, 0, 0], 1, [0.95, 0.35, 0.2]);
       const tn2 = new Node('tela_armas'); tn2.mesh = R.createMesh(tela, { emissive: [0.9, 0.35, 0.15], glow: 1.3, castShadow: false }); this.root.add(tn2);
-      const pl = textQuad(R, ['LOJA DE ARMAS', 'Compre no computador (E)', 'Pistola → Submetralhadora → Fuzil → Sniper → Bazuca', 'As balas também são vendidas aqui'], 2.2, 0.75, { px: 900, bg: '#2a1a16', border: '#ff8a4a' });
+      const pl = textQuad(R, ['LOJA DE ARMAS', 'Compre no computador (E)', 'Estilingue → Pistola → Submetralhadora → Fuzil → Sniper → Bazuca', 'As balas também são vendidas aqui'], 2.2, 0.75, { px: 900, bg: '#2a1a16', border: '#ff8a4a' });
       pl.at(hx + 0.2, 3.25, hz - 1.72).rot(0, 0, 0); this.root.add(pl);
       const ent2 = textQuad(R, ['ARMAS'], 2.4, 0.42, { px: 512, bg: '#3a1c16', border: '#ff8a4a' });
       ent2.at(hx - 2.36, 4.42, hz).rot(0, -Math.PI / 2, 0); this.root.add(ent2);
+    }
+    {
+      const hx = BARRACA_CORRIDA.x, hz = BARRACA_CORRIDA.z;
+      const bg = new Geo(); bg.put(sphere(0.38, 22, 16), [hx + 0.2, 2.82, hz], [0, 0, 0], 1, [0.35, 1, 0.6]);
+      const bola = new Node('bola_corrida'); bola.mesh = R.createMesh(bg, { emissive: [0.3, 1.3, 0.6], glow: 1.4, castShadow: false }); this.root.add(bola);
+      this.bolaCorrida = bola;
+      const pl = textQuad(R, ['CORRIDA DE SUBMARINO', 'Toque na bola (E) e chame os amigos', '2 corredores: vence ganha S$ 200 · perde paga S$ 200', '3 a 5: vence ganha S$ 250 (dividido entre quem perde)'], 2.3, 0.8, { px: 900, bg: '#12302a', border: '#5fe39a' });
+      pl.at(hx + 0.1, 3.3, hz - 1.72).rot(0, 0, 0); this.root.add(pl);
+      const ent3 = textQuad(R, ['CORRIDA'], 2.4, 0.42, { px: 512, bg: '#123a2c', border: '#5fe39a' });
+      ent3.at(hx - 2.36, 4.42, hz).rot(0, -Math.PI / 2, 0); this.root.add(ent3);
     }
     const ent = textQuad(R, ['BOLSAS DE TINTA'], 2.4, 0.42, { px: 512, bg: '#3a2a1c' });
     ent.at(13.6 - 2.36, 4.42, 2.5).rot(0, -Math.PI / 2, 0); this.root.add(ent);
@@ -526,6 +556,7 @@ export class Station {
   }
 
   animateFish(dt, t) {
+    if (this.bolaCorrida) this.bolaCorrida.pos[1] = Math.sin(t * 2.2) * 0.07;
     for (const a of [...this.aqFish, ...this.tankFish]) {
       const b = a.box;
       const sp = 0.06 + (a.cm / 100) * 0.35;
@@ -557,7 +588,8 @@ export class Station {
     if (est?.restauro) list.push(P('restauro', -12, 1.6, -2.5, 2.6, { txt: 'Bancada de restauro' }));
     list.push(P('tinta', 13.4, 1.6, 2.5, 2.2, { txt: 'Fábrica de bolsas de tinta (leia a placa)' }));
     list.push(P('armas', BARRACA_ARMAS.x + 0.9, 1.6, BARRACA_ARMAS.z - 1.2, 2.0, { txt: 'Computador da loja de armas: comprar armas e balas' }));
-    if (est?.tanque && est.tanque.nivel >= 0) list.push(P('tanque', tanqueLayout(est.tanque.nivel).x - TANQUES[est.tanque.nivel].dims[0] / 2 + 1.6, 1.6, -5.3, 3.2, { txt: TANQUES[est.tanque.nivel].nome }));
+    list.push(P('corrida', BARRACA_CORRIDA.x - 0.6, 1.6, BARRACA_CORRIDA.z, 2.0, { txt: 'Corrida de submarino: chamar amigos' }));
+    if (est?.tanque && est.tanque.nivel >= 0) list.push(P('tanque', tanqueLayout(est.tanque.nivel).x - TANQUES[est.tanque.nivel].dims[0] / 2 + 1.3, 1.6, -8.9, 2.4, { txt: TANQUES[est.tanque.nivel].nome }));
     return list;
   }
   // colisores (caixas no plano local) para o personagem
@@ -575,6 +607,8 @@ export class Station {
       { x: BARRACA_ARMAS.x + 2.15, z: BARRACA_ARMAS.z, w: 0.3, d: 4.0 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_ARMAS.x + 1.55, z: BARRACA_ARMAS.z + 0.6, w: 0.9, d: 2.0 }, { x: BARRACA_ARMAS.x + 1.5, z: BARRACA_ARMAS.z - 1.35, w: 0.9, d: 0.9 }, { x: BARRACA_ARMAS.x + 0.45, z: BARRACA_ARMAS.z + 1.45, w: 0.7, d: 0.5 },
       { x: 12, z: 14, w: 0.3, d: 0.3 }, { x: 6, z: -12.5, w: 4.4, d: 0.3 },
+      { x: BARRACA_CORRIDA.x + 2.15, z: BARRACA_CORRIDA.z, w: 0.3, d: 4.0 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z + 1.92, w: 4.4, d: 0.3 },
+      { x: BARRACA_CORRIDA.x + 0.2, z: BARRACA_CORRIDA.z, w: 0.85, d: 0.85 },
     ];
   }
 }

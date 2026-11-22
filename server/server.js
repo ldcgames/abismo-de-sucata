@@ -50,6 +50,14 @@ function broadcast(entry, msg, exceto) {
   for (const c of entry.clients) if (c !== exceto && c.readyState === 1) c.send(s);
 }
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+// eventos que mexem no dinheiro de vários jogadores (Kraken, corrida): manda o perfil novo e salva
+function sincronizarPerfis(entry, evs, exceto) {
+  const slots = new Set(); for (const e of evs) for (const s of e.perfis || []) slots.add(s);
+  if (!slots.size) return;
+  for (const c of entry.clients) if (slots.has(c.slot) && c !== exceto) { send(c, { t: 'perfil', perfil: c.profile }); salvar(c); }
+  if (exceto && slots.has(exceto.slot)) salvar(exceto);
+  agendarCopia(entry);
+}
 
 // salva tudo o que é do jogador (progresso na sala, conta) e a sala
 function salvar(ws) {
@@ -239,6 +247,7 @@ async function handle(ws, m) {
       send(ws, { t: 'res', req: m.req, res: pub, perfil: ws.profile });
       if (events.length) {
         broadcast(ws.entry, { t: 'ev', ev: events });
+        sincronizarPerfis(ws.entry, events, ws);
         // quem ganhou missão por acertar alguém recebe o perfil novo
         for (const e of events) if (e.t === 'missao_ok' && e.slot !== ws.slot) for (const c of ws.entry.clients) if (c.slot === e.slot) { send(c, { t: 'perfil', perfil: c.profile }); salvar(c); }
       }
@@ -266,6 +275,15 @@ async function handle(ws, m) {
       return send(ws, { t: 'saiu_ok' });
     }
     case 'ping': return send(ws, { t: 'pong', ts: m.ts });
+    // só nos testes automatizados (ABISMO_TESTE=1): define o dinheiro do jogador
+    case 'teste_dinheiro': if (process.env.ABISMO_TESTE === '1' && ws.profile && Number.isFinite(m.v)) { ws.profile.dinheiro = m.v; send(ws, { t: 'perfil', perfil: ws.profile }); } return;
+    case 'voz': {
+      // chat de voz: o servidor só repassa a sinalização WebRTC (oferta/resposta/ICE) dentro da mesma sala
+      if (!ws.entry || typeof m.para !== 'string' || !m.d || typeof m.d !== 'object') return;
+      if (JSON.stringify(m.d).length > 20000) return;
+      for (const c of ws.entry.clients) if (c.slot === m.para && c !== ws) send(c, { t: 'voz', de: ws.slot, d: m.d });
+      return;
+    }
   }
 }
 
@@ -277,9 +295,9 @@ setInterval(() => {
   contSnap++;
   for (const [code, entry] of rooms) {
     const ev = entry.room.tick(agora, dt);
-    if (ev.length) broadcast(entry, { t: 'ev', ev });
+    if (ev.length) { broadcast(entry, { t: 'ev', ev }); sincronizarPerfis(entry, ev); }
     if (contSnap % 2 === 0 && entry.clients.size) {
-      const snap = { t: 'snap', snap: entry.room.snapshot(agora), proj: entry.room.world.projeteis.map((p) => ({ id: p.id, tipo: p.tipo, pos: p.pos, vel: p.vel, esp: p.peixe?.esp })) };
+      const snap = { t: 'snap', snap: entry.room.snapshot(agora), proj: entry.room.world.projeteis.map((p) => ({ id: p.id, tipo: p.tipo, pos: p.pos, vel: p.vel, esp: p.peixe?.esp, lixo: p.lixo })) };
       broadcast(entry, snap);
     }
     // sala vazia sai da memória (continua salva em disco; volta igual quando alguém entrar com o código)

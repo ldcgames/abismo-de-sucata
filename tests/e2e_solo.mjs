@@ -138,9 +138,9 @@ await sleep(300);
 await page.goto(base + '?q=0&semdesenho&auto=solo');
 await page.waitForFunction(() => window.__jogo?.me && window.__jogo.t > 0, null, { timeout: 120000 });
 check((await ev(() => __jogo.perfil.dinheiro)) === mv.d && (await ev(() => __jogo.perfil.estacao.decoracao)), 'progresso persiste após recarregar (localStorage)');
-await ev(() => { __jogo.input.press('KeyM'); __jogo.step(1); });
-check(await ev(() => __jogo.ui.aberto === 'mapa' && !!document.getElementById('mapaCv')), 'M abre o mapa do lago');
-await ev(() => { __jogo.input.press('KeyM'); __jogo.step(1); });
+await ev(() => { __jogo.input.press('KeyJ'); __jogo.step(1); });
+check(await ev(() => __jogo.ui.aberto === 'mapa' && !!document.getElementById('mapaCv')), 'J abre o mapa do lago');
+await ev(() => { __jogo.input.press('KeyJ'); __jogo.step(1); });
 // ---------- v0.4: roda de emotes, câmera de ombro, escorregar na encosta, parede invisível, bolsa inicial
 check(await ev(() => __jogo.perfil.baloes >= 1), 'jogador começa com bolsa de tinta', await ev(() => __jogo.perfil.baloes));
 const roda = await ev(() => { const g = __jogo; g.me.emote = null; g.input.wheel = 1; g.step(1); const aberta = !document.getElementById('rodaEmotes').hidden; g.input.wheel = 1; g.step(1); const sel = g.roda?.sel; g.input.mouse.clicked = true; g.step(1); return { aberta, sel, emote: g.me.emote?.i, fechou: document.getElementById('rodaEmotes').hidden }; });
@@ -158,15 +158,21 @@ const cata = await ev(async () => {
   g.step(5); g.input.press('KeyE'); g.step(1);
   const anim = g.me.acao?.tipo;
   for (let k = 0; k < 30; k++) { await new Promise((r) => setTimeout(r, 60)); g.step(2); }
-  return { anim, s0, s1: g.perfil.saco.length, some: !g.items.has(alvo.item.id), av: [...document.querySelectorAll('#avisos *')].map((x) => x.textContent).slice(-2), d: Math.hypot(alvo.pos[0] - g.me.pos[0], alvo.pos[2] - g.me.pos[2]) };
+  const naMao = g.perfil.lixoMao?.tipo || null, prompt = document.getElementById('prompt').textContent;
+  g.input.press('KeyE'); g.step(1);
+  for (let k = 0; k < 10; k++) { await new Promise((r) => setTimeout(r, 60)); g.step(2); }
+  return { anim, naMao, prompt, maoDepois: g.perfil.lixoMao, s0, s1: g.perfil.saco.length, some: !g.items.has(alvo.item.id), av: [...document.querySelectorAll('#avisos *')].map((x) => x.textContent).slice(-2), d: Math.hypot(alvo.pos[0] - g.me.pos[0], alvo.pos[2] - g.me.pos[2]) };
 });
-check(cata.anim === 'pegar' && cata.s1 === cata.s0 + 1 && cata.some, 'E na margem: abaixa, cata o lixo e vai para o saco', JSON.stringify(cata));
+check(cata.anim === 'pegar' && cata.naMao && /Guardar/.test(cata.prompt) && /estilingue/i.test(cata.prompt) && cata.some, 'E na margem: abaixa e cata o lixo para a mão (E guarda · Q estilingue)', JSON.stringify(cata));
+check(cata.s1 === cata.s0 + 1 && !cata.maoDepois, 'E de novo guarda o lixo no saco', JSON.stringify(cata));
 const armas = await ev(async () => {
   const g = __jogo; const st = g.stations[g.slot];
   for (const wp of [[-1.9, 1.5, 10], [10, 1.6, -6], [14.4, 1.7, -3.6]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
   g.perfil.dinheiro = 5000;
   g.step(3); g.input.press('KeyE'); g.step(1);
   const painel = g.ui.aberto;
+  const est = [...document.querySelectorAll('#painelCorpo [data-acao]')].find((b) => /Comprar estilingue/.test(b.textContent));
+  est?.click(); await new Promise((r) => setTimeout(r, 400));
   const bt = [...document.querySelectorAll('#painelCorpo [data-acao]')].find((b) => /Comprar arma/.test(b.textContent));
   bt?.click(); await new Promise((r) => setTimeout(r, 400));
   g.ui.fechar(); g.step(2);
@@ -180,10 +186,52 @@ const armas = await ev(async () => {
   return { painel, tem, segura, naMao, bal0, bal1, dinheiro: g.perfil.dinheiro, guardou: !g.me.arma };
 });
 check(armas.painel === 'armas', 'E no computador da barraca abre a loja de armas');
-check(armas.tem && armas.dinheiro === 5000 - 900, 'comprar a pistola pelo botão', JSON.stringify(armas));
+check(armas.tem && armas.dinheiro === 5000 - 400 - 900, 'comprar o estilingue e depois a pistola pelo botão', JSON.stringify(armas));
 check(armas.segura === 'arma' && armas.naMao, 'tecla 1 equipa a pistola (modelo na mão)');
 check(armas.bal1 === armas.bal0 - 1, 'clique atira (gasta 1 bala)', `${armas.bal0} → ${armas.bal1}`);
 check(armas.guardou, 'H guarda a arma');
+// ---------- v0.9: estilingue, Kraken, breakdance, voz no solo
+const estil = await ev(async () => {
+  const g = __jogo;
+  g.perfil.lixoMao = null; g.perfil.saco.push({ uid: 'e2e_l', tipo: 'latinha' });
+  g.input.press('KeyQ'); g.step(2);
+  const mirando = g.me.mirandoLixo, arco = g.miraPontos.filter((n) => n.visible).length;
+  const n0 = g.perfil.saco.length;
+  g.input.mouse.clicked = true; g.step(1);
+  await new Promise((r) => setTimeout(r, 300)); g.step(3);
+  return { mirando, arco, n0, n1: g.perfil.saco.length, voando: [...g.proj.values()].some((v) => v.tipo === 'lixo') || g.net.room.world.projeteis.some((x) => x.tipo === 'lixo') };
+});
+check(estil.mirando && estil.arco > 3, 'Q mira o estilingue com o mesmo arco do peixe', JSON.stringify(estil));
+check(estil.n1 === estil.n0 - 1, 'clique atira o lixo do saco com o estilingue', JSON.stringify(estil));
+const kr = await ev(async () => {
+  const g = __jogo, k = g.net.room.world.kraken;
+  k.proximo = Date.now() - 1; await new Promise((r) => setTimeout(r, 400)); g.step(3);
+  const hud = document.getElementById('krakenHud').textContent, vis = g.kr.root.visible;
+  // tiro de pistola direto no Kraken (pela regra do servidor local)
+  g.perfil.municao.pistola = 40;
+  const w = await import('/shared/world.js');
+  const t = (Date.now() - k.ini) / 1000, c = w.krakenPos(t, k.a0).pos;
+  const ang = Math.atan2(c[2], c[0]); const pl = g.net.room.players.get(g.slot);
+  pl.pos = [c[0] + Math.cos(ang) * 18, 1.6, c[2] + Math.sin(ang) * 18]; pl.modo = 'terra';
+  const hp0 = k.hp;
+  const r1 = await g.acao({ tipo: 'atirar', arma: 'pistola', dir: [c[0] - pl.pos[0], 2.2 - 3.05, c[2] - pl.pos[2]] });
+  const hp1 = k.hp, din0 = g.perfil.dinheiro;
+  k.hp = 3; await new Promise((r) => setTimeout(r, 500));
+  await g.acao({ tipo: 'atirar', arma: 'pistola', dir: [c[0] - pl.pos[0], 2.2 - 3.05, c[2] - pl.pos[2]], aid: 'kr2' });
+  await new Promise((r) => setTimeout(r, 300)); g.step(2);
+  pl.pos = g.me.pos.slice(); // devolve a posição do servidor local para onde o personagem está
+  return { hud, vis, hp0, hp1, ok: r1.ok, vivo: k.vivo, din0, din1: g.perfil.dinheiro };
+});
+check(kr.vis && /KRAKEN/.test(kr.hud) && /some em/.test(kr.hud), 'Kraken surge com contagem regressiva e vida em cima da tela', JSON.stringify(kr));
+check(kr.hp1 === kr.hp0 - 8, 'tiro de pistola tira vida do Kraken', JSON.stringify(kr));
+check(!kr.vivo && kr.din1 === kr.din0 + 1000, 'Kraken derrotado: S$ 1.000 para quem está na sala', JSON.stringify(kr));
+const brk = await ev(() => {
+  const g = __jogo; g.me.emote = { i: 5, t: 0 }; for (let i = 0; i < 30; i++) g.step(1);
+  return { hp: g.myChar.pose.hp, anim: g.animNome(), fatias: document.querySelectorAll('#rodaEmotes .fatia').length };
+});
+check(brk.hp > 2.5 && brk.anim === 'emote5', 'breakdance: de cabeça para baixo girando', JSON.stringify(brk));
+const vozSolo = await ev(async () => { const g = __jogo; g.input.press('KeyM'); g.step(1); await new Promise((r) => setTimeout(r, 200)); return [...document.querySelectorAll('#avisos *')].map((x) => x.textContent).join(' | '); });
+check(/amigos/.test(vozSolo), 'M no modo solo explica que a voz é para jogar com amigos', vozSolo);
 const est = await ev(async () => {
   const w = await import('/shared/world.js'); const g = __jogo;
   const al = [w.ESTATUA.x - 6, 0, w.ESTATUA.z + 2];

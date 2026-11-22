@@ -68,7 +68,13 @@ export const STATIONS = [
   };
 });
 export function stationById(id) { return STATIONS.find((s) => s.id === id); }
+// coordenadas locais da estação (+z aponta para o lago) → mundo (mesma conta do cliente)
+export function estacaoParaMundo(st, x, z) {
+  const yaw = Math.atan2(-st.dir[0], -st.dir[1]), c = Math.cos(yaw), s = Math.sin(yaw);
+  return [st.pad[0] + x * c + z * s, st.pad[1] - x * s + z * c];
+}
 // estátua (base grande) entre a estação de quem criou a sala (Norte) e a Leste
+export const ESTATUA_RAIO_BASE = 8.8; // raio da praça da estátua (× escala)
 export const ESTATUA = { x: Math.cos(-0.3 * Math.PI) * (LAKE_R + 42), z: Math.sin(-0.3 * Math.PI) * (LAKE_R + 42), y: 1.45, escala: 1.3 };
 // altura do chão da praça da estátua (degraus com rampinha, para ninguém tropeçar); null fora da praça
 export function chaoEstatua(x, z) {
@@ -82,6 +88,8 @@ export function chaoEstatua(x, z) {
 }
 // barraca de armas: posição local na estação (ao lado da casinha de tinta)
 export const BARRACA_ARMAS = { x: 13.6, z: -2.4 };
+// barraca da corrida de submarino, ao lado da loja de armas (coordenadas locais da estação)
+export const BARRACA_CORRIDA = { x: 13.6, z: -7.3 };
 
 // ---------- terreno ----------
 function stationFlatten(x, z) {
@@ -371,3 +379,19 @@ export function shelfSpots() {
 export const DAY_LENGTH_S = 24 * 60;
 export function hourOfDay(worldTimeS) { return ((worldTimeS / DAY_LENGTH_S) * 24 + 7) % 24; }
 export function isNight(h) { return h < 5.5 || h >= 19; }
+
+// alcance do chat de voz: 3 vezes a base inteira da estátua (≈ 69 m). Longe das outras estações.
+export const VOZ_ALCANCE = 3 * 2 * ESTATUA_RAIO_BASE * ESTATUA.escala;
+
+// caminho do Kraken (determinístico: servidor e clientes calculam igual a partir do tempo desde que surgiu)
+// dá voltas no meio do lago e passa perto da ponta dos píeres (raio 56)
+export function krakenPos(t, a0 = 0) {
+  const ang = a0 + t * 0.16;
+  const r = 34 + 13 * Math.sin(t * 0.47 + a0 * 2);
+  const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+  // direção para onde está nadando
+  const ang2 = a0 + (t + 0.2) * 0.16, r2 = 34 + 13 * Math.sin((t + 0.2) * 0.47 + a0 * 2);
+  const yaw = Math.atan2(Math.cos(ang2) * r2 - x, Math.sin(ang2) * r2 - z);
+  // sobe do fundo nos 3 primeiros segundos e afunda nos 3 últimos
+  return { pos: [x, 0, z], yaw };
+}

@@ -4,7 +4,7 @@ Jogo 3D cooperativo (1 a 5 jogadores) de exploração e recuperação de sucata 
 
 Roda no navegador (WebGL2), sem nenhum asset externo: terreno, árvores, personagens, submarinos, peixes, sons e água são gerados por código. As texturas (casca com relevo, folhas recortadas, pedra, ferro, madeira, concreto e o casco do sub com chapas, rebites e ferrugem) também são procedurais, no mesmo método usado no WildLens. O multiplayer usa um servidor Node.js com WebSocket que valida todas as ações (dinheiro, inventário, pesca, arremessos, tinta) e salva o perfil de cada jogador.
 
-> **Status: protótipo jogável v0.8** (8 varas, 9 aquários e 5 tanques de peixe; mochila com até 5 peixes; aba única "Vender" para peixes e sucata)
+> **Status: protótipo jogável v0.9** (chat de voz por distância, Kraken do abismo, corrida de submarino, estilingue de lixo, mais peixes e peças)
 
 ![Estação vista de cima](docs/capturas/estacao_alto.png)
 
@@ -84,7 +84,10 @@ O workflow `ci.yml` roda os testes de regras e do servidor a cada push.
 | Clique / botão direito (armado) | atirar / luneta da sniper | | |
 | **E** na margem | catar lixo (garrafa PET, latinha…) → saco de recicláveis | | |
 | **E** na estátua | colocar as peças achadas no fundo do lago | | |
-| I / Tab / M | inventário / sala e convite / mapa | | |
+| I / Tab / J | inventário / sala e convite / mapa | | |
+| **M** | chat de voz liga/desliga | | |
+| **E** no lixo · **E** de novo · **Q** | catar · guardar no saco · estilingue (mira e clique) | | |
+| **Y / N** | aceitar / recusar convite de corrida | | |
 
 Jogo apenas para PC (teclado e mouse). Todo jogador começa com 1 bolsa de tinta; a casinha ao lado da estação tem a mesa e a placa explicando como fabricar mais (1 lula → 2 bolsas). O compartimento do sub começa com 5 objetos e melhora no computador (8/12/18/25).
 
@@ -97,11 +100,25 @@ Jogo apenas para PC (teclado e mouse). Todo jogador começa com 1 bolsa de tinta
 | Clique (segurar e soltar) | lançar a linha · clique na mordida · segurar para recolher | R | ping do sonar |
 | **G** | pegar o peixe para arremessar (mão para trás) → mire e clique com o botão esquerdo | **B** | balão de tinta (com lançador instalado) |
 | **X** | soltar o peixe | V | câmera cabine / externa |
-| I / Tab / M | inventário / sala e convite / mapa | Q | sair do sub (no berço) |
+| I / Tab / J | inventário / sala e convite / mapa | Q | sair do sub (no berço) |
 
 No celular aparece um joystick virtual e botões (suporte básico, não testado em aparelho real).
 
 ---
+
+## Novidades da v0.9
+
+- **Chat de voz por distância:** aperte **M** para ligar/desligar o microfone. Aparece "Chat de voz ativado/desativado" em cima da tela por 2 s e o estado fica no canto de baixo. Você ouve quem está até ~69 m (3 vezes a base da estátua), mais alto quanto mais perto; de outra estação não se ouve. Funciona de navegador para navegador (WebRTC); o servidor só faz a ponte inicial. Algumas redes (escola, empresa) podem bloquear a voz.
+- **Mapa** mudou para a tecla **J** (o M agora é o chat de voz).
+- **Ranking** dos 3 mais ricos da sala no quadro do canto superior direito, embaixo do nome da estação.
+- **Mais peixes e mais caros:** 18 espécies (novas: piranha, traíra, pacu, tambaqui, dourado, pintado e o lendário peixe-lua-dourado). Tucunaré S$ 170 (antes 65), pirarucu S$ 850, tubarão S$ 3.000.
+- **O dobro de peças no fundo do lago**, 100 lixos na margem, e tudo **reaparece em segundos em outro lugar** (lixo em 3–8 s, peças do fundo em 5–12 s). Sucata do fundo vale 60% a mais, lixo 2,5× mais.
+- **Estilingue de lixo (S$ 400):** primeira arma da loja (a pistola agora pede o estilingue). Cate o lixo com **E** (ele fica na mão), **E** de novo guarda no saco, **Q** mira com o mesmo arco do peixe e o clique atira. Sem lixo na mão, usa o do saco. Derruba o amigo por 1 s. Não machuca o Kraken.
+- **Queda mole:** quem é acertado cai de costas no chão (não fica mais "dançando" em pé). Peixe e estilingue derrubam no lugar; as armas de fogo jogam para longe (pistola um pouco, bazuca muito).
+- **Breakdance** na roda de danças (scroll): de cabeça para baixo girando.
+- **Kraken do abismo:** polvo gigante (5× o submarino) que surge no meio do lago a cada 20 min (aviso 1 min antes) e fica 1 min rondando perto dos píeres. Contagem e vida em cima da tela. Vida calculada para 5 pistolas, 4 submetralhadoras, 3 fuzis, 2 snipers ou 1 bazuca derrubarem em 1 minuto atirando bastante. Se cair, **todo mundo da sala ganha S$ 1.000**.
+- **Corrida de submarino:** barraca nova ao lado da loja de armas, com troféus e uma bola brilhante. Na bola (E), escolha os amigos (o botão verde fica cinza), clique em **Chamar para corrida**; cada um aceita com **Y** ou recusa com **N**. Quem aceita vai para dentro do submarino, lado a lado no lago, contagem 3-2-1 e 5 palitos brilhantes sobre a água (só os corredores veem). Quem pegar todos primeiro vence: com 2 corredores ganha S$ 200 e o outro paga S$ 200; de 3 a 5, ganha S$ 250 divididos entre os que perderam. No fim, todos voltam para onde estavam.
+- O tanque de peixes agora fica atrás da barraca da corrida.
 
 ## Novidades da v0.8
 
@@ -181,10 +198,11 @@ O modo solo e o modo online têm progressos separados (o solo fica no navegador 
 ## 6. Testes (última execução)
 
 ```bash
-npm test                          # regras + servidor real (inclui reiniciar o servidor): 26/26
+npm test                          # regras + servidor real (inclui reiniciar o servidor): 32/32
 npm start                         # em outro terminal, para os testes no navegador:
 node tests/e2e_solo.mjs           # 41/41 (Chrome real, SwiftShader)
-node tests/e2e_multi.mjs          # 23/23: dois navegadores, criar sala, cor repetida, entrar por código, arremesso, sair e voltar pela lista
+node tests/e2e_multi.mjs          # 36/36: dois navegadores, sala, arremesso, chat de voz (microfone falso), corrida de submarino, sair e voltar
+# o e2e_multi precisa do servidor com ABISMO_TESTE=1 (libera só a ação de teste que define o dinheiro)
 node tools/build-html.mjs saida.html  # gera o HTML único (precisa de esbuild)
 node tools/tour.mjs               # capturas de tela de várias cenas
 ```

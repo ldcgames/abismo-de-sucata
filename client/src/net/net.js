@@ -51,8 +51,11 @@ export class SoloNet extends Emitter {
     this.timer = setInterval(() => {
       const now = Date.now();
       const ev = this.room.tick(now, Math.min(0.1, (now - last) / 1000)); last = now;
-      if (ev.length) this.emit('ev', ev);
-      this.emit('snap', this.room.snapshot(now), this.room.world.projeteis.map((p) => ({ id: p.id, tipo: p.tipo, pos: p.pos, vel: p.vel, esp: p.peixe?.esp })));
+      if (ev.length) {
+        this.emit('ev', ev);
+        if (ev.some((e) => e.perfis?.includes(this.slot))) { salvarSolo(this.perfil); this.emit('perfil', this.perfil); }
+      }
+      this.emit('snap', this.room.snapshot(now), this.room.world.projeteis.map((p) => ({ id: p.id, tipo: p.tipo, pos: p.pos, vel: p.vel, esp: p.peixe?.esp, lixo: p.lixo })));
     }, 50);
     this.saveTimer = setInterval(() => { salvarSolo(this.perfil); localStorage.setItem('abismo_solo_tempo', String(this.room.worldTime(Date.now()))); }, 10000);
     return { slot: this.slot, code: this.code, mundo: this.room.worldSnapshot(), snap: this.room.snapshot(), perfil: this.perfil };
@@ -191,6 +194,7 @@ export class OnlineNet extends Emitter {
         else this.emit('erro', m.msg);
         break;
       case 'copia': guardarCopia(this.url, m.copia); break;
+      case 'voz': this.emit('voz', m.de, m.d); break;
       case 'snap': this.emit('snap', m.snap, m.proj || []); break;
       case 'ev': this.emit('ev', m.ev); break;
       case 'perfil': this.perfil = m.perfil; this.emit('perfil', m.perfil); break;
@@ -213,6 +217,8 @@ export class OnlineNet extends Emitter {
     });
   }
   setCfg(nome, cor) { if (this.ws?.readyState === 1) this.enviar(({ t: 'perfil_cfg', nome, cor })); }
+  // sinalização do chat de voz (WebRTC): o servidor só repassa para o jogador da mesma sala
+  sinalVoz(para, d) { this.enviar({ t: 'voz', para, d }); }
   close() { this.fechado = true; this.enviar({ t: 'sair' }); this.ws?.close(); }
 }
 

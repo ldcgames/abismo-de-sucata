@@ -1,9 +1,9 @@
 // E2E multiplayer real: dois navegadores independentes conectados ao servidor WebSocket.
 import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
 const base = process.argv[2] || 'http://localhost:8090/';
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const ctxA = await browser.newContext({ viewport: { width: 900, height: 560 } });
-const ctxB = await browser.newContext({ viewport: { width: 900, height: 560 } });
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+const ctxA = await browser.newContext({ viewport: { width: 900, height: 560 }, permissions: ['microphone'] });
+const ctxB = await browser.newContext({ viewport: { width: 900, height: 560 }, permissions: ['microphone'] });
 const A = await ctxA.newPage(), B = await ctxB.newPage();
 const erros = [];
 for (const [n, p] of [['A', A], ['B', B]]) { p.on('pageerror', (e) => erros.push(n + ': ' + e.message)); p.on('console', (m) => { if (m.type() === 'error') erros.push(n + ': ' + m.text()); }); }
@@ -128,6 +128,83 @@ const dinA = await A.evaluate(() => 0);
 await A.click(`[data-entrar="${code}"]`);
 await pronto(A);
 check(await A.evaluate(() => __jogo.slot) === sa && await A.evaluate(() => __jogo.net.code) === code, 'líder volta para a mesma sala (mesmo código) e mesma estação');
+// ---------- v0.9: chat de voz (M), ranking, corrida de submarino entre os dois navegadores
+const voz = await A.evaluate(async () => {
+  const g = __jogo; g.input.press('KeyM'); g.step(1);
+  for (let k = 0; k < 40 && !g.voz.ligado; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  return { ligado: g.voz.ligado, aviso: document.getElementById('vozAviso').textContent, avisoVis: !document.getElementById('vozAviso').hidden, hud: document.getElementById('vozHud').textContent };
+});
+check(voz.ligado && voz.avisoVis && /ativado/.test(voz.aviso) && /ligado/.test(voz.hud), 'M liga o chat de voz: "Chat de voz ativado" em cima e "ligado" no canto', JSON.stringify(voz));
+const conexaoVoz = await B2.evaluate(async (sa) => {
+  const g = __jogo; let st = null, bytes = 0;
+  for (let k = 0; k < 120; k++) {
+    g.step(1); const p = g.voz.peers.get(sa);
+    st = p?.pc?.connectionState;
+    if (st === 'connected' && p.tr) { const rep = await p.pc.getStats(p.tr.receiver.track); rep.forEach((x) => { if (x.type === 'inbound-rtp') bytes = x.bytesReceived; }); if (bytes > 2000) break; }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  const p = g.voz.peers.get(sa);
+  return { st, bytes, vol: p?.audio?.volume, dist: Math.round(Math.hypot(...[0, 1, 2].map((i) => g.remotos[sa].char.root.pos[i] - g.me.pos[i]))) };
+}, sa);
+check(conexaoVoz.st === 'connected' && conexaoVoz.bytes > 2000, 'chat de voz conecta os dois navegadores e o áudio chega', JSON.stringify(conexaoVoz));
+check(conexaoVoz.dist > 69 ? conexaoVoz.vol < 0.01 : conexaoVoz.vol > 0, 'volume pela distância: de outra estação não se ouve', JSON.stringify(conexaoVoz));
+const rank = await A.evaluate(() => document.querySelector('#topoDir .ranking')?.textContent || '');
+check(/Ana/.test(rank) && /Beto/.test(rank) && /S\$/.test(rank), 'ranking top 3 do dinheiro no canto (embaixo da estação)', rank);
+// A vai até a barraca da corrida, escolhe o Beto e chama
+const chamou = await A.evaluate(async (sb) => {
+  const g = __jogo, st = g.stations[g.slot]; g.net.enviar({ t: 'teste_dinheiro', v: 1000 }); await new Promise((r) => setTimeout(r, 300));
+  for (const wp of [[-1.9, 1.5, 10], [9.5, 1.6, -6], [12.8, 1.6, -7.3]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
+  g.step(3); const prompt = document.getElementById('prompt').textContent;
+  g.input.press('KeyE'); g.step(1);
+  const painel = g.ui.aberto;
+  document.querySelector(`[data-escolher="${sb}"]`)?.click();
+  const cinza = document.querySelector(`[data-escolher="${sb}"]`)?.className;
+  document.querySelector('[data-chamar]')?.click();
+  await new Promise((r) => setTimeout(r, 600));
+  return { prompt, painel, cinza, fechou: !g.ui.aberto, pos: g.me.pos.slice(), modo: g.me.modo };
+}, sb);
+check(chamou.painel === 'corrida' && /Corrida/.test(chamou.prompt), 'E na bola da barraca abre a corrida de submarino', JSON.stringify(chamou));
+check(chamou.cinza === 'cinza' && chamou.fechou, 'Escolher fica cinza e "Chamar para corrida" envia o convite', JSON.stringify(chamou));
+const convite = await B2.evaluate(async () => {
+  const g = __jogo; for (let k = 0; k < 40 && document.getElementById('corridaConvite').hidden; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  const txt = document.getElementById('corridaConvite').textContent, vis = !document.getElementById('corridaConvite').hidden;
+  const antes = { modo: g.me.modo, pos: g.me.pos.slice(), din: g.perfil.dinheiro };
+  g.net.enviar({ t: 'teste_dinheiro', v: 1000 }); await new Promise((r) => setTimeout(r, 300));
+  g.input.press('KeyY'); g.step(1);
+  for (let k = 0; k < 40 && !g.corrida; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  return { vis, txt, antes, modo: g.me.modo, crane: g.crane.estado, corrida: !!g.corrida, palitos: g.palitos?.length, cont: document.getElementById('corridaContagem').textContent };
+});
+check(convite.vis && /Ana/.test(convite.txt) && /S\$ 200/.test(convite.txt), 'Beto recebe o convite com o prêmio escrito', convite.txt);
+check(convite.corrida && convite.modo === 'sub' && convite.crane === 'livre' && convite.palitos === 5, 'Y aceita: vai para dentro do submarino na água, com 5 palitos', JSON.stringify(convite));
+const lado = await A.evaluate(async (sb) => {
+  const g = __jogo; for (let k = 0; k < 20 && !g.corrida; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  const r = g.remotos[sb]; const dist = () => Math.hypot(g.sub.pos[0] - r.sub.pos[0], g.sub.pos[2] - r.sub.pos[2]);
+  for (let k = 0; k < 30 && dist() > 15; k++) { await new Promise((res) => setTimeout(res, 100)); g.step(1); }
+  return { modo: g.me.modo, d: dist(), contagem: !document.getElementById('corridaContagem').hidden, hud: document.getElementById('corridaHud').textContent };
+}, sb);
+check(lado.modo === 'sub' && lado.d < 15 && lado.contagem, 'Ana também está no sub, lado a lado com o Beto, com contagem regressiva', JSON.stringify(lado));
+// os dois estão perto: o volume do chat de voz sobe
+const perto = await B2.evaluate(async (sa) => { const g = __jogo; for (let k = 0; k < 15; k++) { g.step(1); await new Promise((r) => setTimeout(r, 80)); } return g.voz.peers.get(sa)?.audio?.volume; }, sa);
+check(perto > 0.9, 'perto um do outro o volume do amigo fica alto', String(perto));
+// Beto passa pelos 5 palitos (o sub é levado até cada um) e vence
+const fim = await B2.evaluate(async () => {
+  const g = __jogo; const C = g.corrida;
+  while (performance.now() < C.largaEm + 100) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  const din0 = g.perfil.dinheiro;
+  for (const c of C.checkpoints) { g.sub.pos = [c[0], -0.5, c[2]]; g.sub.vel = [0, 0, 0]; for (let k = 0; k < 6; k++) { g.step(1); await new Promise((r) => setTimeout(r, 70)); } }
+  for (let k = 0; k < 40 && g.corrida; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  for (let k = 0; k < 10; k++) { await new Promise((r) => setTimeout(r, 80)); g.step(1); }
+  return { acabou: !g.corrida, din0, din1: g.perfil.dinheiro, res: document.getElementById('corridaResultado').textContent, modo: g.me.modo, crane: g.crane.estado, pos: g.me.pos.slice() };
+});
+check(fim.acabou && fim.din1 === fim.din0 + 200 && /VENCEU/.test(fim.res), 'Beto pega os 5 palitos, vence e ganha S$ 200', JSON.stringify(fim));
+check(fim.modo === convite.antes.modo && Math.hypot(fim.pos[0] - convite.antes.pos[0], fim.pos[2] - convite.antes.pos[2]) < 1, 'Beto volta para onde estava antes da corrida', JSON.stringify({ fim, antes: convite.antes }));
+const fimA = await A.evaluate(async (pos0) => {
+  const g = __jogo; for (let k = 0; k < 30 && g.corrida; k++) { await new Promise((r) => setTimeout(r, 100)); g.step(1); }
+  g.step(2);
+  return { modo: g.me.modo, crane: g.crane.estado, d: Math.hypot(g.me.pos[0] - pos0[0], g.me.pos[2] - pos0[2]), res: document.getElementById('corridaResultado').textContent, din: g.perfil.dinheiro };
+}, chamou.pos);
+check(fimA.modo === 'terra' && fimA.crane === 'berco' && fimA.d < 1 && /perdeu S\$ 200/.test(fimA.res), 'Ana perde S$ 200 e volta a pé para a barraca (sub de volta no berço)', JSON.stringify(fimA));
+
 // servidor grátis "dormindo": reinicia sem nenhum arquivo e os jogadores voltam sozinhos pela cópia guardada no aparelho
 // (só roda se E2E_REINICIAR tiver o comando que reinicia o servidor com uma pasta de dados vazia)
 if (process.env.E2E_REINICIAR) {

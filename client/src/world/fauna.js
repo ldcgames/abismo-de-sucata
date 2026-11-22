@@ -141,7 +141,7 @@ export class Fauna {
     this.schools = [];
     const max = [60, 110, 160][quality];
     this.maxPer = max;
-    for (const esp of ['lambari', 'tetra', 'barrigudo', 'tilapia', 'tucunare', 'carpa', 'bagre', 'lula', 'enguia', 'pirarucu', 'tubarao']) {
+    for (const esp of Object.keys(ESPECIES)) {
       const me = R.createMesh(makeFishGeo(esp, 1), { rough: 0.35, swim: esp === 'tubarao' ? 0.5 : esp === 'enguia' ? 0.7 : 1, castShadow: false, caustics: true, kind: 12 }, { instances: max });
       const n = new Node('peixes_' + esp); n.mesh = me; this.root.add(n);
       this.meshes[esp] = me;

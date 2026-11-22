@@ -16,6 +16,7 @@ import { Particles } from './systems/particles.js';
 import { Audio } from './systems/audio.js';
 import { Input } from './systems/input.js';
 import { UI } from './ui/ui.js';
+import { Novidades } from './game/novidades.js';
 import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listarSalas } from './net/net.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
 import { terrainHeight, navSDF, STATIONS, stationById, PLAY_R, SLIDE_R, LAKE_R, depthZone, isNight, hourOfDay, SHAFT_C, CAVES, ESTATUA, chaoEstatua, colidirPedras } from '../shared/world.js';
@@ -147,6 +148,7 @@ class Game {
     this.net.on('perfil', (p) => { this.perfil = p; });
     this.net.on('erro', (m) => this.ui.aviso(m, 'ruim'));
     this.net.on('status', (s, ok) => this.ui.aviso(s, ok ? 'ok' : 'ruim'));
+    this.initNovidades();
     this.onSnap(r.snap, []);
     $('carregando').hidden = true; $('hud').hidden = false;
     canvas.addEventListener('click', () => { if (!this.ui.aberto) this.input.lock(); this.audio.start(); });
@@ -262,8 +264,8 @@ class Game {
   }
   // calcula a direção do arremesso para o peixe cair exatamente onde a mira (centro da tela) aponta,
   // com a mesma física do servidor, e devolve a trajetória para desenhar
-  miraPeixe() {
-    const tub = !!ESPECIES[this.perfil.mao?.esp]?.pesado;
+  miraPeixe(lixo = false) {
+    const tub = !lixo && !!ESPECIES[this.perfil.mao?.esp]?.pesado;
     const v = TROLL.peixeVelocidade * (tub ? 0.75 : 1), alc = (tub ? TROLL.tubaraoAlcance : TROLL.peixeAlcance) + 6;
     const c = this.cam.pos, f = this.camForwardVis();
     // 1) ponto mirado: terreno, água ou um amigo
@@ -303,7 +305,7 @@ class Game {
   }
   desenharMira(ativo) {
     if (!ativo) { this.miraMarca.visible = false; for (const n of this.miraPontos) n.visible = false; return; }
-    const m = this.miraPeixe();
+    const m = this.miraPeixe(!this.perfil.mao);
     this.miraMarca.visible = !!m.queda;
     if (m.queda) this.miraMarca.at(m.queda[0], m.queda[1], m.queda[2]).sc(1 + 0.12 * Math.sin(this.t * 6));
     const passo = Math.max(1, Math.floor(m.pts.length / this.miraPontos.length));
@@ -324,6 +326,7 @@ class Game {
   // ------------------------------------------------------------ rede: snapshots e eventos
   onSnap(s, proj) {
     this.tempoBase = s.tempo; this.tempoRecebido = performance.now();
+    if (this.kr) this.snapNovidades(s);
     const agora = performance.now();
     const vistos = new Set();
     for (const [slot, pl] of Object.entries(s.players)) {
@@ -366,6 +369,8 @@ class Game {
     } else if (p.tipo === 'foguete') {
       n = new Node('foguete'); n.mesh = this.R.createMesh(rocketGeo(), { rough: 0.5, metal: 0.4 });
       this.audio.noise(0.9, 300, 0.35, 1); this.audio.blip(120, 0.5, 'sawtooth', 0.08, -60);
+    } else if (p.tipo === 'lixo') {
+      n = itemNode(this.R, { id: 'voando', tipo: p.lixo || 'latinha', x: 0, y: 0, z: 0, rot: 0 });
     } else n = fishNode(this.R, p.esp || 'tilapia', p.tipo === 'tubarao' ? 300 : 40);
     this.fxRoot.add(n);
     const v = { n, pos: p.pos.slice(), vel: p.vel.slice(), tipo: p.tipo, criado: performance.now(), servidor: true };
@@ -374,6 +379,7 @@ class Game {
   }
   onEvents(evs) {
     for (const e of evs) {
+      if (this.kr && this.eventoNovidades(e)) continue;
       switch (e.t) {
         case 'item_removido': {
           const n = this.items.get(e.id);
@@ -416,6 +422,10 @@ class Game {
           if (e.alvo === this.slot) {
             this.me.stunUntil = performance.now() + e.ms;
             this.me.stunTub = !!e.tubarao;
+            this.me.emote = null; this.roda = null; this.me.mirando = false; this.me.mirandoLixo = false;
+            // vira de frente para quem acertou: cai de costas, para longe dele
+            const de = e.empurrao && Math.hypot(e.empurrao[0], e.empurrao[2]) > 0.1 ? [-e.empurrao[0], -e.empurrao[2]] : (() => { const o = e.por === this.slot ? null : this.remotos[e.por]?.char.root.pos; return o ? [o[0] - this.me.pos[0], o[2] - this.me.pos[2]] : null; })();
+            if (de) this.me.yaw = Math.atan2(de[0], de[1]);
             if (e.empurrao) {
               // o tiro joga você longe (mais forte quanto mais forte a arma)
               this.me.voo = { v: [e.empurrao[0], e.empurrao[2]], t: 0 };
@@ -424,14 +434,14 @@ class Game {
               if (this.pesca.estado !== 'off') this.cancelarPesca();
             }
             $('acertado').hidden = false;
-            $('acertado').querySelector('.t').textContent = e.arma ? (e.arma === 'bazuca' ? 'BOOOM! VOCÊ VOOU LONGE!' : 'VOCÊ LEVOU UM TIRO!') : e.tubarao ? 'VOCÊ FOI MORDIDO POR UM TUBARÃO!' : 'VOCÊ FOI ACERTADO POR UM PEIXE!';
-            $('acertadoSub').textContent = e.arma ? `${quem} acertou você com ${e.arma === 'bazuca' ? 'a bazuca' : 'a ' + armaNome} — ${e.ms / 1000} s no chão` : `${quem} jogou ${e.tubarao ? 'um tubarão' : 'um peixe'} em você — ${e.ms / 1000} s sem se mexer`;
+            $('acertado').querySelector('.t').textContent = e.arma ? (e.arma === 'bazuca' ? 'BOOOM! VOCÊ VOOU LONGE!' : 'VOCÊ LEVOU UM TIRO!') : e.lixo ? 'LIXO NA CARA!' : e.tubarao ? 'VOCÊ FOI MORDIDO POR UM TUBARÃO!' : 'VOCÊ FOI ACERTADO POR UM PEIXE!';
+            $('acertadoSub').textContent = e.arma ? `${quem} acertou você com ${e.arma === 'bazuca' ? 'a bazuca' : 'a ' + armaNome} — ${e.ms / 1000} s no chão` : e.lixo ? `${quem} acertou você com o estilingue (${SUCATA[e.lixo]?.nome || 'lixo'}) — ${e.ms / 1000} s no chão` : `${quem} jogou ${e.tubarao ? 'um tubarão' : 'um peixe'} em você — ${e.ms / 1000} s no chão`;
             clearTimeout(this.acertTimer); this.acertTimer = setTimeout(() => { $('acertado').hidden = true; }, e.ms);
             e.tubarao ? this.audio.chomp() : this.audio.bonk();
             this.shake = 0.6;
           } else {
             const alvo = this.remotos[e.alvo]?.nome || 'alguém';
-            this.ui.aviso(`${quem} acertou ${alvo} com ${e.arma ? (e.arma === 'bazuca' ? 'a BAZUCA' : 'a ' + armaNome) : e.tubarao ? 'um TUBARÃO' : 'um peixe'}!`, 'info');
+            this.ui.aviso(`${quem} acertou ${alvo} com ${e.arma ? (e.arma === 'bazuca' ? 'a BAZUCA' : 'a ' + armaNome) : e.lixo ? 'o estilingue de lixo' : e.tubarao ? 'um TUBARÃO' : 'um peixe'}!`, 'info');
             if (e.por === this.slot) { e.tubarao ? this.audio.chomp() : this.audio.bonk(); }
           }
           break;
@@ -493,9 +503,9 @@ class Game {
     // painéis/atalhos
     if (!this.ui.aberto) {
       if (I.hit('KeyI')) this.ui.abrir('inventario');
-      if (I.hit('KeyM')) this.ui.abrir('mapa');
+      if (I.hit('KeyJ')) this.ui.abrir('mapa');
       if (I.hit('Tab')) this.ui.abrir('sala');
-    } else if (I.hit('KeyI') || I.hit('Tab') || I.hit('KeyM')) this.ui.fechar();
+    } else if (I.hit('KeyI') || I.hit('Tab') || I.hit('KeyJ')) this.ui.fechar();
     const livre = !this.ui.aberto;
     // olhar com o mouse
     const sens = 0.0021 * (this.zoom ? 0.3 : 1);
@@ -511,12 +521,12 @@ class Game {
     const stunned = performance.now() < this.me.stunUntil;
     if (this.me.modo === 'terra' || this.me.modo === 'nadando') this.updateWalk(dt, livre && !stunned, stunned);
     else if (this.me.modo === 'entrando') this.cameraTerra(dt);
-    else this.updateSub(dt, livre);
+    else this.updateSub(dt, livre && !this.corridaTravada());
     // gesto/dança: termina ao andar ou depois de um tempo (sentado fica até mexer)
     if (this.me.emote) {
       this.me.emote.t += dt;
       const andando = Math.hypot(this.me.vel[0], this.me.vel[2]) > 0.6 || this.me.modo !== 'terra' || this.pesca.estado !== 'off' || this.me.mirando;
-      if (andando || (this.me.emote.i !== 2 && this.me.emote.t > [2.2, 6, 0, 2.6, 6][this.me.emote.i])) this.me.emote = null;
+      if (andando || (this.me.emote.i !== 2 && this.me.emote.t > [2.2, 6, 0, 2.6, 6, 8][this.me.emote.i])) this.me.emote = null;
     }
     // ação temporizada do personagem
     if (this.me.acao) { this.me.acao.t += dt; if (this.me.acao.t > this.me.acao.dur) this.me.acao = null; }
@@ -526,11 +536,13 @@ class Game {
     const speedH = Math.hypot(this.me.vel[0], this.me.vel[2]);
     ch.root.visible = !(this.me.modo === 'sub' || this.me.modo === 'guindaste');
     ch.root.at(this.me.pos[0], this.me.pos[1], this.me.pos[2]).rot(0, this.me.yaw, 0);
-    this.me.segura = p.mao ? (ESPECIES[p.mao.esp].pesado ? 'tubarao' : this.me.mirando ? 'mira' : 'peixe') : this.pesca.estado !== 'off' ? 'vara' : this.me.arma && (this.me.modo === 'terra') ? 'arma' : null;
+    if (this.me.modo !== 'terra' || p.mao || this.me.arma) this.me.mirandoLixo = false;
+    this.me.segura = p.mao ? (ESPECIES[p.mao.esp].pesado ? 'tubarao' : this.me.mirando ? 'mira' : 'peixe') : this.me.mirandoLixo ? 'mira' : p.lixoMao ? 'peixe' : this.pesca.estado !== 'off' ? 'vara' : this.me.arma && (this.me.modo === 'terra') ? 'arma' : null;
     ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
     this.coice = damp(this.coice || 0, 0, 14, dt);
     this.updateArmaMao(ch, this.me.modo === 'terra' ? this.me.arma : null);
-    this.desenharMira(this.me.mirando && !!this.perfil.mao && this.me.modo === 'terra');
+    this.desenharMira((this.me.mirando && !!this.perfil.mao || this.me.mirandoLixo) && this.me.modo === 'terra');
+    this.updateLixoMao(ch, this.me.modo === 'terra' ? p.lixoMao?.tipo || null : null);
     if (!this.me.arma || this.me.modo !== 'terra') { $('hudArma').hidden = true; this.zoom = false; }
     $('miraArma').hidden = !(this.me.arma && this.me.modo === 'terra' && !this.zoom);
     $('luneta').hidden = !this.zoom;
@@ -540,6 +552,7 @@ class Game {
     this.updateHeld(ch, p.mao, 'local');
     // remotos
     this.updateRemotes(dt);
+    this.updateNovidades(dt, livre);
     // estações (visual por perfil público)
     for (const s of STATIONS) {
       const st = this.stations[s.id];
@@ -586,19 +599,19 @@ class Game {
     if (this.sendAcc > 1 / 15) {
       this.sendAcc = 0;
       this.net.sendState({
-        pos: this.me.pos.map((v) => +v.toFixed(3)), rot: +this.me.yaw.toFixed(3), modo: this.me.modo, anim: this.animNome(), arma: this.me.modo === 'terra' ? this.me.arma : null,
+        pos: this.me.pos.map((v) => +v.toFixed(3)), rot: +this.me.yaw.toFixed(3), modo: this.me.modo, anim: this.animNome(), arma: this.me.modo === 'terra' ? this.me.arma : null, mic: !!this.voz?.ligado,
         sub: { pos: this.sub.pos.map((v) => +v.toFixed(3)), rot: +this.sub.yaw.toFixed(3), pitch: +this.sub.pitchVis.toFixed(3), luz: this.sub.luzes, estado: this.crane.estado, braco: this.bracoAnim ? 1 : 0, gancho: this.crane.ganchoY || 0 },
         pescaVis: this.pesca.bobber ? { b: this.pesca.bobber.map((v) => +v.toFixed(2)), e: this.pesca.estado } : null,
       });
     }
     // HUD
     const zona = this.me.modo === 'terra' ? (estaNaEstacao({ slot: this.slot, modo: 'terra', pos: this.me.pos }) ? stationById(this.slot).nome : 'Margem do lago') : depthZone(-this.sub.pos[1]).nome;
-    this.ui.hud(p, { hora: hourOfDay(this.worldTime), noite: isNight(hourOfDay(this.worldTime)), zona, rede: this.net.mode === 'solo' ? 'Solo (salvo no navegador)' : (this.net.status || ''), fps: DEBUG || params.has('fps') ? this.fps : 0 });
+    this.ui.hud(p, { hora: hourOfDay(this.worldTime), noite: isNight(hourOfDay(this.worldTime)), zona, rede: this.net.mode === 'solo' ? 'Solo (salvo no navegador)' : (this.net.status || ''), fps: DEBUG || params.has('fps') ? this.fps : 0, ranking: this.rankingHtml() });
     this.ui.maoUi(p, this.naEstacao());
     if (this.camOverride) this.setCam(this.camOverride.pos, this.camOverride.alvo, this.camOverride.fov || 1.0);
     this.audio.update(dt, { camDepth: -this.cam.pos[1], vento: 0.3, dia: env ? env.day : 1, motor: { on: this.me.modo === 'sub' && this.crane.estado === 'livre', thr: this.sub.thrust }, estresse: this.sub.estresse });
   }
-  animNome() { if (this.me.escorrega) return 'escorrega'; if (this.me.mirando) return 'mira'; if (this.me.emote) return 'emote' + this.me.emote.i; return this.me.modo === 'nadando' ? 'nado' : Math.hypot(this.me.vel[0], this.me.vel[2]) > 3.5 ? 'corre' : Math.hypot(this.me.vel[0], this.me.vel[2]) > 0.3 ? 'anda' : 'parado'; }
+  animNome() { if (this.me.escorrega) return 'escorrega'; if (this.me.mirando || this.me.mirandoLixo) return 'mira'; if (this.me.emote) return 'emote' + this.me.emote.i; return this.me.modo === 'nadando' ? 'nado' : Math.hypot(this.me.vel[0], this.me.vel[2]) > 3.5 ? 'corre' : Math.hypot(this.me.vel[0], this.me.vel[2]) > 0.3 ? 'anda' : 'parado'; }
   naEstacao() {
     return estaNaEstacao({ slot: this.slot, modo: this.me.modo, pos: this.me.pos, sub: { pos: this.sub.pos } });
   }
@@ -798,6 +811,13 @@ class Game {
         const n = p.estatua.colocadas.length;
         txt = n >= ESTATUA_PECAS.length ? `🏆 Estátua completa · multiplicador ×${multDinheiro(p)}` : `<kbd>E</kbd>Colocar peças na estátua <span class="nota">(${n}/${ESTATUA_PECAS.length} · ×${multDinheiro(p)})</span>`;
         if (livre && I.hit('KeyE') && n < ESTATUA_PECAS.length) this.acao({ tipo: 'estatua_colocar' });
+      } else if (p.lixoMao && !p.mao) {
+        const nm = SUCATA[p.lixoMao.tipo]?.nome || 'Lixo';
+        txt = me.mirandoLixo ? `🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para atirar ${nm} com o estilingue · <kbd>Q</kbd> cancelar`
+          : `<kbd>E</kbd>Guardar ${nm} no saco <span class="nota">(${p.saco.length}/${LIXO.saco})</span> · <kbd>Q</kbd>${p.armas.estilingue ? 'Usar no estilingue' : 'Estilingue (compre na loja de armas)'}`;
+        if (livre && I.hit('KeyE')) { me.mirandoLixo = false; this.acao({ tipo: 'lixo_guardar' }); }
+      } else if (me.mirandoLixo && !p.mao) {
+        txt = `🎯 Estilingue: atirando lixo do saco (${p.saco.length}) · clique para atirar · <kbd>Q</kbd> cancelar`;
       } else if (!p.mao && !me.arma && (this.lixoPerto = this.lixoMaisProximo(2.3))) {
         const t = SUCATA[this.lixoPerto.item.tipo];
         txt = `<kbd>E</kbd>Catar ${t.nome} <span class="nota">(saco ${p.saco.length}/${LIXO.saco})</span>`;
@@ -834,9 +854,9 @@ class Game {
         if (!best) txt = null;
         this.updateArma(livre, A, bal);
       }
-      if (livre && I.wheel && this.pesca.estado === 'off' && !this.me.mirando && !this.me.arma && this.me.grounded) {
+      if (livre && I.wheel && this.pesca.estado === 'off' && !this.me.mirando && !this.me.mirandoLixo && !this.me.arma && this.me.grounded) {
         if (!this.roda) this.roda = { sel: this.me.emoteIdx ?? 0, t: 0, v: [0, 0] };
-        else this.roda.sel = ((this.roda.sel + (I.wheel > 0 ? 1 : -1)) % 5 + 5) % 5;
+        else this.roda.sel = ((this.roda.sel + (I.wheel > 0 ? 1 : -1)) % 6 + 6) % 6;
         this.roda.t = 0; this.roda.v = [0, 0];
       }
       if (this.roda) this.updateRoda(this.dtQuadro || 1 / 60, livre);
@@ -846,6 +866,13 @@ class Game {
       }
       if (livre && this.me.mirando && I.mouse.clicked) { this.me.mirando = false; this.arremessar(); }
       if (livre && I.hit('KeyX')) { this.me.mirando = false; this.soltarPeixe(); }
+      // estilingue: Q mira com o lixo da mão (ou do saco), clique atira; mesmo arco do peixe
+      if (livre && I.hit('KeyQ') && !p.mao && !me.arma && this.pesca.estado === 'off') {
+        if (!p.armas.estilingue) this.ui.aviso(p.lixoMao ? `Compre o Estilingue de lixo na loja de armas (S$ ${ARMAS.estilingue.preco})` : 'O estilingue é vendido na loja de armas', 'info');
+        else if (!p.lixoMao && !p.saco.length) this.ui.aviso('Sem lixo para o estilingue: cate um lixo na margem (E)', 'info');
+        else { me.mirandoLixo = !me.mirandoLixo; me.emote = null; this.roda = null; if (me.mirandoLixo) this.input.lock(); }
+      }
+      if (livre && me.mirandoLixo && I.mouse.clicked) { me.mirandoLixo = false; this.atirarLixo(); }
       if (this.pesca.estado !== 'off') txt = this.pesca.prompt || txt;
     } else if (me.modo === 'nadando') {
       txt = 'Nadando — volte à margem ou suba no cais pela escada (<kbd>E</kbd>)';
@@ -858,6 +885,7 @@ class Game {
     const p = this.perfil;
     if (id === 'terminal') this.ui.abrir('terminal');
     else if (id === 'armas') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('armas'); }
+    else if (id === 'corrida') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('corrida'); }
     else if (id === 'deposito' || id === 'reciclador' || id === 'restauro') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.8 }; this.ui.abrir(id); }
     else if (id === 'aquario' || id === 'tanque') {
       if (p.mao) this.acao({ tipo: 'peixe_aquario', destino: id });
@@ -924,7 +952,7 @@ class Game {
   }
   catar(n) {
     if (this.catando) return;
-    if (this.perfil.saco.length >= LIXO.saco) { this.ui.aviso(`Saco cheio (${LIXO.saco}/${LIXO.saco}) — venda no computador da estação`, 'ruim'); return; }
+    if ((this.perfil.mao || this.perfil.lixoMao) && this.perfil.saco.length >= LIXO.saco) { this.ui.aviso(`Saco cheio (${LIXO.saco}/${LIXO.saco}) — venda no computador da estação`, 'ruim'); return; }
     this.catando = true;
     // abaixa, pega e levanta
     this.me.yaw = Math.atan2(n.pos[0] - this.me.pos[0], n.pos[2] - this.me.pos[2]);
@@ -960,6 +988,7 @@ class Game {
         const ip = r.char.root.pos;
         if (Math.hypot(x - ip[0], z - ip[2]) < 0.45 && y > ip[1] && y < ip[1] + 1.8) { hit = true; break; }
       }
+      if (!hit && this.kr?.root.visible) { const kc = this.kr.centro(); if (Math.hypot(x - kc[0], y - kc[1], z - kc[2]) < 6.2) hit = true; }
       if (hit) { alvo = [x, y, z]; break; }
     }
     const boca = [me.pos[0], me.pos[1] + 1.45, me.pos[2]];
@@ -1005,6 +1034,7 @@ class Game {
     const cor = e.acertou ? [1, 0.85, 0.3, 1] : [0.8, 0.7, 0.5, 1];
     for (let k = 0; k < (e.acertou ? 14 : 6); k++) this.particles.emit({ p: b.slice(), v: [(Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4], life: 0.35, size: 0.05, col: cor, g: 9.8, drag: 1, kind: 'faisca', add: true });
     if (!e.acertou && b[1] < 0.2 && terrainHeight(b[0], b[2]) < 0) this.particles.ripple(b[0], b[2], this.t, 0.15);
+    if (e.acertou === 'kraken') { this.particles.ink(b, 18); this.kr.flash = 1; return; }
     if (e.acertou) this.particles.confetti(b, 10);
   }
   explosao(pos, agua) {
@@ -1039,11 +1069,12 @@ class Game {
   // ------------------------------------------------------------ roda de emotes
   updateRoda(dt, livre) {
     const R = this.roda, I = this.input, el = $('rodaEmotes');
-    const NOMES = [['👍', 'Joinha'], ['💃', 'Dança'], ['🪑', 'Sentar'], ['👋', 'Acenar'], ['🤖', 'Robô']];
+    const NOMES = [['👍', 'Joinha'], ['💃', 'Dança'], ['🪑', 'Sentar'], ['👋', 'Acenar'], ['🤖', 'Robô'], ['🌀', 'Breakdance']];
+    const NF = NOMES.length;
     if (!el.dataset.ok) {
       el.dataset.ok = 1;
       NOMES.forEach(([ic, nm], i) => {
-        const a = -Math.PI / 2 + (i / 5) * Math.PI * 2;
+        const a = -Math.PI / 2 + (i / NF) * Math.PI * 2;
         const d = document.createElement('div'); d.className = 'fatia'; d.innerHTML = `${ic}<small>${nm}</small>`;
         d.style.left = 170 + Math.cos(a) * 118 + 'px'; d.style.top = 170 + Math.sin(a) * 118 + 'px'; el.appendChild(d);
       });
@@ -1057,12 +1088,12 @@ class Game {
     if (Math.hypot(I.mouse.dx, I.mouse.dy) > 0.5) R.t = 0;
     if (Math.hypot(R.v[0], R.v[1]) > 45) {
       const ang = Math.atan2(R.v[1], R.v[0]);
-      R.sel = ((Math.round((ang + Math.PI / 2) / (Math.PI * 2 / 5)) % 5) + 5) % 5;
+      R.sel = ((Math.round((ang + Math.PI / 2) / (Math.PI * 2 / NF)) % NF) + NF) % NF;
     }
     el.hidden = false;
     [...el.querySelectorAll('.fatia')].forEach((d, i) => d.classList.toggle('sel', i === R.sel));
     el.querySelector('.centro b').textContent = NOMES[R.sel][1];
-    el.querySelector('.seta').style.transform = `rotate(${(R.sel / 5) * 360 + 180}deg)`;
+    el.querySelector('.seta').style.transform = `rotate(${(R.sel / NF) * 360 + 180}deg)`;
     const cancelar = I.hit('Escape') || I.mouse.rdown;
     if (cancelar) return fechar();
     if (I.mouse.clicked || R.t > 1.6) {
@@ -1664,6 +1695,7 @@ class Game {
       if (em) { if (!r.emote || r.emote.i !== +em[1]) r.emote = { i: +em[1], t: 0 }; r.emote.t += dt; } else r.emote = null;
       ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote });
       this.updateHeld(ch, r.mao, slot);
+      this.updateLixoMao(ch, r.modo === 'terra' ? r.lixo : null);
       this.updateArmaMao(ch, r.modo === 'terra' ? r.arma : null);
       // nome flutuando
       if (!r.tag || r.tagNome !== r.nome) {
@@ -1788,6 +1820,8 @@ class Game {
     if (lavando) { c.strokeStyle = 'rgba(190,220,255,0.5)'; c.lineWidth = 3; for (let k = 0; k < 40; k++) { const x = (k / 40) * W + Math.sin(k * 7 + this.t * 3) * 10; c.beginPath(); c.moveTo(x, topo - 60); c.lineTo(x + 6, topo + 40); c.stroke(); } }
   }
 }
+
+Object.assign(Game.prototype, Novidades);
 
 function frame() { return new Promise((r) => requestAnimationFrame(() => r())); }
 
