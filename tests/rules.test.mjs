@@ -106,7 +106,7 @@ test('casco melhorado muda a profundidade máxima real', () => {
   const res = r.action('N', { tipo: 'comprar', cat: 'sub', chave: 'casco' }, T0).res;
   assert.equal(res.ok, true, res.msg);
   assert.equal(subStats(p).maxProf, 560);
-  assert.equal(p.dinheiro, 5000 - 550); assert.equal(p.comps.metal, 0); // só dinheiro, preços reduzidos
+  assert.equal(p.dinheiro, 5000 - 1650); assert.equal(p.comps.metal, 0); // só dinheiro (preço triplicado)
 });
 
 test('vara melhorada captura o que a inicial não consegue', () => {

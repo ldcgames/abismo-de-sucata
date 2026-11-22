@@ -106,6 +106,10 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.3
+
+- **Melhorias do submarino 3× mais caras** (casco, propulsores, bateria, faróis, sonar, braço, carga e oxigênio). Continuam só com dinheiro.
+
 ## Novidades da v0.9.2
 
 - **Decorações: equipar e desequipar.** Depois de comprada, cada decoração tem o botão **Desequipar** (some da estação) e **Equipar** (volta), sem pagar de novo.

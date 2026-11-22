@@ -147,9 +147,10 @@ export const SUB_UP = {
     { v: 6000, custo: { dinheiro: 10000, comps: { eletronica: 10 } }, desc: 'Eletrólise de água' },
   ] },
 };
-// evolução do submarino mais rápida: preços 40% menores e só dinheiro (sem componentes)
+// melhorias do submarino: só dinheiro (sem componentes). Preço = 60% da tabela acima × 3 (triplicado em 22/11)
+export const SUB_PRECO_MULT = 3;
 for (const up of Object.values(SUB_UP)) for (const n of up.niveis) if (n.custo) {
-  n.custo.dinheiro = Math.round((n.custo.dinheiro * 0.6) / 50) * 50;
+  n.custo.dinheiro = Math.round((n.custo.dinheiro * 0.6) / 50) * 50 * SUB_PRECO_MULT;
   n.custo.comps = {}; // o submarino melhora só com dinheiro
 }
 export const SUB_ORDEM = ['casco', 'propulsor', 'bateria', 'farol', 'sonar', 'braco', 'carga', 'oxigenio'];

@@ -1,5 +1,8 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v0.9.3
+Melhorias do submarino com preço triplicado (`SUB_PRECO_MULT = 3` em data.js). Testes: npm test 35/35 · e2e_solo 54/54.
+
 ## Novidades da v0.9.2
 Decorações com Equipar/Desequipar (`estacao.decoOff`). Tubarão do lago (TUBARAO em data.js: 200 de vida, um por vez, 20 min após morrer, ronda raio 42–54 m; carcaça boia; `tubarao_pegar`; derruba ao ser acertado; vende S$ 400 fixo). Dano de cada arma na loja; estilingue 1 de dano. Testes: npm test 35/35 · e2e_solo 54/54 · e2e_multi 36/36.
 
