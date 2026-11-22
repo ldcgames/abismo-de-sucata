@@ -106,6 +106,12 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.2
+
+- **Decorações: equipar e desequipar.** Depois de comprada, cada decoração tem o botão **Desequipar** (some da estação) e **Equipar** (volta), sem pagar de novo.
+- **Tubarão do lago:** um tubarão aparece 20 min depois de a sala abrir e fica rondando a frente dos píeres, só com a barbatana de fora. Ele não ataca ninguém e a vida não aparece na tela. É **um só por vez**: o próximo só começa a contar 20 min depois que este morrer. Tem **200 de vida** (25 tiros de pistola, por exemplo). Quando cai, fica **boiando**: quem estiver com a mão livre nada até lá e aperta **E** para pegar; leva na mão até o computador da sua estação e vende por **S$ 400**. Se quem está levando levar um tiro (ou peixe, ou estilingue), **deixa o tubarão cair** ali mesmo, no chão ou na água, e qualquer um pode pegar. **X** larga.
+- **Dano na loja:** cada arma mostra o dano (vale para o Kraken e o tubarão). As pessoas nunca perdem vida: nelas o acerto só derruba. Estilingue agora tira **1** de vida do Kraken e do tubarão.
+
 ## Novidades da v0.9.1
 
 - **Estação só com dinheiro:** tudo do computador da estação (recicladora, bancada de restauro, iluminação, carregador rápido, decoração, depósito, lançador e luvas) não pede mais metal nem outros componentes. Os preços continuam os mesmos.

@@ -197,3 +197,5 @@ button.fraco { background: transparent; border: 1px solid rgba(255,255,255,.25);
 .premioCorrida { background: rgba(255,211,107,.08); border: 1px solid rgba(255,211,107,.35); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
 button.verde { background: #2e8b57; } button.cinza { background: #5a5f63; }
 button.grande { font-size: 1.05rem; padding: 10px 18px; }
+
+.card .dano { color: #ffb38a; font-size: .88rem; margin: 2px 0 4px; }

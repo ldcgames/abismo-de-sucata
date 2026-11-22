@@ -1,5 +1,8 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v0.9.2
+Decorações com Equipar/Desequipar (`estacao.decoOff`). Tubarão do lago (TUBARAO em data.js: 200 de vida, um por vez, 20 min após morrer, ronda raio 42–54 m; carcaça boia; `tubarao_pegar`; derruba ao ser acertado; vende S$ 400 fixo). Dano de cada arma na loja; estilingue 1 de dano. Testes: npm test 35/35 · e2e_solo 54/54 · e2e_multi 36/36.
+
 ## Novidades da v0.9.1
 Estação, depósito e extras só com dinheiro (sem componentes). 8 decorações de S$ 90–100 (vasos, flamingos, boias, banco, luzinhas, guarda-sol, churrasqueira, rede) com visual e colisão. Testes: npm test 33/33 · e2e_solo 50/50 · e2e_multi 36/36.
 
@@ -30,8 +33,8 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 ## Resultados dos testes (última execução)
 | Comando | Resultado |
 |---|---|
-| `npm test` (regras + servidor WebSocket real) | **33/33** |
-| `node tests/e2e_solo.mjs` (Chrome real) | **50/50** |
+| `npm test` (regras + servidor WebSocket real) | **35/35** |
+| `node tests/e2e_solo.mjs` (Chrome real) | **54/54** |
 | `node tests/e2e_multi.mjs` (dois navegadores no mesmo servidor) | **36/36** |
 | `node tools/tour.mjs` | 18 capturas de tela reais em `docs/capturas/` |
 

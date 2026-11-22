@@ -97,6 +97,11 @@ export class UI {
     const k = JSON.stringify([f.uid, naEstacao, motivo, motivoT, p.estacao.tinta]);
     if (el._k === k) return;
     el._k = k; el.hidden = false;
+    if (e.cacado) {
+      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixe(f.esp, f.cm)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="soltar">Largar (X)</button></div>`;
+      el.querySelectorAll('button').forEach((b) => (b.onclick = () => this.g.acaoMao(b.dataset.a)));
+      return;
+    }
     el.innerHTML = `<div>🐟 <b>${esc(e.nome)}</b> — ${f.cm} cm · vale S$ ${valorPeixe(f.esp, f.cm)}</div>
       <div class="bt">
         <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">Aquário</button>
@@ -216,7 +221,9 @@ export class UI {
     let h = '<div class="grade">';
     for (const [k, it] of Object.entries(ESTACAO)) {
       const falta = faltando(p, it.custo);
-      h += `<div class="card"><h3>${it.nome}</h3><div class="nv">${it.desc}</div><div class="custo">${custoTxt(it.custo)}</div>${p.estacao[k] ? '<div class="val"><b>Construído</b></div>' : this.btn('Construir', { tipo: 'comprar', cat: 'estacao', chave: k }, falta.length > 0, falta.join(', '))}</div>`;
+      const deco = it.deco || k === 'decoracao', off = !!p.estacao.decoOff?.[k];
+      const tem = p.estacao[k] ? (deco ? `<div class="val"><b>${off ? 'Guardada (fora da estação)' : 'Equipada'}</b></div>${this.btn(off ? 'Equipar' : 'Desequipar', { tipo: 'deco_alternar', chave: k })}` : '<div class="val"><b>Construído</b></div>') : this.btn(deco ? 'Comprar e equipar' : 'Construir', { tipo: 'comprar', cat: 'estacao', chave: k }, falta.length > 0, falta.join(', '));
+      h += `<div class="card"><h3>${it.nome}</h3><div class="nv">${it.desc}</div><div class="custo">${custoTxt(it.custo)}</div>${tem}</div>`;
     }
     const prox = DEPOSITO[p.estacao.deposito + 1];
     h += `<div class="card"><h3>Depósito</h3><div class="val">Vagas: <b>${depositoVagas(p)}</b></div>${prox ? `<div class="custo">Ampliar para ${prox.vagas}: ${custoTxt(prox.custo)}</div>${this.btn('Ampliar', { tipo: 'comprar', cat: 'estacao', chave: 'deposito' }, faltando(p, prox.custo).length > 0)}` : '<div class="val">Máximo</div>'}</div>`;
@@ -326,18 +333,20 @@ export class UI {
     return h;
   }
   lojaArmas(p) {
-    let h = `<p class="nota">Compre em ordem: primeiro o estilingue, depois a pistola e assim por diante. Cada acerto derruba o amigo no chão; as armas de fogo ainda jogam ele para longe (só vale contra quem está a pé). Armas: teclas <kbd>1</kbd>–<kbd>5</kbd>, <kbd>H</kbd> guarda, botão esquerdo atira, a sniper mira com o botão direito. O Kraken só leva dano das armas de fogo.</p><div class="grade">`;
+    let h = `<p class="nota">Compre em ordem: primeiro o estilingue, depois a pistola e assim por diante. As pessoas não perdem vida: cada acerto só derruba o amigo no chão, e as armas de fogo ainda jogam ele para longe. O <b>dano</b> vale para o Kraken (3.000 de vida) e o tubarão (200 de vida). Armas: teclas <kbd>1</kbd>–<kbd>5</kbd>, <kbd>H</kbd> guarda, botão esquerdo atira, a sniper mira com o botão direito.</p><div class="grade">`;
     ARMAS_LOJA.forEach((k) => {
       const A = ARMAS[k], tem = !!p.armas[k], bloqueada = A.requer && !p.armas[A.requer];
       const bal = p.municao[k] || 0;
       const tecla = A.lixo ? 'Q' : String(ARMAS_ORDEM.indexOf(k) + 1);
       if (A.lixo) {
         h += `<div class="card"><h3>${esc(A.nome)} <span class="nota">(tecla Q)</span></h3>
-          <div class="nv">Munição: o <b>lixo</b> que você cata na margem. Cate com <kbd>E</kbd>, aperte <kbd>Q</kbd> para mirar (mesmo arco do peixe) e clique para atirar. Sem lixo na mão, usa o do saco. Derruba o amigo por <b>${A.stunMs / 1000} s</b> · alcance ${A.alcance} m · não machuca o Kraken.</div>
+          <div class="dano">Dano: <b>${A.danoKraken}</b> por acerto (Kraken e tubarão)</div>
+          <div class="nv">Munição: o <b>lixo</b> que você cata na margem. Cate com <kbd>E</kbd>, aperte <kbd>Q</kbd> para mirar (mesmo arco do peixe) e clique para atirar. Sem lixo na mão, usa o do saco. Derruba o amigo por <b>${A.stunMs / 1000} s</b> · alcance ${A.alcance} m.</div>
           ${tem ? `<div class="val"><b>Você tem</b> · lixo no saco: ${p.saco.length}${p.lixoMao ? ' + 1 na mão' : ''}</div>` : `<div class="custo">S$ ${fmt(A.preco)}</div>${this.btn('Comprar estilingue', { tipo: 'arma_comprar', arma: k }, p.dinheiro < A.preco, p.dinheiro < A.preco ? `Faltam S$ ${fmt(A.preco - p.dinheiro)}` : '')}`}</div>`;
         return;
       }
       h += `<div class="card"><h3>${tecla}. ${esc(A.nome)}</h3>
+        <div class="dano">Dano: <b>${A.danoKraken}</b> por tiro${A.foguete ? ' (explosão)' : ''} · no Kraken e no tubarão</div>
         <div class="nv">No chão: <b>${A.stunMs / 1000} s</b> por tiro · empurrão ${A.empurrao[0] < 5 ? 'pequeno' : A.empurrao[0] < 9 ? 'médio' : A.empurrao[0] < 14 ? 'forte' : 'voa longe'} · alcance ${A.alcance} m${A.auto ? ' · automática' : ''}${A.foguete ? ' · explode' : ''}</div>
         ${tem ? `<div class="val">Você tem · <b>${bal}/${MUNICAO_MAX[k]}</b> ${A.foguete ? 'foguetes' : 'balas'}</div>${this.btn(`Comprar ${A.municao.n} ${A.foguete ? 'foguete' : 'balas'} — S$ ${fmt(A.municao.preco)}`, { tipo: 'municao_comprar', arma: k }, p.dinheiro < A.municao.preco || bal + A.municao.n > MUNICAO_MAX[k])}`
           : `<div class="custo">S$ ${fmt(A.preco)} (vem com ${A.municao.n} ${A.foguete ? 'foguete' : 'balas'})</div>${bloqueada ? `<div class="falta">Primeiro compre: ${esc(ARMAS[A.requer].nome)}</div>` : this.btn('Comprar arma', { tipo: 'arma_comprar', arma: k }, p.dinheiro < A.preco, p.dinheiro < A.preco ? `Faltam S$ ${fmt(A.preco - p.dinheiro)}` : '')}`}</div>`;

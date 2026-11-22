@@ -395,3 +395,14 @@ export function krakenPos(t, a0 = 0) {
   // sobe do fundo nos 3 primeiros segundos e afunda nos 3 últimos
   return { pos: [x, 0, z], yaw };
 }
+
+// caminho do tubarão: ronda a frente dos píeres (raio 44–56), indo e voltando em volta do lago, sem padrão fixo
+export function tubaraoPos(t, a0 = 0) {
+  const ang = a0 + t * 0.03 + 0.22 * Math.sin(t * 0.07 + a0) + 0.05 * Math.sin(t * 0.23);
+  const r = 48 + 4.5 * Math.sin(t * 0.11 + a0 * 3) + 1 * Math.sin(t * 0.5);
+  const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+  const t2 = t + 0.25;
+  const ang2 = a0 + t2 * 0.03 + 0.22 * Math.sin(t2 * 0.07 + a0) + 0.05 * Math.sin(t2 * 0.23);
+  const r2 = 48 + 4.5 * Math.sin(t2 * 0.11 + a0 * 3) + 1 * Math.sin(t2 * 0.5);
+  return { pos: [x, -0.35, z], yaw: Math.atan2(Math.cos(ang2) * r2 - x, Math.sin(ang2) * r2 - z) };
+}

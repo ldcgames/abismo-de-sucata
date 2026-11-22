@@ -233,7 +233,7 @@ class Game {
   async soltarPeixe() {
     const f = this.perfil.mao; if (!f) return;
     const r = await this.acao({ tipo: 'peixe_soltar' });
-    if (r.ok) this.peixeVoltaAgua(f, this.me.pos);
+    if (r.ok && !ESPECIES[f.esp]?.cacado) this.peixeVoltaAgua(f, this.me.pos);
   }
   peixeVoltaAgua(f, pos) {
     // anima o peixe voltando à água (ou sumindo suavemente em terra)
@@ -811,6 +811,9 @@ class Game {
         const n = p.estatua.colocadas.length;
         txt = n >= ESTATUA_PECAS.length ? `🏆 Estátua completa · multiplicador ×${multDinheiro(p)}` : `<kbd>E</kbd>Colocar peças na estátua <span class="nota">(${n}/${ESTATUA_PECAS.length} · ×${multDinheiro(p)})</span>`;
         if (livre && I.hit('KeyE') && n < ESTATUA_PECAS.length) this.acao({ tipo: 'estatua_colocar' });
+      } else if (!p.mao && (this.tubPerto = this.carcacaPerto())) {
+        txt = `<kbd>E</kbd>Pegar o tubarão abatido <span class="nota">(vende por S$ 400 no computador da sua estação)</span>`;
+        if (livre && I.hit('KeyE')) this.acao({ tipo: 'tubarao_pegar', id: this.tubPerto.id });
       } else if (p.lixoMao && !p.mao) {
         const nm = SUCATA[p.lixoMao.tipo]?.nome || 'Lixo';
         txt = me.mirandoLixo ? `🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para atirar ${nm} com o estilingue · <kbd>Q</kbd> cancelar`
@@ -829,7 +832,8 @@ class Game {
         txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila <span class="nota">(${p.mochila.length}/${MOCHILA.peixes})</span>`;
       }
       if (!p.mao) this.me.mirando = false;
-      if (p.mao && !best) txt = this.me.mirando
+      if (p.mao && !best && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão abatido: vá até o <b>computador da sua estação</b> e venda por S$ 400 · <kbd>X</kbd> largar · cuidado, um tiro faz você derrubar';
+      else if (p.mao && !best) txt = this.me.mirando
         ? '🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para jogar · <kbd>G</kbd> cancelar'
         : `<kbd>X</kbd>Soltar · <kbd>G</kbd>Pegar para arremessar · <kbd>Z</kbd>${p.mochila.length >= MOCHILA.peixes ? 'Mochila cheia' : `Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`} <span class="nota">(${ESPECIES[p.mao.esp].nome}, ${p.mao.cm} cm)</span>`;
       if (livre && I.hit('KeyF') && !p.mao) { if (this.pesca.estado !== 'off' || this.pertoDaAgua()) this.toggleVara(); else this.ui.aviso('Vá até o píer ou a beira d\'água para pescar', 'info'); }
@@ -860,7 +864,7 @@ class Game {
         this.roda.t = 0; this.roda.v = [0, 0];
       }
       if (this.roda) this.updateRoda(this.dtQuadro || 1 / 60, livre);
-      if (livre && I.hit('KeyG') && p.mao) {
+      if (livre && I.hit('KeyG') && p.mao && !ESPECIES[p.mao.esp]?.cacado) {
         if (ESPECIES[p.mao.esp].pesado && !p.extras.luvas) this.ui.aviso('Precisa das luvas hidráulicas para arremessar um tubarão', 'ruim');
         else { this.me.mirando = !this.me.mirando; if (this.me.mirando) this.input.lock(); }
       }
@@ -875,7 +879,11 @@ class Game {
       if (livre && me.mirandoLixo && I.mouse.clicked) { me.mirandoLixo = false; this.atirarLixo(); }
       if (this.pesca.estado !== 'off') txt = this.pesca.prompt || txt;
     } else if (me.modo === 'nadando') {
-      txt = 'Nadando — volte à margem ou suba no cais pela escada (<kbd>E</kbd>)';
+      const c = !p.mao && this.carcacaPerto();
+      if (c) { txt = '<kbd>E</kbd>Pegar o tubarão abatido <span class="nota">(leve até a sua estação e venda por S$ 400)</span>'; if (livre && I.hit('KeyE')) this.acao({ tipo: 'tubarao_pegar', id: c.id }); }
+      else if (p.mao && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão — nade até a margem e vá até o computador da sua estação · <kbd>X</kbd> largar';
+      else txt = 'Nadando — volte à margem ou suba no cais pela escada (<kbd>E</kbd>)';
+      if (livre && p.mao && I.hit('KeyX')) this.soltarPeixe();
     } else if (me.modo === 'sub' || me.modo === 'guindaste') {
       txt = this.subPrompt;
     }
@@ -989,6 +997,7 @@ class Game {
         if (Math.hypot(x - ip[0], z - ip[2]) < 0.45 && y > ip[1] && y < ip[1] + 1.8) { hit = true; break; }
       }
       if (!hit && this.kr?.root.visible) { const kc = this.kr.centro(); if (Math.hypot(x - kc[0], y - kc[1], z - kc[2]) < 6.2) hit = true; }
+      if (!hit && this.tubPos && Math.hypot(x - this.tubPos[0], y - this.tubPos[1], z - this.tubPos[2]) < 2.1) hit = true;
       if (hit) { alvo = [x, y, z]; break; }
     }
     const boca = [me.pos[0], me.pos[1] + 1.45, me.pos[2]];
@@ -1035,6 +1044,7 @@ class Game {
     for (let k = 0; k < (e.acertou ? 14 : 6); k++) this.particles.emit({ p: b.slice(), v: [(Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4], life: 0.35, size: 0.05, col: cor, g: 9.8, drag: 1, kind: 'faisca', add: true });
     if (!e.acertou && b[1] < 0.2 && terrainHeight(b[0], b[2]) < 0) this.particles.ripple(b[0], b[2], this.t, 0.15);
     if (e.acertou === 'kraken') { this.particles.ink(b, 18); this.kr.flash = 1; return; }
+    if (e.acertou === 'tubarao') { this.particles.splash(b[0], b[2], this.t, 0.25); for (let k = 0; k < 8; k++) this.particles.emit({ p: b.slice(), v: [(Math.random() - 0.5) * 3, Math.random() * 2.5, (Math.random() - 0.5) * 3], life: 0.5, size: 0.07, col: [0.7, 0.12, 0.1, 0.9], g: 9.8, drag: 1, kind: 'faisca' }); return; }
     if (e.acertou) this.particles.confetti(b, 10);
   }
   explosao(pos, agua) {

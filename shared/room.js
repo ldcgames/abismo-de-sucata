@@ -2,7 +2,7 @@
 // Usada pelo servidor WebSocket (multiplayer real) e pelo servidor local do navegador (modo solo).
 // A sala NÃO é dona da progressão: cada jogador traz o próprio perfil, que é salvo fora daqui.
 
-import { avancarMissao, applyAction, createWorld, tickWorld, stepProjectiles, checkSurface, checkDiscovery, estaNaEstacao, tickKraken, krakenPublico, uid } from './rules.js';
+import { avancarMissao, applyAction, createWorld, tickWorld, stepProjectiles, checkSurface, checkDiscovery, estaNaEstacao, tickKraken, krakenPublico, tickTubarao, tubaraoPublico, uid } from './rules.js';
 import { STATIONS, stationById, hourOfDay, terrainHeight, estacaoParaMundo, BARRACA_CORRIDA, LAKE_R } from './world.js';
 import { CORES_JOGADOR, KRAKEN, CORRIDA, divisaoCorrida } from './data.js';
 
@@ -132,6 +132,7 @@ export class Room {
     this.premiarKraken(ev);
     ev.push(...tickWorld(this.world, now, this.rnd));
     ev.push(...tickKraken(this.world, now, this.rnd));
+    ev.push(...tickTubarao(this.world, now, this.rnd));
     ev.push(...this.tickCorrida(now));
     for (const [slot, pl] of this.players) {
       if (!pl.conectado && now - pl.caiuEm > RECONEXAO_MS) {
@@ -287,7 +288,7 @@ export class Room {
   snapshot(now = Date.now()) {
     const players = {};
     for (const [slot, pl] of this.players) players[slot] = this.publicPlayer(pl, now);
-    return { code: this.code, tempo: this.worldTime(now), players, kraken: krakenPublico(this.world.kraken, now), corrida: this.corridaPublica(now) };
+    return { code: this.code, tempo: this.worldTime(now), players, kraken: krakenPublico(this.world.kraken, now), tubarao: tubaraoPublico(this.world, now), corrida: this.corridaPublica(now) };
   }
   worldSnapshot() {
     return { items: Object.values(this.world.items), projeteis: this.world.projeteis };

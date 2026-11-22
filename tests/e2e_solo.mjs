@@ -225,6 +225,27 @@ const kr = await ev(async () => {
 check(kr.vis && /KRAKEN/.test(kr.hud) && /some em/.test(kr.hud), 'Kraken surge com contagem regressiva e vida em cima da tela', JSON.stringify(kr));
 check(kr.hp1 === kr.hp0 - 8, 'tiro de pistola tira vida do Kraken', JSON.stringify(kr));
 check(!kr.vivo && kr.din1 === kr.din0 + 1000, 'Kraken derrotado: S$ 1.000 para quem está na sala', JSON.stringify(kr));
+const tub = await ev(async () => {
+  const g = __jogo, w = g.net.room.world;
+  w.tubarao.proximo = Date.now() - 1; await new Promise((r) => setTimeout(r, 300)); g.step(3);
+  const nadando = g.tubNode.visible;
+  const rules = await import('/shared/rules.js');
+  const ev = rules.danoTubarao(w, 999, g.slot, Date.now()); g.onEvents(ev); g.step(2);
+  const c = ev[0].carcaca; const pl = g.net.room.players.get(g.slot);
+  const antes = { pos: g.me.pos.slice(), modo: g.me.modo };
+  g.me.pos = [c.pos[0] + 1, -0.55, c.pos[2]]; g.me.modo = 'nadando'; pl.pos = g.me.pos.slice(); pl.modo = 'nadando';
+  g.perfil.mao = null; g.step(2);
+  const prompt = document.getElementById('prompt').textContent;
+  g.input.press('KeyE'); g.step(1); await new Promise((r) => setTimeout(r, 300)); g.step(2);
+  const mao = g.perfil.mao?.esp;
+  g.input.press('KeyX'); g.step(1); await new Promise((r) => setTimeout(r, 300)); g.step(2);
+  const largou = !g.perfil.mao && g.carcacas.size === 1;
+  g.me.pos = antes.pos; g.me.modo = antes.modo; pl.pos = antes.pos.slice(); pl.modo = antes.modo; g.step(2);
+  return { nadando, carc: g.carcacas.size, prompt, mao, largou };
+});
+check(tub.nadando, 'tubarão aparece nadando na frente dos píeres', JSON.stringify(tub));
+check(/Pegar o tubarão/.test(tub.prompt) && tub.mao === 'tubarao_cacado', 'tubarão abatido boia; nadando até ele, E pega', JSON.stringify(tub));
+check(tub.largou, 'X larga o tubarão (volta a boiar)', JSON.stringify(tub));
 const brk = await ev(() => {
   const g = __jogo; g.me.emote = { i: 5, t: 0 }; for (let i = 0; i < 30; i++) g.step(1);
   return { hp: g.myChar.pose.hp, anim: g.animNome(), fatias: document.querySelectorAll('#rodaEmotes .fatia').length };

@@ -6,11 +6,11 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
-  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS, krakenPos,
+  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS, krakenPos, tubaraoPos,
 } from './world.js';
 
 // ------------------------------------------------------------------ util
@@ -271,7 +271,7 @@ function randomBedSpot(rnd, zona) {
 
 export function createWorld(seed = 1) {
   const rnd = makeRng(seed);
-  const w = { seed, items: {}, seq: 0, respawn: [], projeteis: [], pseq: 0, kraken: { vivo: false, proximo: 0, hp: 0 } };
+  const w = { seed, items: {}, seq: 0, respawn: [], projeteis: [], pseq: 0, kraken: { vivo: false, proximo: 0, hp: 0 }, tubarao: { vivo: false, proximo: 0, hp: 0 }, carcacas: {}, cseq: 0 };
   const tipos = Object.entries(SUCATA).filter(([, t]) => t.zona);
   const sorteia = (prof) => {
     const cand = tipos.filter(([, t]) => prof >= t.zona[0] && prof <= t.zona[1]);
@@ -412,9 +412,11 @@ export function cabeNoAquario(p, peixe, destino = 'aquario') {
     const a = AQUARIOS[p.aquario.nivel];
     if (p.aquario.peixes.length >= a.vagas) return `${a.nome} lotado [${p.aquario.peixes.length}/${a.vagas}]`;
     if (peixe.cm > a.maxCm) return `${ESPECIES[peixe.esp].nome} de ${peixe.cm} cm não cabe: máximo ${a.maxCm} cm no ${a.nome}`;
+    if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
     if (ESPECIES[peixe.esp].pesado) return 'Tubarões só no tanque de peixes';
     return null;
   }
+  if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
   if (p.tanque.nivel < 0) return 'Você ainda não tem tanque de peixes';
   const t = TANQUES[p.tanque.nivel];
   if (p.tanque.peixes.length >= t.vagas) return `${t.nome} lotado [${p.tanque.peixes.length}/${t.vagas}]`;
@@ -695,8 +697,32 @@ const ACOES = {
     p.dinheiro += v;
     return okR(`Vendido: ${ESPECIES[f.esp].nome} por S$ ${v}`, de === 'aquario' || de === 'tanque' ? [{ t: 'visual_estacao', slot: ctx.player.slot }] : [], { de });
   },
+  // decorações: depois de compradas dá para tirar (desequipar) e colocar de volta, sem pagar de novo
+  deco_alternar(p, a, ctx) {
+    const e = precisaEstacao(ctx); if (e) return e;
+    const k = a.chave, it = ESTACAO[k];
+    if (!it || !(it.deco || k === 'decoracao')) return fail('Isso não é decoração');
+    if (!p.estacao[k]) return fail('Compre primeiro');
+    const off = { ...(p.estacao.decoOff || {}) };
+    if (off[k]) delete off[k]; else off[k] = true;
+    p.estacao.decoOff = off;
+    return okR(`${it.nome}: ${off[k] ? 'retirada da estação' : 'colocada de volta'}`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+  },
+  tubarao_pegar(p, a, ctx) {
+    const { world, player } = ctx;
+    const c = world.carcacas?.[a.id];
+    if (!c) return fail('Alguém já pegou esse tubarão');
+    if (player.modo !== 'terra' && player.modo !== 'nadando') return fail('Chegue perto a pé ou nadando');
+    if (Math.hypot(player.pos[0] - c.pos[0], player.pos[2] - c.pos[2]) > TUBARAO.pegarRaio + 0.6) return fail('Chegue mais perto do tubarão');
+    if (player.stunUntil > ctx.now) return fail('Você está no chão');
+    if (p.mao) return fail('Suas mãos estão ocupadas: guarde ou solte o peixe primeiro');
+    delete world.carcacas[c.id];
+    p.mao = { uid: uid(ctx.rnd), esp: 'tubarao_cacado', cm: ESPECIES.tubarao_cacado.cm[0] };
+    return okR(`Você pegou o tubarão! Leve até o computador da sua estação e venda por S$ ${TUBARAO.valor}`, [{ t: 'carcaca_pega', id: c.id, slot: player.slot }]);
+  },
   peixe_soltar(p, a, ctx) {
     if (!p.mao) return fail('Nenhum peixe na mão');
+    if (ESPECIES[p.mao.esp].cacado) { p.mao = null; return okR('Você largou o tubarão', [{ t: 'carcaca_nova', carcaca: novaCarcaca(ctx.world, ctx.player.pos), de: ctx.player.slot }]); }
     const f = p.mao; p.mao = null;
     return okR(`${ESPECIES[f.esp].nome} solto`, [{ t: 'soltou', slot: ctx.player.slot, peixe: f, pos: ctx.player.pos }]);
   },
@@ -732,6 +758,7 @@ const ACOES = {
     if (!emTerra(player)) return fail('Arremesse de terra firme ou do cais');
     if (player.stunUntil > now) return fail('Você está atordoado');
     const tub = !!ESPECIES[p.mao.esp].pesado;
+    if (ESPECIES[p.mao.esp].cacado) return fail('O tubarão abatido não dá para arremessar: leve até a estação e venda');
     if (tub && !p.extras.luvas) return fail('Precisa das luvas hidráulicas para arremessar um tubarão');
     const cd = tub ? 'cdTubarao' : 'cdPeixe';
     if ((player[cd] || 0) > now) return fail(`Aguarde ${Math.ceil((player[cd] - now) / 1000)} s`);
@@ -885,16 +912,18 @@ const ACOES = {
     const evs = [];
     let ponto = fim;
     // o Kraken é um alvo enorme: acerta se a linha passar pela "esfera" dele antes de um jogador
-    const tk = raioKraken(world.kraken, now, boca, dir, tMax);
-    if (tk !== null && (!melhor || tk < melhor.s * tMax)) {
-      ponto = [boca[0] + dir[0] * tk, boca[1] + dir[1] * tk, boca[2] + dir[2] * tk];
-      evs.push(...danoKraken(world.kraken, A.danoKraken || 0, player.slot, now));
-      evs.unshift({ t: 'tiro', de: player.slot, arma: k, a: boca, b: ponto, acertou: 'kraken' });
+    const tk = raioKraken(world.kraken, now, boca, dir, tMax), tt = raioTubarao(world, now, boca, dir, tMax);
+    const tb = tk !== null && (tt === null || tk < tt) ? ['kraken', tk] : tt !== null ? ['tubarao', tt] : null;
+    if (tb && (!melhor || tb[1] < melhor.s * tMax)) {
+      ponto = [boca[0] + dir[0] * tb[1], boca[1] + dir[1] * tb[1], boca[2] + dir[2] * tb[1]];
+      if (tb[0] === 'kraken') evs.push(...danoKraken(world.kraken, A.danoKraken || 0, player.slot, now));
+      else evs.push(...danoTubarao(world, A.danoKraken || 0, player.slot, now));
+      evs.unshift({ t: 'tiro', de: player.slot, arma: k, a: boca, b: ponto, acertou: tb[0] });
       return okR('', evs, { municao: p.municao[k] });
     }
     if (melhor) {
       ponto = [boca[0] + (fim[0] - boca[0]) * melhor.s, boca[1] + (fim[1] - boca[1]) * melhor.s, boca[2] + (fim[2] - boca[2]) * melhor.s];
-      evs.push(...acertoArma(players.get(melhor.slot), melhor.slot, player.slot, k, dir, now));
+      evs.push(...acertoArma(players.get(melhor.slot), melhor.slot, player.slot, k, dir, now, 1, world));
     }
     evs.unshift({ t: 'tiro', de: player.slot, arma: k, a: boca, b: ponto, acertou: !!melhor });
     return okR('', evs, { municao: p.municao[k] });
@@ -1012,14 +1041,16 @@ export function stepProjectiles(world, players, dt, now) {
         if (slot === pr.dono || (o.modo !== 'terra' && o.modo !== 'nadando')) continue;
         if (segSegDist(prev, pr.pos, o.pos, [o.pos[0], o.pos[1] + 1.75, o.pos[2]]).dist < 0.7) { bateu = 'jogador'; break; }
       }
-      const kc = centroKraken(world.kraken, now);
+      const kc = centroKraken(world.kraken, now), tc = centroTubarao(world, now);
       if (!bateu && kc && d3(pr.pos, kc) < KRAKEN.raio + 0.8) bateu = 'kraken';
+      if (!bateu && tc && d3(pr.pos, tc) < TUBARAO.raio + 0.8) bateu = 'tubarao';
       const h = terrainHeight(pr.pos[0], pr.pos[2]);
       if (!bateu && (pr.pos[1] < Math.max(h, 0) || now - pr.nasc > 5000 || Math.hypot(pr.pos[0] - pr.ini[0], pr.pos[2] - pr.ini[2]) > pr.alcance)) bateu = 'chao';
       if (!bateu) continue;
       world.projeteis.splice(i, 1);
       ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'explosao', agua: h < 0 });
       if (kc && d3(pr.pos, kc) < KRAKEN.raio + (ARMAS[pr.arma] || ARMAS.bazuca).raio) ev.push(...danoKraken(world.kraken, (ARMAS[pr.arma] || ARMAS.bazuca).danoKraken || 0, pr.dono, now));
+      if (tc && d3(pr.pos, tc) < TUBARAO.raio + (ARMAS[pr.arma] || ARMAS.bazuca).raio) ev.push(...danoTubarao(world, (ARMAS[pr.arma] || ARMAS.bazuca).danoKraken || 0, pr.dono, now));
       // explosão: derruba e arremessa quem estiver perto (mais forte no centro)
       const A = ARMAS[pr.arma] || ARMAS.bazuca;
       for (const [slot, o] of players) {
@@ -1029,7 +1060,7 @@ export function stepProjectiles(world, players, dt, now) {
         if (d > A.raio) continue;
         if (slot === pr.dono && d > A.raio * 0.6) continue;
         const dir = [o.pos[0] - pr.pos[0] || 0.01, 0, o.pos[2] - pr.pos[2]];
-        ev.push(...acertoArma(o, slot, pr.dono, pr.arma || 'bazuca', dir, now, 0.6 + 0.4 * (1 - d / A.raio)));
+        ev.push(...acertoArma(o, slot, pr.dono, pr.arma || 'bazuca', dir, now, 0.6 + 0.4 * (1 - d / A.raio), world));
       }
       continue;
     }
@@ -1045,6 +1076,11 @@ export function stepProjectiles(world, players, dt, now) {
     const prev = pr.pos.slice();
     pr.pos[0] += pr.vel[0] * dt; pr.pos[1] += pr.vel[1] * dt; pr.pos[2] += pr.vel[2] * dt;
     let fim = null;
+    if (pr.tipo === 'lixo') {
+      const kc = centroKraken(world.kraken, now), tc = centroTubarao(world, now);
+      if (kc && segSphere(prev, pr.pos, kc, KRAKEN.raio)) { world.projeteis.splice(i, 1); ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'kraken' }, ...danoKraken(world.kraken, ARMAS.estilingue.danoKraken, pr.dono, now)); continue; }
+      if (tc && segSphere(prev, pr.pos, tc, TUBARAO.raio)) { world.projeteis.splice(i, 1); ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'tubarao' }, ...danoTubarao(world, ARMAS.estilingue.danoKraken, pr.dono, now)); continue; }
+    }
     // colisão com jogadores / submarinos (teste por segmento contra esfera/cápsula)
     for (const [slot, o] of players) {
       if (slot === pr.dono) continue;
@@ -1086,6 +1122,7 @@ export function stepProjectiles(world, players, dt, now) {
       alvo.imuneUntil = now + ms + (pr.tipo === 'lixo' ? 800 : TROLL.imunidadeMs);
       ev.push({ t: 'projetil_fim', id: pr.id, pos: pr.pos, res: 'acerto' });
       ev.push({ t: 'atordoado', alvo: fim.alvo, por: pr.dono, ms, ate: alvo.stunUntil, tubarao: pr.tipo === 'tubarao', esp: pr.peixe?.esp, lixo: pr.lixo || null });
+      ev.push(...largarCarcaca(world, alvo, fim.alvo));
     } else if (fim.t === 'balao_acerto') {
       const alvo = players.get(fim.alvo);
       if (alvo.tinta || (alvo.tintaProt || 0) > now) {
@@ -1176,8 +1213,59 @@ export function krakenPublico(k, now) {
   return { vivo: true, t: (now - k.ini) / 1000, resta: Math.max(0, k.fim - now), hp: k.hp, hpMax: k.hpMax, a0: k.a0 };
 }
 
+// ------------------------------------------------------------------ tubarão do lago
+export function centroTubarao(w, now) {
+  const tb = w.tubarao; if (!tb?.vivo) return null;
+  const { pos } = tubaraoPos((now - tb.ini) / 1000, tb.a0);
+  return [pos[0], 0.1, pos[2]];
+}
+function raioTubarao(w, now, o, d, tMax) {
+  const c = centroTubarao(w, now); if (!c) return null;
+  const oc = [o[0] - c[0], o[1] - c[1], o[2] - c[2]];
+  const b = oc[0] * d[0] + oc[1] * d[1] + oc[2] * d[2], cc = oc[0] ** 2 + oc[1] ** 2 + oc[2] ** 2 - TUBARAO.raio ** 2;
+  const disc = b * b - cc; if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  return t > 0 && t <= tMax ? t : null;
+}
+function novaCarcaca(w, pos) {
+  const h = terrainHeight(pos[0], pos[2]);
+  const c = { id: 'c' + (++w.cseq), pos: [+pos[0].toFixed(2), h < 0 ? 0 : +(h + 0.05).toFixed(2), +pos[2].toFixed(2)], agua: h < 0 };
+  w.carcacas[c.id] = c;
+  return c;
+}
+export function danoTubarao(w, dano, slot, now) {
+  const tb = w.tubarao; if (!tb?.vivo || dano <= 0) return [];
+  const c = centroTubarao(w, now);
+  tb.hp = Math.max(0, tb.hp - dano);
+  if (tb.hp > 0) return [];
+  tb.vivo = false; tb.proximo = now + TUBARAO.intervaloMs;
+  return [{ t: 'tubarao_morto', por: slot, carcaca: novaCarcaca(w, c) }];
+}
+// quem leva o tubarão abatido e é acertado deixa ele cair ali mesmo
+function largarCarcaca(w, alvo, slot) {
+  const p = alvo?.profile;
+  if (!w || !p?.mao || !ESPECIES[p.mao.esp]?.cacado) return [];
+  p.mao = null;
+  return [{ t: 'carcaca_nova', carcaca: novaCarcaca(w, alvo.pos), de: slot, perfis: [slot] }];
+}
+// um só por vez: o próximo só começa a contar 20 min depois que o anterior morrer
+export function tickTubarao(w, now, rnd = Math.random) {
+  const tb = w.tubarao || (w.tubarao = { vivo: false, proximo: 0, hp: 0 });
+  w.carcacas ||= {};
+  if (!tb.proximo) tb.proximo = now + TUBARAO.intervaloMs;
+  if (!tb.vivo && now >= tb.proximo) {
+    Object.assign(tb, { vivo: true, ini: now, a0: rnd() * Math.PI * 2, hp: TUBARAO.hp });
+    return [{ t: 'tubarao_surgiu' }];
+  }
+  return [];
+}
+export function tubaraoPublico(w, now) {
+  const tb = w.tubarao;
+  return { vivo: !!tb?.vivo, t: tb?.vivo ? (now - tb.ini) / 1000 : 0, a0: tb?.a0 || 0, carcacas: Object.values(w.carcacas || {}) };
+}
+
 // tiro acertou: derruba (stun) e empurra o alvo; respeita a imunidade curta depois de levantar
-function acertoArma(alvo, slot, dono, k, dir, now, fator = 1) {
+function acertoArma(alvo, slot, dono, k, dir, now, fator = 1, world = null) {
   const A = ARMAS[k];
   if (!alvo) return [];
   if ((alvo.imuneUntil || 0) > now) return [{ t: 'imune', alvo: slot }];
@@ -1186,7 +1274,7 @@ function acertoArma(alvo, slot, dono, k, dir, now, fator = 1) {
   alvo.empurraoAte = now + 3500;
   const h = Math.hypot(dir[0], dir[2]) || 1;
   const emp = [(dir[0] / h) * A.empurrao[0] * fator, A.empurrao[1] * fator, (dir[2] / h) * A.empurrao[0] * fator];
-  return [{ t: 'atordoado', alvo: slot, por: dono, ms: A.stunMs, ate: alvo.stunUntil, arma: k, empurrao: emp }];
+  return [{ t: 'atordoado', alvo: slot, por: dono, ms: A.stunMs, ate: alvo.stunUntil, arma: k, empurrao: emp }, ...(world ? largarCarcaca(world, alvo, slot) : [])];
 }
 // menor distância entre os segmentos ab e cd (s = posição ao longo de ab)
 function segSegDist(a, b, c, d) {

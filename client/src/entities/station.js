@@ -354,6 +354,8 @@ export class Station {
 
   // reconstrói peças dependentes de compras (só quando algo muda)
   updateVisual(est, cor, nome) {
+    // decorações desequipadas não aparecem (continuam compradas)
+    if (est?.decoOff) { est = { ...est }; for (const k of Object.keys(est.decoOff)) if (est.decoOff[k]) est[k] = false; }
     const key = JSON.stringify({ e: est, cor, nome: nome || '' }, (k, v) => (k === 'peixes' ? v.map((f) => f.uid + f.esp + f.cm) : v));
     this.setSign(nome);
     if (key === this.lastKey) return;

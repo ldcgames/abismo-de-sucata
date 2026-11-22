@@ -5,8 +5,9 @@ import { Geo, cylinder, torus, sphere } from '../engine/geometry.js';
 import { Kraken } from '../entities/kraken.js';
 import { itemNode } from '../entities/items.js';
 import { Voz } from '../systems/voz.js';
-import { ARMAS, CORRIDA, KRAKEN, LIXO, SUCATA, textoPremioCorrida, divisaoCorrida } from '../../shared/data.js';
-import { stationById } from '../../shared/world.js';
+import { ARMAS, CORRIDA, KRAKEN, LIXO, SUCATA, TUBARAO, textoPremioCorrida, divisaoCorrida } from '../../shared/data.js';
+import { stationById, tubaraoPos } from '../../shared/world.js';
+import { fishNode } from '../entities/station.js';
 import { lerp } from '../engine/math.js';
 import { subStats } from '../../shared/rules.js';
 
@@ -20,6 +21,8 @@ export const Novidades = {
     this.kr = new Kraken(this.R);
     this.scene.add(this.kr.root);
     this.krSnap = null; this.krSnapEm = 0;
+    this.tbSnap = null; this.tbSnapEm = 0; this.carcacas = new Map(); // id -> { c, n }
+    this.tubNode = fishNode(this.R, 'tubarao', 360); this.tubNode.visible = false; this.scene.add(this.tubNode);
     this.corrida = null;       // corrida em que EU estou: { id, participantes, checkpoints, nos, largaEm, ... }
     this.convite = null;       // convite recebido pendente
     this.corridaSel = new Set(); // amigos escolhidos no painel da barraca
@@ -31,6 +34,8 @@ export const Novidades = {
   // ------------------------------------------------------------ snapshots e eventos
   snapNovidades(s) {
     this.krSnap = s.kraken || null; this.krSnapEm = performance.now();
+    this.tbSnap = s.tubarao || null; this.tbSnapEm = performance.now();
+    if (s.tubarao) this.sincronizarCarcacas(s.tubarao.carcacas || []);
     this.corridaSnap = s.corrida || null;
   },
   eventoNovidades(e) {
@@ -49,6 +54,23 @@ export const Novidades = {
         this.krSnap = { vivo: false, em: KRAKEN.intervaloMs }; this.krSnapEm = performance.now();
         return true;
       }
+      case 'tubarao_surgiu': this.ui.aviso('🦈 Um tubarão está rondando a frente dos píeres! Derrube com as armas e venda por S$ 400.', 'info', 6000); return false;
+      case 'tubarao_morto': {
+        const quem = e.por === this.slot ? 'Você' : this.remotos[e.por]?.nome || 'Alguém';
+        this.ui.aviso(`🦈 ${quem} derrubou o tubarão! Ele está boiando — nade até lá e aperte E para pegar (vale S$ ${TUBARAO.valor}).`, 'ok', 6000);
+        if (e.carcaca) { this.particles.splash(e.carcaca.pos[0], e.carcaca.pos[2], this.t, 0.6); this.sincronizarCarcacas([...[...this.carcacas.values()].map((x) => x.c), e.carcaca]); }
+        this.tbSnap = { ...(this.tbSnap || {}), vivo: false };
+        return false;
+      }
+      case 'carcaca_nova':
+        if (e.de === this.slot) this.ui.aviso('Você deixou o tubarão cair! Pegue de volta (E) antes que alguém leve.', 'ruim', 4000);
+        else if (this.remotos[e.de]) this.ui.aviso(`${this.remotos[e.de].nome} deixou o tubarão cair!`, 'info');
+        this.sincronizarCarcacas([...[...this.carcacas.values()].map((x) => x.c), e.carcaca]);
+        return false;
+      case 'carcaca_pega':
+        if (this.carcacas.has(e.id)) { this.fxRoot.remove(this.carcacas.get(e.id).n); this.carcacas.delete(e.id); }
+        if (e.slot !== this.slot && this.remotos[e.slot]) this.ui.aviso(`🦈 ${this.remotos[e.slot].nome} pegou o tubarão!`, 'info');
+        return false;
       case 'corrida_convite': this.onConvite(e); return true;
       case 'corrida_resposta':
         if (this.convite?.id === e.id && e.slot === this.slot) { this.convite = null; $('corridaConvite').hidden = true; }
@@ -81,13 +103,26 @@ export const Novidades = {
     const kh = $('krakenHud');
     if (kl && kl.resta > 0) {
       kh.hidden = false;
-      const h = `<div class="tit">🐙 KRAKEN DO ABISMO <span>some em ${mmss(kl.resta)}</span></div><div class="barra"><i style="width:${(100 * kl.hp / kl.hpMax).toFixed(1)}%"></i></div><small>${fmt(kl.hp)} / ${fmt(kl.hpMax)} · derrube para todos ganharem S$ ${fmt(KRAKEN.premio)} · o estilingue não machuca</small>`;
+      const h = `<div class="tit">🐙 KRAKEN DO ABISMO <span>some em ${mmss(kl.resta)}</span></div><div class="barra"><i style="width:${(100 * kl.hp / kl.hpMax).toFixed(1)}%"></i></div><small>${fmt(kl.hp)} / ${fmt(kl.hpMax)} · derrube para todos ganharem S$ ${fmt(KRAKEN.premio)}</small>`;
       if (kh._h !== h) { kh.innerHTML = h; kh._h = h; }
     } else if (k && !k.vivo && k.em - dk * 1000 < KRAKEN.avisoMs && k.em - dk * 1000 > 0) {
       kh.hidden = false;
       const h = `<div class="tit">🐙 O Kraken surge em <span>${mmss(k.em - dk * 1000)}</span></div>`;
       if (kh._h !== h) { kh.innerHTML = h; kh._h = h; }
     } else kh.hidden = true;
+    // tubarão rondando os píeres (só a barbatana e um pouco das costas de fora)
+    const tb = this.tbSnap;
+    if (tb?.vivo) {
+      const t = tb.t + (performance.now() - this.tbSnapEm) / 1000;
+      const { pos, yaw } = tubaraoPos(t, tb.a0);
+      this.tubNode.visible = true;
+      this.tubNode.at(pos[0], pos[1] + Math.sin(this.t * 1.7) * 0.06, pos[2]).rot(0.03 * Math.sin(this.t * 2.3), yaw + 0.08 * Math.sin(this.t * 3.1), 0);
+      this.tubPos = [pos[0], 0.1, pos[2]];
+      if (Math.random() < 0.2) this.particles.ripple(pos[0], pos[2], this.t, 0.12);
+    } else { this.tubNode.visible = false; this.tubPos = null; }
+    for (const { c, n } of this.carcacas.values()) {
+      if (c.agua) n.at(c.pos[0], c.pos[1] + 0.15 + Math.sin(this.t * 1.3 + c.pos[0]) * 0.06, c.pos[2]);
+    }
     // voz: M liga/desliga
     if (livre && I.hit('KeyM')) this.alternarVoz();
     const minha = this.me.modo === 'sub' || this.me.modo === 'guindaste' ? this.sub.pos : this.me.pos;
@@ -109,6 +144,24 @@ export const Novidades = {
         else if (I.hit('KeyN')) this.responderConvite(false);
       }
     }
+  },
+
+  // ------------------------------------------------------------ tubarão abatido (boiando ou no chão)
+  sincronizarCarcacas(lista) {
+    const ids = new Set(lista.map((c) => c.id));
+    for (const [id, x] of this.carcacas) if (!ids.has(id)) { this.fxRoot.remove(x.n); this.carcacas.delete(id); }
+    for (const c of lista) {
+      if (this.carcacas.has(c.id)) continue;
+      const n = fishNode(this.R, 'tubarao_cacado', 330);
+      // de barriga para cima, boiando (ou deitado de lado no chão)
+      n.at(c.pos[0], c.pos[1] + (c.agua ? 0.15 : 0.45), c.pos[2]).rot(0, (c.pos[0] * 7) % 6.28, c.agua ? Math.PI : Math.PI / 2);
+      this.fxRoot.add(n); this.carcacas.set(c.id, { c, n });
+    }
+  },
+  carcacaPerto(r = TUBARAO.pegarRaio) {
+    let best = null, bd = r;
+    for (const { c } of this.carcacas.values()) { const d = Math.hypot(c.pos[0] - this.me.pos[0], c.pos[2] - this.me.pos[2]); if (d < bd) { bd = d; best = c; } }
+    return best;
   },
 
   // ------------------------------------------------------------ ranking (top 3 da sala por dinheiro)

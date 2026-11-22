@@ -472,7 +472,7 @@ test('Kraken: aviso, surge a cada 20 min por 1 min, vida pelo dano das armas e S
     const t = KRAKEN.hp / (dps(k) * n);
     assert.ok(t > 20 && t < 45, `${n}× ${k}: ${t.toFixed(0)} s atirando sem parar`);
   }
-  assert.equal(ARMAS.estilingue.danoKraken, 0, 'estilingue não machuca');
+  assert.equal(ARMAS.estilingue.danoKraken, 1, 'estilingue tira só 1');
   // tiro de pistola de um píer na direção do Kraken
   const A = r.players.get('N'); A.modo = 'terra'; A.profile.armas.pistola = true; A.profile.municao.pistola = 50;
   const tk = t1 + 5000, c = krakenPos(5, r.world.kraken.a0).pos;
@@ -560,4 +560,68 @@ test('estação: tudo só com dinheiro (sem metal/componentes) e decorações no
   assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'banco' }, T0).res.ok, true);
   assert.equal(pl.profile.dinheiro, 1000 - 800 - 100);
   assert.equal(pl.profile.estacao.banco, true);
+});
+
+test('tubarão do lago: um por vez, 200 de vida, boia morto, pegar, derrubar quem leva e vender por S$ 400', async () => {
+  const { TUBARAO } = await import('../shared/data.js');
+  const { tubaraoPos } = await import('../shared/world.js');
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0);
+  const A = r.players.get('N'), B = r.players.get('L');
+  r.tick(T0, 0.05);
+  assert.equal(r.world.tubarao.vivo, false);
+  assert.ok(r.tick(T0 + TUBARAO.intervaloMs, 0.05).some((e) => e.t === 'tubarao_surgiu'), 'aparece depois de 20 min');
+  // passados 40 min continua só um
+  r.tick(T0 + 2 * TUBARAO.intervaloMs + 10, 0.05);
+  assert.equal(r.world.tubarao.vivo, true); assert.equal(r.world.tubarao.hp, TUBARAO.hp);
+  assert.equal(r.snapshot(T0 + TUBARAO.intervaloMs + 1000).tubarao.hp, undefined, 'vida não aparece para os jogadores');
+  // atira com a pistola até cair
+  const tk = T0 + TUBARAO.intervaloMs + 30000; const tb = r.world.tubarao;
+  A.modo = 'terra'; A.profile.armas.pistola = true; A.profile.armas.estilingue = true; A.profile.municao.pistola = 100;
+  let morto = null, tiros = 0, t = tk;
+  while (!morto && tiros < 60) {
+    const c = tubaraoPos((t - tb.ini) / 1000, tb.a0).pos;
+    A.pos = [c[0] * 0.75, 1.6, c[2] * 0.75];
+    const d = [c[0] - A.pos[0], 0.1 - (A.pos[1] + 1.45), c[2] - A.pos[2]];
+    const res = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: d }, t).res;
+    assert.equal(res.events.find((e) => e.t === 'tiro')?.acertou, 'tubarao', 'tiro acerta o tubarão');
+    morto = res.events.find((e) => e.t === 'tubarao_morto'); tiros++; t += 500;
+  }
+  assert.equal(tiros, Math.ceil(TUBARAO.hp / ARMAS.pistola.danoKraken), '200 de vida ÷ 8 por tiro de pistola');
+  assert.equal(r.world.tubarao.proximo, t - 500 + TUBARAO.intervaloMs, 'outro só 20 min depois de morrer');
+  const c = morto.carcaca; assert.equal(c.pos[1], 0, 'boia na água');
+  // B nada até lá e pega (mão livre)
+  B.modo = 'nadando'; B.pos = [c.pos[0] + 1, -0.5, c.pos[2]];
+  B.profile.mao = { uid: 'x', esp: 'lambari', cm: 10 };
+  assert.match(r.action('L', { tipo: 'tubarao_pegar', id: c.id }, t).res.msg, /mãos/);
+  B.profile.mao = null;
+  assert.equal(r.action('L', { tipo: 'tubarao_pegar', id: c.id }, t).res.ok, true);
+  assert.equal(B.profile.mao.esp, 'tubarao_cacado');
+  assert.equal(r.action('L', { tipo: 'mochila_guardar' }, t).res.ok, false, 'não vai para a mochila');
+  // A derruba B com um tiro: o tubarão cai onde B estava e A pega
+  B.modo = 'terra'; B.pos = [A.pos[0] + 8, 1.6, A.pos[2]]; B.imuneUntil = 0;
+  const tiro = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: [1, 0, 0] }, t + 1000).res;
+  const caiu = tiro.events.find((e) => e.t === 'carcaca_nova');
+  assert.ok(caiu && caiu.perfis.includes('L'), 'derrubou o tubarão'); assert.equal(B.profile.mao, null);
+  assert.equal(r.action('L', { tipo: 'tubarao_pegar', id: caiu.carcaca.id }, t + 1200).res.ok, false, 'no chão não pega');
+  A.pos = [caiu.carcaca.pos[0] - 1, 1.6, caiu.carcaca.pos[2]];
+  assert.equal(r.action('N', { tipo: 'tubarao_pegar', id: caiu.carcaca.id }, t + 1300).res.ok, true, 'quem derrubou pega');
+  // vende na estação por 400
+  const st = STATIONS.find((s) => s.id === 'N'); A.pos = [st.pad[0], 1.6, st.pad[1]];
+  const d0 = A.profile.dinheiro;
+  assert.equal(r.action('N', { tipo: 'peixe_vender' }, t + 2000).res.ok, true);
+  assert.equal(A.profile.dinheiro, d0 + TUBARAO.valor);
+});
+
+test('estilingue tira 1 de vida do Kraken/tubarão; decorações saem e voltam sem pagar de novo', () => {
+  assert.equal(ARMAS.estilingue.danoKraken, 1);
+  const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'); const st = STATIONS.find((s) => s.id === 'N');
+  pl.modo = 'terra'; pl.pos = [st.pad[0], 1.6, st.pad[1]]; pl.profile.dinheiro = 500;
+  assert.equal(r.action('N', { tipo: 'deco_alternar', chave: 'banco' }, T0).res.ok, false, 'precisa comprar antes');
+  r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'banco' }, T0);
+  const d = pl.profile.dinheiro;
+  assert.equal(r.action('N', { tipo: 'deco_alternar', chave: 'banco' }, T0).res.ok, true);
+  assert.equal(pl.profile.estacao.decoOff.banco, true);
+  assert.equal(r.action('N', { tipo: 'deco_alternar', chave: 'banco' }, T0).res.ok, true);
+  assert.ok(!pl.profile.estacao.decoOff.banco); assert.equal(pl.profile.dinheiro, d, 'não cobra de novo');
+  assert.equal(r.action('N', { tipo: 'deco_alternar', chave: 'carregador' }, T0).res.ok, false, 'carregador não é decoração');
 });

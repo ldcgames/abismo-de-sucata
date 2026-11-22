@@ -76,6 +76,8 @@ export const ESPECIES = {
   pirarucu:  { nome: 'Pirarucu', cm: [120, 250], prof: [10, 80], hora: 'dia', chance: 3, valor: 850, cor: [0.4, 0.35, 0.3], forca: 5.5, forma: 'peixe' },
   peixe_lua: { nome: 'Peixe-lua-dourado (lendário)', cm: [80, 180], prof: [30, 110], hora: 'noite', chance: 1, valor: 1600, cor: [1.0, 0.84, 0.32], forca: 5.0, forma: 'peixe' },
   tubarao:   { nome: 'Tubarão-touro-do-lago', cm: [250, 420], prof: [25, 150], hora: 'noite', chance: 2.2, valor: 3000, cor: [0.42, 0.46, 0.5], forca: 9, forma: 'tubarao', pesado: true },
+  // o tubarão que ronda os píeres: não se pesca, só cai na bala. Vale sempre S$ 400.
+  tubarao_cacado: { nome: 'Tubarão do lago (abatido)', cm: [330, 330], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 400, valorFixo: 400, cor: [0.4, 0.45, 0.5], forca: 9, forma: 'tubarao', pesado: true, cacado: true },
 };
 // massa aproximada (kg) a partir do comprimento
 export function massaPeixe(esp, cm) {
@@ -84,6 +86,7 @@ export function massaPeixe(esp, cm) {
 }
 export function valorPeixe(esp, cm) {
   const e = ESPECIES[esp];
+  if (e.valorFixo) return e.valorFixo;
   const t = (cm - e.cm[0]) / Math.max(1, e.cm[1] - e.cm[0]);
   return Math.round(e.valor * (0.7 + 0.8 * t));
 }
@@ -271,7 +274,7 @@ export const SUCATA_RESPAWN_S = [5, 12];
 // stunMs: tempo no chão; empurrao: velocidade horizontal (m/s) e salto (m/s) aplicados no alvo.
 export const ARMAS = {
   // estilingue: a munição é o lixo catado na margem (E cata · Q mira e atira). Não machuca o Kraken.
-  estilingue:   { nome: 'Estilingue de lixo', preco: 400, requer: null, alcance: 32, cdMs: 1200, stunMs: 1000, empurrao: [0, 0], dispersao: 0, municao: null, ordem: 0, lixo: true, danoKraken: 0 },
+  estilingue:   { nome: 'Estilingue de lixo', preco: 400, requer: null, alcance: 32, cdMs: 1200, stunMs: 1000, empurrao: [0, 0], dispersao: 0, municao: null, ordem: 0, lixo: true, danoKraken: 1 },
   pistola:      { nome: 'Pistola', preco: 900, requer: 'estilingue', alcance: 45, cdMs: 420, stunMs: 2000, empurrao: [3, 2.5], dispersao: 0.012, municao: { n: 12, preco: 20 }, danoKraken: 8, ordem: 1 },
   metralhadora: { nome: 'Submetralhadora', preco: 3500, requer: 'pistola', alcance: 45, cdMs: 110, stunMs: 3000, empurrao: [4.5, 3], dispersao: 0.035, municao: { n: 40, preco: 45 }, danoKraken: 3, ordem: 2, auto: true },
   fuzil:        { nome: 'Fuzil', preco: 9000, requer: 'metralhadora', alcance: 85, cdMs: 170, stunMs: 4000, empurrao: [7, 4], dispersao: 0.016, municao: { n: 30, preco: 80 }, danoKraken: 6, ordem: 3, auto: true },
@@ -284,7 +287,13 @@ export const ARMAS_LOJA = ['estilingue', ...ARMAS_ORDEM]; // ordem de compra na 
 // ---------------- KRAKEN DO ABISMO ----------------
 // Aparece no meio do lago a cada 20 min e fica 1 min rondando perto dos píeres.
 // Vida calculada pelo dano das armas: 5 pistolas, 4 submetralhadoras, 3 fuzis, 2 snipers ou 1 bazuca
-// conseguem derrubar em 1 minuto atirando bastante. O estilingue não faz dano.
+// conseguem derrubar em 1 minuto atirando bastante. O estilingue tira só 1 (danoKraken vale para o Kraken e o tubarão).
+// As pessoas nunca perdem vida: nelas o tiro só derruba e empurra.
+// ---------------- TUBARÃO DO LAGO ----------------
+// Um só por vez: nasce 20 min depois do anterior morrer e fica rondando a frente dos píeres (barbatana de fora)
+// até alguém derrubar. 200 de vida. Morto, boia: quem estiver com a mão livre pega (E) e vende por S$ 400.
+// Quem leva o tubarão e é acertado (tiro, peixe, estilingue) deixa ele cair ali mesmo.
+export const TUBARAO = { intervaloMs: 20 * 60e3, hp: 200, raio: 2.1, valor: 400, pegarRaio: 3.2 };
 export const KRAKEN = { intervaloMs: 20 * 60e3, duracaoMs: 60e3, avisoMs: 60e3, hp: 3000, premio: 1000, raio: 6.2, tamanho: 5 };
 
 // ---------------- CORRIDA DE SUBMARINO ----------------
