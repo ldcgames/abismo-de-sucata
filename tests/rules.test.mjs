@@ -197,12 +197,14 @@ test('mochila: até 5 peixes e no máximo 10 bolsas; sub começa com limite de 5
   p.mao = { uid: 'f6', esp: 'tilapia', cm: 20 };
   const cheia = r.action('N', { tipo: 'mochila_guardar' }, T0).res; assert.equal(cheia.ok, false); assert.match(cheia.msg, /Mochila cheia \(5\/5/);
   p.mao = null; assert.equal(r.action('N', { tipo: 'mochila_tirar', uid: 'f2' }, T0).res.ok, true); assert.equal(p.mao.uid, 'f2'); assert.equal(p.mochila.length, 4);
-  // vender peixe direto da mochila e do aquário no computador da estação
+  // vende direto da mochila; do aquário só depois de tirar
   const st = stationById('N'); pl.modo = 'terra'; pl.pos = [st.pad[0], 1.6, st.pad[1]];
   const d0 = p.dinheiro;
   assert.equal(r.action('N', { tipo: 'peixe_vender', uid: 'f3' }, T0).res.ok, true); assert.ok(p.dinheiro > d0); assert.equal(p.mochila.length, 3);
   p.aquario.peixes.push({ uid: 'aq1', esp: 'lambari', cm: 8 });
-  assert.equal(r.action('N', { tipo: 'peixe_vender', uid: 'aq1' }, T0).res.ok, true); assert.equal(p.aquario.peixes.length, 0);
+  assert.match(r.action('N', { tipo: 'peixe_vender', uid: 'aq1' }, T0).res.msg, /aquário/, 'do aquário não vende direto'); assert.equal(p.aquario.peixes.length, 1);
+  p.mao = null; assert.equal(r.action('N', { tipo: 'aquario_retirar', uid: 'aq1', de: 'aquario' }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'peixe_vender' }, T0).res.ok, true, 'tirou e vendeu'); assert.equal(p.aquario.peixes.length, 0);
   p.mao = null;
   p.baloes = 9; p.mao = { uid: 'l', esp: 'lula', cm: 30 };
   assert.equal(r.action('N', { tipo: 'processar_lula' }, T0).res.ok, true); assert.equal(p.baloes, 10);

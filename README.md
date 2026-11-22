@@ -106,6 +106,11 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.4
+
+- **Peixe do aquário não é mais vendido sem querer:** a aba "Vender" do computador só mostra o peixe da mão e da mochila. Para vender um peixe do aquário ou do tanque, tire primeiro (aba Aquário → **Pegar na mão**) e depois venda.
+- **Sem caixa térmica:** com o peixe na mão, as opções agora são Vender, Guardar na mochila, Aquário/Tanque, Arremessar e Soltar. Quem ainda tinha peixe na caixa térmica antiga continua vendo esses peixes para pegar ou vender.
+
 ## Novidades da v0.9.3
 
 - **Melhorias do submarino 3× mais caras** (casco, propulsores, bateria, faróis, sonar, braço, carga e oxigênio). Continuam só com dinheiro.

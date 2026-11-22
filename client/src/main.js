@@ -225,6 +225,7 @@ class Game {
     if (tipo === 'aquario') return this.acao({ tipo: 'peixe_aquario', destino: 'aquario' });
     if (tipo === 'tanque') return this.acao({ tipo: 'peixe_aquario', destino: 'tanque' });
     if (tipo === 'caixa') return this.acao({ tipo: 'peixe_caixa' });
+    if (tipo === 'mochila') return this.acao({ tipo: 'mochila_guardar' });
     if (tipo === 'vender') return this.acao({ tipo: 'peixe_vender' });
     if (tipo === 'tinta') { this.me.acao = { tipo: 'bancada', t: 0, dur: 1.4 }; return this.acao({ tipo: 'processar_lula' }); }
     if (tipo === 'soltar') return this.soltarPeixe();

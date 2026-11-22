@@ -685,8 +685,9 @@ const ACOES = {
     const e = precisaEstacao(ctx); if (e) return e;
     let f, de;
     if (a.uid && a.uid !== p.mao?.uid) {
-      // vende de qualquer lugar: mochila, caixa térmica, aquário ou tanque
-      const fontes = [['mochila', p.mochila], ['caixa', p.caixaTermica], ['aquario', p.aquario.peixes], ['tanque', p.tanque.peixes]];
+      // vende da mochila (ou da caixa térmica antiga). Do aquário/tanque não: tem que tirar o peixe antes
+      if (p.aquario.peixes.some((x) => x.uid === a.uid) || p.tanque.peixes.some((x) => x.uid === a.uid)) return fail('Esse peixe está no aquário: tire ele primeiro (Pegar na mão) e depois venda');
+      const fontes = [['mochila', p.mochila], ['caixa', p.caixaTermica]];
       for (const [nome, lista] of fontes) { const i = lista.findIndex((x) => x.uid === a.uid); if (i >= 0) { f = lista.splice(i, 1)[0]; de = nome; break; } }
       if (!f) return fail('Peixe não encontrado');
     } else {

@@ -1,5 +1,8 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v0.9.4
+`peixe_vender` recusa peixe do aquário/tanque (tem que `aquario_retirar` antes); aba Vender e lista do aquário sem botão Vender para aquário/tanque; caixa térmica fora da interface (só aparece se ainda tiver peixe antigo); painel da mão ganhou botão Mochila. Testes: npm test 35/35 · e2e_solo 54/54.
+
 ## Novidades da v0.9.3
 Melhorias do submarino com preço triplicado (`SUB_PRECO_MULT = 3` em data.js). Testes: npm test 35/35 · e2e_solo 54/54.
 

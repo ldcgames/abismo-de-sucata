@@ -106,7 +106,7 @@ export class UI {
       <div class="bt">
         <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">Aquário</button>
         ${p.tanque.nivel >= 0 ? `<button data-a="tanque" ${!naEstacao || motivoT ? 'disabled' : ''} title="${esc(motivoT || '')}">Tanque</button>` : ''}
-        <button data-a="caixa" ${tub ? 'disabled' : ''}>Caixa térmica (${p.caixaTermica.length}/${CAIXA_TERMICA.vagas})</button>
+        <button data-a="mochila" ${tub || p.mochila.length >= MOCHILA.peixes ? 'disabled' : ''}>Mochila (${p.mochila.length}/${MOCHILA.peixes})</button>
         <button data-a="vender" ${!naEstacao ? 'disabled' : ''}>Vender</button>
         ${e.tinta ? `<button data-a="tinta" ${!naEstacao || !p.estacao.tinta ? 'disabled' : ''} title="${p.estacao.tinta ? '' : 'Construa a bancada de tinta'}">Extrair tinta</button>` : ''}
         <button data-a="arremessar">Arremessar (G)</button>
@@ -231,7 +231,7 @@ export class UI {
   }
   aba_aquario(p) {
     const a = AQUARIOS[p.aquario.nivel];
-    let h = `<p class="nota">Aquários são decoração e guardam seus peixes: dá para pegar de volta (para arremessar no amigo) ou vender. Pode comprar qualquer um maior direto. Atual: <b>${esc(a.nome)}</b> [${p.aquario.peixes.length}/${a.vagas}] · peixes até ${a.maxCm} cm.</p>`;
+    let h = `<p class="nota">Aquários são decoração e guardam seus peixes. Para vender ou arremessar, clique em <b>Pegar na mão</b> primeiro. Pode comprar qualquer um maior direto. Atual: <b>${esc(a.nome)}</b> [${p.aquario.peixes.length}/${a.vagas}] · peixes até ${a.maxCm} cm.</p>`;
     h += this.listaPeixes(p, 'aquario');
     h += '<h3>Aquários</h3><div class="grade">';
     AQUARIOS.forEach((aq, i) => {
@@ -253,14 +253,14 @@ export class UI {
     });
     return h + '</div>';
   }
-  // peixes guardados num lugar, com Pegar (para a mão) e Vender
+  // peixes guardados num lugar: Pegar (para a mão) sempre; Vender só da mochila (do aquário/tanque tem que tirar antes)
   listaPeixes(p, onde) {
     const lista = onde === 'aquario' ? p.aquario.peixes : onde === 'tanque' ? p.tanque.peixes : onde === 'mochila' ? p.mochila : p.caixaTermica;
     if (!lista.length) return '';
     const pegar = (f) => onde === 'mochila' ? { tipo: 'mochila_tirar', uid: f.uid } : onde === 'caixa' ? { tipo: 'caixa_mao', uid: f.uid } : { tipo: 'aquario_retirar', uid: f.uid, de: onde };
     const m = multDinheiro(p);
     let h = '<div class="lista">';
-    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(f.esp, f.cm) * m))}`, { tipo: 'peixe_vender', uid: f.uid })}</div></div>`;
+    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(f.esp, f.cm) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
     return h + '</div>';
   }
   sacoVenda(p) {
@@ -273,7 +273,7 @@ export class UI {
   aba_vender(p) {
     // tudo o que dá para vender num lugar só: peixes (mão, mochila, aquário, tanque), lixo catado e a carga do submarino
     const peixes = this.peixesVenda(p);
-    let h = this.sacoVenda(p) + (peixes || '<p class="nota">🐟 Nenhum peixe para vender (pesque, guarde na mochila com Z ou no aquário).</p>');
+    let h = this.sacoVenda(p) + (peixes || '<p class="nota">🐟 Nenhum peixe para vender (pesque, ou guarde na mochila com Z). Peixe do aquário: tire na aba Aquário (Pegar na mão) e venda.</p>');
     if (!p.carga.length) return h + '<h3>Carga do submarino</h3><p class="nota">Vazia. Use a garra (E) para recolher sucata no fundo do lago.</p>';
     h += `<h3>Carga do submarino</h3><div class="convite">${this.btn('Guardar tudo no depósito', { tipo: 'guardar', uid: '*' })}</div><div class="lista">`;
     for (const it of p.carga) h += this.linhaItem(it, 'carga', p);
@@ -284,9 +284,10 @@ export class UI {
     const m = multDinheiro(p);
     if (p.mao) {
       const e = ESPECIES[p.mao.esp];
-      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(p.mao.esp, p.mao.cm) * m))}`, { tipo: 'peixe_vender' })}${e.pesado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.pesado ? '' : this.btn(`Caixa térmica (${p.caixaTermica.length}/${CAIXA_TERMICA.vagas})`, { tipo: 'peixe_caixa' }, p.caixaTermica.length >= CAIXA_TERMICA.vagas)}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
+      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(p.mao.esp, p.mao.cm) * m))}`, { tipo: 'peixe_vender' })}${e.pesado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
     }
-    for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${MOCHILA.peixes})`], ['caixa', 'Caixa térmica'], ['aquario', 'No aquário'], ['tanque', 'No tanque']]) {
+    // aquário e tanque não aparecem aqui: para vender, tire o peixe de lá antes (aba Aquário → Pegar na mão)
+    for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${MOCHILA.peixes})`], ['caixa', 'Caixa térmica (peixes antigos)']]) {
       const l = this.listaPeixes(p, onde);
       if (l) h += `<h3>${tit}</h3>` + l;
     }
@@ -366,7 +367,7 @@ export class UI {
   inventario(p) {
     const st = subStats(p), u = cargaUso(p), vs = varaStats(p);
     let h = `<div class="grade"><div class="card"><h3>Submarino</h3><div class="val">Carga: ${fmt(u.kg)}/${st.cargaKg} kg · ${fmt(u.L)}/${st.cargaL} L</div>${p.carga.map((it) => `<div class="rar-${SUCATA[it.tipo].rar}">• ${esc(SUCATA[it.tipo].nome)}</div>`).join('') || '<div class="nota">vazio</div>'}</div>
-      <div class="card"><h3>Peixes</h3><div>Na mão: ${p.mao ? `${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm)` : '—'}</div><div>Caixa térmica [${p.caixaTermica.length}/${CAIXA_TERMICA.vagas}]: ${p.caixaTermica.map((f) => `${esc(ESPECIES[f.esp].nome)} ${f.cm} cm`).join(', ') || '—'}</div>
+      <div class="card"><h3>Peixes</h3><div>Na mão: ${p.mao ? `${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm)` : '—'}</div>${p.caixaTermica.length ? `<div>Caixa térmica (antiga): ${p.caixaTermica.map((f) => `${esc(ESPECIES[f.esp].nome)} ${f.cm} cm`).join(', ')}</div>` : ''}
       <div>Aquário [${p.aquario.peixes.length}/${AQUARIOS[p.aquario.nivel].vagas}] · Tanque ${p.tanque.nivel >= 0 ? `[${p.tanque.peixes.length}/${TANQUES[p.tanque.nivel].vagas}]` : '—'}</div><div>Balões de tinta: ${p.baloes}</div></div>
       <div class="card"><h3>Equipamento</h3><div>${esc(vs.nome)} (até ${vs.maxCm} cm)</div><div>Casco ${fmt(st.maxProf)} m · Bateria ${st.bateria} kWh</div><div>Faróis ${st.farol} m · Sonar ${st.sonar} m</div><div>Garra ${st.bracoKg} kg · O₂ ${st.oxigenio} s</div></div>
       <div class="card"><h3>Descobertas</h3><div>Profundidade máxima: ${fmt(p.profMax)} m</div><div>Espécies: ${p.descobertas.filter((d) => d.startsWith('peixe:')).length}/${Object.keys(ESPECIES).length}</div><div>Lugares: ${p.descobertas.filter((d) => d.startsWith('lugar:')).length}</div><div>Depósito: ${p.deposito.length}/${depositoVagas(p)}</div></div></div>`;
