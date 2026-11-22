@@ -386,6 +386,61 @@ export class Station {
       // bandeirinhas
       for (let k = 0; k < 10; k++) g.put(box(0.3, 0.35, 0.02), [-5 + k * 1.1, 6.2 - Math.sin((k / 9) * Math.PI) * 0.6, -4], [0, 0, 0], 1, CORES_JOGADOR[k % CORES_JOGADOR.length].roupa);
     }
+    // ---- decorações baratinhas ----
+    if (est?.vasos) for (let k = 0; k < 3; k++) {
+      const x = 5.6 + k * 1.3, cores = [[0.95, 0.3, 0.45], [1, 0.82, 0.2], [0.65, 0.4, 0.95]];
+      g.put(cylinder(0.32, 0.24, 0.55, 12), [x, 1.83, 15.6], [0, 0, 0], 1, [0.72, 0.42, 0.28]);
+      g.put(cylinder(0.3, 0.3, 0.05, 12), [x, 2.1, 15.6], [0, 0, 0], 1, [0.3, 0.2, 0.12]);
+      for (let f = 0; f < 5; f++) {
+        const a2 = f * 1.26, fx = x + Math.cos(a2) * 0.14, fz = 15.6 + Math.sin(a2) * 0.14;
+        g.put(cylinder(0.015, 0.015, 0.45, 5), [fx, 2.35, fz], [0, 0, 0], 1, [0.25, 0.55, 0.22]);
+        g.put(sphere(0.1, 8, 6), [fx, 2.6, fz], [0, 0, 0], [1, 0.6, 1], cores[(k + f) % 3]);
+        g.put(sphere(0.04, 6, 4), [fx, 2.64, fz], [0, 0, 0], 1, [1, 0.9, 0.3]);
+      }
+    }
+    if (est?.flamingos) for (const [x, z, r] of [[9.4, 11.4, 0.4], [10.3, 12.1, -0.5]]) {
+      const pk = [0.98, 0.45, 0.62];
+      for (const s2 of [-1, 1]) g.put(cylinder(0.02, 0.02, 0.85, 5), [x + s2 * 0.06, 1.98, z], [0, 0, 0], 1, [0.2, 0.2, 0.2]);
+      g.put(sphere(0.28, 12, 8), [x, 2.55, z], [0, r, 0], [0.8, 0.75, 1.25], pk);
+      g.add(tube([[0, 0, 0.25], [0, 0.35, 0.32], [0, 0.6, 0.2], [0, 0.7, 0.3]], 0.05, 6), m4.compose(m4.create(), [x, 2.55, z], quat.fromEuler(quat.create(), 0, r, 0), [1, 1, 1]), [...pk, 1]);
+      g.put(sphere(0.11, 10, 8), [x + Math.sin(r) * 0.3, 3.27, z + Math.cos(r) * 0.3], [0, 0, 0], 1, pk);
+      g.put(cylinder(0.03, 0.05, 0.16, 6), [x + Math.sin(r) * 0.42, 3.22, z + Math.cos(r) * 0.42], [Math.PI / 2 + 0.4, r, 0], 1, [0.15, 0.12, 0.12]);
+    }
+    if (est?.boias) for (const z of [24, 36]) for (const s2 of [-1, 1]) {
+      for (let k = 0; k < 8; k++) g.put(torus(0.32, 0.1, 6, 8), [s2 * 2.2, 1.55, z], [0, 0, Math.PI / 2], 1, [0.95, 0.95, 0.95]);
+      for (let k = 0; k < 4; k++) { const a3 = (k / 4) * Math.PI * 2 + 0.4; g.put(box(0.04, 0.24, 0.24), [s2 * 2.2, 1.55 + Math.sin(a3) * 0.32, z + Math.cos(a3) * 0.32], [a3, 0, 0], 1, [0.9, 0.15, 0.12]); }
+    }
+    if (est?.banco) {
+      const bx = -8, bz = 13;
+      for (let k = 0; k < 3; k++) g.put(rbox(2.0, 0.06, 0.16, 0.02), [bx, 2.15, bz - 0.2 + k * 0.2], [0, 0, 0], 1, [0.62, 0.42, 0.24]); // assento
+      for (let k = 0; k < 2; k++) g.put(rbox(2.0, 0.14, 0.05, 0.02), [bx, 2.45 + k * 0.22, bz - 0.36], [0.12, 0, 0], 1, [0.62, 0.42, 0.24]); // encosto
+      for (const s2 of [-0.85, 0.85]) { g.put(box(0.07, 0.6, 0.55), [bx + s2, 1.85, bz], [0, 0, 0], 1, [0.15, 0.15, 0.16]); g.put(box(0.07, 0.55, 0.06), [bx + s2, 2.45, bz - 0.38], [0.12, 0, 0], 1, [0.15, 0.15, 0.16]); }
+    }
+    if (est?.guardasol) {
+      const ux = -13.5, uz = 4.5;
+      g.put(cylinder(0.04, 0.04, 2.6, 6), [ux, 2.85, uz], [0, 0, 0.08], 1, [0.85, 0.85, 0.85]);
+      for (let k = 0; k < 8; k++) g.put(lathe([[0, 0.45], [1.25, 0]], 3), [ux + 0.1, 4.05, uz], [0, (k / 8) * Math.PI * 2, 0], 1, k % 2 ? [0.95, 0.95, 0.92] : [0.2, 0.55, 0.85]);
+      // cadeira de praia listrada
+      g.put(box(0.6, 0.04, 0.9), [ux + 1.1, 1.95, uz + 0.4], [0.3, 0, 0], 1, [0.95, 0.55, 0.2]);
+      g.put(box(0.6, 0.04, 0.6), [ux + 1.1, 2.15, uz - 0.15], [-0.9, 0, 0], 1, [0.95, 0.55, 0.2]);
+      for (const s2 of [-0.28, 0.28]) g.put(box(0.04, 0.5, 0.04), [ux + 1.1 + s2, 1.8, uz + 0.1], [0.5, 0, 0], 1, [0.4, 0.3, 0.2]);
+    }
+    if (est?.churrasqueira) {
+      const cx = -10, cz = 2.6;
+      g.put(rbox(1.2, 1.0, 0.75, 0.03), [cx, 2.05, cz], [0, 0, 0], 1, [0.62, 0.3, 0.2]); // tijolos
+      for (let k = 0; k < 4; k++) g.put(box(1.22, 0.03, 0.77), [cx, 1.7 + k * 0.25, cz], [0, 0, 0], 1, [0.8, 0.75, 0.7]); // rejunte
+      g.put(box(1.0, 0.04, 0.6), [cx, 2.58, cz], [0, 0, 0], 1, [0.15, 0.15, 0.15]); // grelha
+      g.put(rbox(0.5, 0.7, 0.45, 0.03), [cx + 0.3, 3.0, cz - 0.1], [0, 0, 0], 1, [0.55, 0.27, 0.18]); // chaminé
+      for (let k = 0; k < 3; k++) g.put(capsule(0.05, 0.25, 6, 2), [cx - 0.3 + k * 0.18, 2.64, cz + 0.05], [0, 0, Math.PI / 2], 1, [0.55, 0.22, 0.15]); // linguiças
+    }
+    if (est?.rede) {
+      for (const x of [4.5, 8.3]) g.put(cylinder(0.1, 0.12, 2.6, 8), [x, 2.85, -5], [0, 0, 0], 1, WOOD_DK);
+      const listras = [[0.95, 0.35, 0.3], [0.98, 0.85, 0.3], [0.3, 0.65, 0.9]];
+      for (let k = 0; k < 9; k++) {
+        const t = k / 8, x = 4.7 + t * 3.4, y = 3.3 - Math.sin(t * Math.PI) * 0.75;
+        g.put(box(0.44, 0.04, 0.9), [x, y, -5], [0, 0, Math.atan(-0.69 * Math.cos(t * Math.PI))], 1, listras[k % 3]);
+      }
+    }
     // depósito: caixas proporcionais ao número de itens guardados
     const nCx = Math.min(12, Math.ceil((est?.depositoN || 0) / 2));
     for (let k = 0; k < nCx; k++) g.put(rbox(0.7, 0.55, 0.7, 0.04), [-7.7, 1.85 + (k % 3) * 0.95, -3.5 + Math.floor(k / 3) * 0.95], [0, k * 0.2, 0], 1, k % 2 ? [0.6, 0.45, 0.25] : [0.5, 0.38, 0.2]);
@@ -402,6 +457,17 @@ export class Station {
       const lg = new Geo(); for (const p of this.lights) { const l = this.toLocal(p); lg.put(sphere(0.18, 10, 6), [l[0], 5.15, l[2]], [0, 0, 0], 1, [1, 0.9, 0.6]); }
       const ln = new Node('lampadas'); ln.mesh = R.createMesh(lg, { emissive: [1, 0.85, 0.5], glow: 2, castShadow: false }); this.dyn.add(ln);
       this.lampNode = ln;
+    }
+    if (est?.luzinhas) {
+      const lg = new Geo(), cores = [[1, 0.3, 0.3], [1, 0.85, 0.3], [0.3, 1, 0.45], [0.35, 0.6, 1], [1, 0.45, 0.9]];
+      const fio = new Geo();
+      for (let k = 0; k <= 16; k++) {
+        const t = k / 16, x = -16.3 + t * 10.6, y = 5.3 - Math.sin(t * Math.PI) * 0.55;
+        lg.put(sphere(0.09, 8, 6), [x, y - 0.12, -0.9], [0, 0, 0], [1, 1.3, 1], cores[k % cores.length]);
+        if (k < 16) { const x2 = -16.3 + ((k + 1) / 16) * 10.6, y2 = 5.3 - Math.sin(((k + 1) / 16) * Math.PI) * 0.55; fio.put(cylinder(0.012, 0.012, Math.hypot(x2 - x, y2 - y), 4), [(x + x2) / 2, (y + y2) / 2, -0.9], [0, 0, Math.atan2(x2 - x, y - y2) + Math.PI / 2], 1, [0.1, 0.1, 0.1]); }
+      }
+      const fn = new Node('fio_luzinhas'); fn.mesh = R.createMesh(fio, { rough: 0.8 }); this.dyn.add(fn);
+      const ln2 = new Node('luzinhas'); ln2.mesh = R.createMesh(lg, { emissive: [0.35, 0.3, 0.28], glow: 0.9, castShadow: false }); this.dyn.add(ln2);
     }
     // aquário
     this.estVis = est;
@@ -609,6 +675,11 @@ export class Station {
       { x: 12, z: 14, w: 0.3, d: 0.3 }, { x: 6, z: -12.5, w: 4.4, d: 0.3 },
       { x: BARRACA_CORRIDA.x + 2.15, z: BARRACA_CORRIDA.z, w: 0.3, d: 4.0 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_CORRIDA.x + 0.2, z: BARRACA_CORRIDA.z, w: 0.85, d: 0.85 },
+      ...(est?.banco ? [{ x: -8, z: 13, w: 2.0, d: 0.7 }] : []),
+      ...(est?.guardasol ? [{ x: -13.5, z: 4.5, w: 0.3, d: 0.3 }, { x: -12.4, z: 4.6, w: 0.7, d: 1.0 }] : []),
+      ...(est?.churrasqueira ? [{ x: -10, z: 2.6, w: 1.25, d: 0.8 }] : []),
+      ...(est?.rede ? [{ x: 4.5, z: -5, w: 0.3, d: 0.3 }, { x: 8.3, z: -5, w: 0.3, d: 0.3 }] : []),
+      ...(est?.vasos ? [{ x: 6.9, z: 15.6, w: 3.3, d: 0.7 }] : []),
     ];
   }
 }

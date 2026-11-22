@@ -197,19 +197,28 @@ export const MOCHILA = { peixes: 5, bolsas: 10 };
 // ---------------- ESTAÇÃO (BASE) ----------------
 export const ESTACAO = {
   reciclador: { nome: 'Recicladora', custo: { dinheiro: 200, comps: {} }, desc: 'Transforma sucata em componentes.' },
-  restauro:   { nome: 'Bancada de restauro', custo: { dinheiro: 600, comps: { metal: 6 } }, desc: 'Restaura sucata em itens valiosos.' },
-  iluminacao: { nome: 'Iluminação da estação', custo: { dinheiro: 150, comps: { cobre: 2 } }, desc: 'Postes e luzes no cais.' },
-  carregador: { nome: 'Carregador rápido', custo: { dinheiro: 800, comps: { cobre: 6 } }, desc: 'Recarrega a bateria 3× mais rápido no cais.' },
+  restauro:   { nome: 'Bancada de restauro', custo: { dinheiro: 600, comps: {} }, desc: 'Restaura sucata em itens valiosos.' },
+  iluminacao: { nome: 'Iluminação da estação', custo: { dinheiro: 150, comps: {} }, desc: 'Postes e luzes no cais.' },
+  carregador: { nome: 'Carregador rápido', custo: { dinheiro: 800, comps: {} }, desc: 'Recarrega a bateria 3× mais rápido no cais.' },
   decoracao:  { nome: 'Decoração (bandeiras e plantas)', custo: { dinheiro: 120, comps: {} }, desc: 'Deixa a estação com a sua cara.' },
+  // decorações baratinhas (só enfeite, cada uma aparece num canto da estação)
+  vasos:      { nome: 'Vasos de flores', custo: { dinheiro: 90, comps: {} }, desc: 'Três vasos com flores coloridas na frente da estação.', deco: true },
+  flamingos:  { nome: 'Flamingos de plástico', custo: { dinheiro: 90, comps: {} }, desc: 'Um casal de flamingos cor-de-rosa no pátio.', deco: true },
+  boias:      { nome: 'Boias salva-vidas', custo: { dinheiro: 90, comps: {} }, desc: 'Boias vermelhas e brancas penduradas no cais.', deco: true },
+  banco:      { nome: 'Banco de praça', custo: { dinheiro: 100, comps: {} }, desc: 'Um banco de madeira virado para o lago.', deco: true },
+  luzinhas:   { nome: 'Varal de luzinhas', custo: { dinheiro: 100, comps: {} }, desc: 'Lâmpadas coloridas na frente da oficina (brilham à noite).', deco: true },
+  guardasol:  { nome: 'Guarda-sol e cadeira de praia', custo: { dinheiro: 100, comps: {} }, desc: 'Para descansar entre um mergulho e outro.', deco: true },
+  churrasqueira: { nome: 'Churrasqueira', custo: { dinheiro: 100, comps: {} }, desc: 'Churrasqueira de tijolo com fumacinha.', deco: true },
+  rede:       { nome: 'Rede de descanso', custo: { dinheiro: 100, comps: {} }, desc: 'Uma rede listrada entre dois postes.', deco: true },
 };
 export const DEPOSITO = [
   { vagas: 12, custo: null },
-  { vagas: 30, custo: { dinheiro: 300, comps: { metal: 4 } } },
-  { vagas: 80, custo: { dinheiro: 1500, comps: { metal: 12 } } },
+  { vagas: 30, custo: { dinheiro: 300, comps: {} } },
+  { vagas: 80, custo: { dinheiro: 1500, comps: {} } },
 ];
 export const EXTRAS = {
-  lancador: { nome: 'Lançador de balões (escotilha)', custo: { dinheiro: 150, comps: { borracha: 2 } }, desc: 'Braço externo que arremessa balões de tinta.' },
-  luvas:    { nome: 'Luvas hidráulicas', custo: { dinheiro: 2500, comps: { metal: 10 } }, desc: 'Permitem segurar e arremessar um tubarão (brincadeira).' },
+  lancador: { nome: 'Lançador de balões (escotilha)', custo: { dinheiro: 150, comps: {} }, desc: 'Braço externo que arremessa balões de tinta.' },
+  luvas:    { nome: 'Luvas hidráulicas', custo: { dinheiro: 2500, comps: {} }, desc: 'Permitem segurar e arremessar um tubarão (brincadeira).' },
 };
 
 // ---------------- CONTRATOS ----------------

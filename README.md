@@ -106,6 +106,11 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.1
+
+- **Estação só com dinheiro:** tudo do computador da estação (recicladora, bancada de restauro, iluminação, carregador rápido, decoração, depósito, lançador e luvas) não pede mais metal nem outros componentes. Os preços continuam os mesmos.
+- **8 decorações novas e baratinhas:** vasos de flores (S$ 90), flamingos de plástico (S$ 90), boias salva-vidas no cais (S$ 90), banco de praça (S$ 100), varal de luzinhas coloridas (S$ 100), guarda-sol com cadeira de praia (S$ 100), churrasqueira (S$ 100) e rede de descanso (S$ 100). Cada uma aparece num canto da estação, e os amigos também veem.
+
 ## Novidades da v0.9
 
 - **Chat de voz por distância:** aperte **M** para ligar/desligar o microfone. Aparece "Chat de voz ativado/desativado" em cima da tela por 2 s e o estado fica no canto de baixo. Você ouve quem está até ~69 m (3 vezes a base da estátua), mais alto quanto mais perto; de outra estação não se ouve. Funciona de navegador para navegador (WebRTC); o servidor só faz a ponte inicial. Algumas redes (escola, empresa) podem bloquear a voz.

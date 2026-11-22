@@ -548,3 +548,16 @@ test('corrida de submarino: convite, aceitar, 5 palitos, prêmio 200 (2) e 250 d
   assert.equal(cv4.ok, true, cv4.msg);
   assert.ok(r.tick(t2 + 20000 + CORRIDA.conviteMs + 10, 0.05).some((e) => e.t === 'corrida_cancelada'));
 });
+
+test('estação: tudo só com dinheiro (sem metal/componentes) e decorações novas de S$ 90–100', async () => {
+  const { ESTACAO, DEPOSITO, EXTRAS } = await import('../shared/data.js');
+  for (const it of [...Object.values(ESTACAO), ...DEPOSITO.filter((d) => d.custo), ...Object.values(EXTRAS)]) assert.deepEqual(it.custo.comps, {}, it.nome || 'depósito');
+  const decos = Object.entries(ESTACAO).filter(([, v]) => v.deco);
+  assert.ok(decos.length >= 8 && decos.every(([, v]) => v.custo.dinheiro >= 90 && v.custo.dinheiro <= 100));
+  const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'); const st = STATIONS.find((s) => s.id === 'N');
+  pl.modo = 'terra'; pl.pos = [st.pad[0], 1.6, st.pad[1]]; pl.profile.dinheiro = 1000;
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'carregador' }, T0).res.ok, true, 'carregador sem metal');
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'banco' }, T0).res.ok, true);
+  assert.equal(pl.profile.dinheiro, 1000 - 800 - 100);
+  assert.equal(pl.profile.estacao.banco, true);
+});
