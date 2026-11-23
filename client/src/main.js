@@ -902,7 +902,7 @@ class Game {
         txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila <span class="nota">(${p.mochila.length}/${capPeixes(p)})</span>`;
       }
       if (!p.mao) this.me.mirando = false;
-      if (p.mao && !best && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão abatido: vá até o <b>computador da sua estação</b> e venda por S$ 400 · <kbd>X</kbd> doar (perto de um amigo) · cuidado, um tiro faz você derrubar';
+      if (p.mao && !best && ESPECIES[p.mao.esp]?.cacado) txt = `🦈 Levando o tubarão abatido: vá até o <b>computador da sua estação</b> e venda por S$ 400 · <kbd>Z</kbd> guardar na bolsa (${p.mochila.length}/${capPeixes(p)}) · <kbd>X</kbd> doar (perto de um amigo) · cuidado, um tiro faz você derrubar`;
       else if (p.mao && !best) txt = this.me.mirando
         ? '🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para jogar · <kbd>G</kbd> cancelar'
         : `<kbd>X</kbd>Doar (perto de um amigo) · <kbd>G</kbd>Pegar para arremessar · <kbd>Z</kbd>${p.mochila.length >= capPeixes(p) ? 'Mochila cheia' : `Guardar na mochila (${p.mochila.length}/${capPeixes(p)})`} <span class="nota">(${ESPECIES[p.mao.esp].nome}, ${p.mao.cm} cm)</span>`;
@@ -951,9 +951,10 @@ class Game {
     } else if (me.modo === 'nadando') {
       const c = !p.mao && this.carcacaPerto();
       if (c) { txt = '<kbd>E</kbd>Pegar o tubarão abatido <span class="nota">(leve até a sua estação e venda por S$ 400)</span>'; if (livre && I.hit('KeyE')) this.acao({ tipo: 'tubarao_pegar', id: c.id }); }
-      else if (p.mao && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão — nade até a margem e vá até o computador da sua estação · <kbd>X</kbd> doar (perto de um amigo)';
+      else if (p.mao && ESPECIES[p.mao.esp]?.cacado) txt = `🦈 Levando o tubarão — <kbd>Z</kbd> guardar na bolsa (${p.mochila.length}/${capPeixes(p)}) · ou leve até o computador da sua estação · <kbd>X</kbd> doar (perto de um amigo)`;
       else txt = 'Nadando — volte à margem ou suba no cais pela escada (<kbd>E</kbd>)';
       if (livre && p.mao && I.hit('KeyX')) this.doarPeixe();
+      if (livre && p.mao && I.hit('KeyZ')) { if (p.mochila.length >= capPeixes(p)) this.ui.aviso(`Bolsa cheia (${capPeixes(p)}/${capPeixes(p)} peixes)`, 'ruim'); else this.acao({ tipo: 'mochila_guardar' }); }
     } else if (me.modo === 'sub' || me.modo === 'guindaste') {
       txt = this.subPrompt;
     }

@@ -603,7 +603,9 @@ test('tubarão do lago: um por vez, 200 de vida, boia morto, pegar, derrubar que
   B.profile.mao = null;
   assert.equal(r.action('L', { tipo: 'tubarao_pegar', id: c.id }, t).res.ok, true);
   assert.equal(B.profile.mao.esp, 'tubarao_cacado');
-  assert.equal(r.action('L', { tipo: 'mochila_guardar' }, t).res.ok, false, 'não vai para a mochila');
+  assert.equal(r.action('L', { tipo: 'mochila_guardar' }, t).res.ok, true, 'tubarão cabe na bolsa');
+  assert.equal(B.profile.mochila.at(-1).esp, 'tubarao_cacado');
+  assert.equal(r.action('L', { tipo: 'mochila_tirar' }, t).res.ok, true);
   // A derruba B com um tiro: o tubarão cai onde B estava e A pega
   B.modo = 'terra'; B.pos = [A.pos[0] + 8, 1.6, A.pos[2]]; B.imuneUntil = 0;
   const tiro = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: [1, 0, 0] }, t + 1000).res;
@@ -691,8 +693,8 @@ test('bancada de peixe (S$ 2.000): só peixe na mão de mais de 2 kg; tábua (E)
   // cortado vai para a mochila; tubarão cortado também cabe
   assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, true); assert.equal(p.mao, null);
   p.mao = { uid: 'tc', esp: 'tubarao_cacado', cm: 330 };
-  assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, false, 'tubarão inteiro não cabe');
-  p.mao.cortado = true;
+  assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, true, 'tubarão inteiro também cabe na bolsa');
+  p.mao = p.mochila.pop(); p.mao.cortado = true;
   assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, true, 'tubarão cortado cabe');
   pl.pos = [st.pad[0], 1.6, st.pad[1]];
   const { valorPeixe } = await import('../shared/data.js');

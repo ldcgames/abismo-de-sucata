@@ -861,7 +861,6 @@ const ACOES = {
 
   mochila_guardar(p) {
     if (!p.mao) return fail('Nenhum peixe na mão');
-    if (ESPECIES[p.mao.esp].pesado && !p.mao.cortado) return fail('Um tubarão inteiro não cabe na mochila (corte ele na bancada de peixe)');
     if (p.mochila.length >= capPeixes(p)) return fail(`Mochila cheia (${p.mochila.length}/${capPeixes(p)} peixes)`);
     const f = p.mao; p.mochila.push(f); p.mao = null;
     return okR(`${ESPECIES[f.esp].nome} guardado na mochila [${p.mochila.length}/${capPeixes(p)}]`);

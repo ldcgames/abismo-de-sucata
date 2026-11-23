@@ -99,7 +99,7 @@ export class UI {
     if (el._k === k) return;
     el._k = k; el.hidden = false;
     if (e.cacado) {
-      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixeItem(f)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="doar">Doar (X)</button></div>`;
+      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixeItem(f)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="mochila">Guardar na bolsa (Z)</button><button data-a="doar">Doar (X)</button></div>`;
       el.querySelectorAll('button').forEach((b) => (b.onclick = () => this.g.acaoMao(b.dataset.a)));
       return;
     }
