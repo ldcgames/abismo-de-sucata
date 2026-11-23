@@ -916,7 +916,7 @@ const ACOES = {
     const obj = { uid: uid(ctx.rnd), tipo: it.tipo };
     if (naMao) p.lixoMao = obj; else p.saco.push(obj);
     p.xp += 1;
-    world.respawn.push({ em: ctx.now + (LIXO.respawnMinS + ctx.rnd() * (LIXO.respawnMaxS - LIXO.respawnMinS)) * 1000, terra: true });
+    if (!it.jogado) world.respawn.push({ em: ctx.now + (LIXO.respawnMinS + ctx.rnd() * (LIXO.respawnMaxS - LIXO.respawnMinS)) * 1000, terra: true });
     const ev = [{ t: 'item_removido', id: it.id, por: player.slot }];
     if (naMao) return okR(`${t.nome} na mão`, ev);
     return okR(`Catou: ${t.nome} [saco ${p.saco.length}/${LIXO.saco}]`, ev);
@@ -1215,6 +1215,13 @@ export function stepProjectiles(world, players, dt, now) {
     }
     if (!fim) continue;
     world.projeteis.splice(i, 1);
+    // lixo do estilingue não some: fica onde caiu (ou no pé de quem foi acertado). Só some na água.
+    if (pr.tipo === 'lixo' && pr.lixo && SUCATA[pr.lixo]) {
+      let pos = null;
+      if (fim.t === 'peixe_acerto') { const o = players.get(fim.alvo); pos = [o.pos[0] + (Math.random() - 0.5) * 0.6, o.pos[1] + 0.04, o.pos[2] + (Math.random() - 0.5) * 0.6]; }
+      else if (fim.t === 'erro' && !fim.agua) { const h = terrainHeight(pr.pos[0], pr.pos[2]); if (h > -0.05) pos = [pr.pos[0], Math.max(h, 0) + 0.04, pr.pos[2]]; }
+      if (pos) { const it = addItem(world, pr.lixo, pos, Math.random); it.jogado = true; ev.push({ t: 'item_novo', item: it }); }
+    }
     if (fim.t === 'peixe_acerto') {
       const alvo = players.get(fim.alvo);
       if ((alvo.imuneUntil || 0) > now) {

@@ -726,3 +726,18 @@ test('cortar todos (mochila), restaurar todos e vender tudo de uma vez', () => {
   assert.equal(p.dinheiro - d0, esperado);
   assert.equal(p.mochila.length + p.saco.length + p.carga.length, 0);
 });
+
+import { createWorld as cwL, stepProjectiles as spL } from '../shared/rules.js';
+test('lixo do estilingue fica onde cai (some só na água)', () => {
+  const w = cwL(5), st = STATIONS[0];
+  const n0 = Object.keys(w.items).length;
+  // em terra: cai na plataforma da estação
+  w.projeteis.push({ id: 'x1', tipo: 'lixo', lixo: 'garrafa_pet', dono: 'N', pos: [st.pad[0], 3, st.pad[1]], vel: [0, -5, 0], nasc: 0, ini: [st.pad[0], 0, st.pad[1]], alcance: 32 });
+  let ev = []; for (let k = 0; k < 40 && w.projeteis.length; k++) ev.push(...spL(w, new Map(), 0.05, k * 50));
+  const novo = ev.find((e) => e.t === 'item_novo');
+  assert.ok(novo, 'virou lixo no chão'); assert.equal(novo.item.tipo, 'garrafa_pet'); assert.equal(Object.keys(w.items).length, n0 + 1);
+  // na água: some
+  w.projeteis.push({ id: 'x2', tipo: 'lixo', lixo: 'latinha', dono: 'N', pos: [0, 3, 0], vel: [0, -5, 0], nasc: 0, ini: [0, 0, 0], alcance: 32 });
+  ev = []; for (let k = 0; k < 40 && w.projeteis.length; k++) ev.push(...spL(w, new Map(), 0.05, k * 50));
+  assert.ok(!ev.some((e) => e.t === 'item_novo'), 'na água some');
+});

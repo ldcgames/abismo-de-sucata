@@ -1,5 +1,9 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v0.9.9
+
+- O lixo atirado com o estilingue **fica onde caiu** (perto da árvore, no chão, no pé do amigo que levou o tiro) e dá para catar de novo. Só some se cair na água (ou acertar o Kraken/tubarão). Esse lixo não gera outro novo quando é catado, então a margem não enche demais.
+
 ## Novidades da v0.9.8
 
 - Qualquer peixe pode ser cortado (até um lambari): o peixe cortado vale o dobro.
