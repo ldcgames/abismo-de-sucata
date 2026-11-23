@@ -62,7 +62,11 @@ export const Veiculos = {
   eventoVeiculos(e) {
     switch (e.t) {
       case 'veic_tranca': this.bipBip(e.pos, e.trancado); if (e.dono === this.slot || this.me.veicInfo?.dono === e.dono) this.ui.aviso(e.trancado ? '🔒 Trancado' : '🔓 Destrancado', 'info', 1500); return true;
-      case 'veic_buzina': this.buzinar(e.tipo, e.pos); return true;
+      case 'veic_buzina':
+        if (e.por === this.slot) return true; // a minha eu já estou tocando
+        if (e.liga) { this.buzinasRemotas ||= {}; this.buzinasRemotas[e.dono] = performance.now() + 900; this.audio.buzinaLiga('v' + e.dono, e.tipo, this.volBuzina(e.pos)); }
+        else { delete this.buzinasRemotas?.[e.dono]; this.audio.buzinaDesliga('v' + e.dono); }
+        return true;
       case 'veic_reset':
         if (e.ejetados?.includes(this.slot) && this.me.modo === 'carro' && e.motivo !== 'corrida') this.sairDoVeiculo(true, e.motivo === 'agua');
         if (this.carro?.dono === e.dono && e.motivo !== 'corrida' && e.ejetados?.includes(this.slot)) this.carro = null;
@@ -90,11 +94,28 @@ export const Veiculos = {
     if (pos && this.me.pos && Math.hypot(pos[0] - this.me.pos[0], pos[2] - this.me.pos[2]) > 60) return;
     this.audio.blip(trancou ? 1760 : 1480, 0.08, 'square', 0.07); setTimeout(() => this.audio.blip(trancou ? 1760 : 1480, 0.08, 'square', 0.07), 160);
   },
-  buzinar(tipo, pos) {
-    if (pos && this.me.pos && Math.hypot(pos[0] - this.me.pos[0], pos[2] - this.me.pos[2]) > 120) return;
-    const f = { patinete: [1900], moto: [520, 640], carro: [415, 520], som: [330, 415, 494], caminhonete: [262, 330], esportivo: [494, 622] }[tipo] || [440];
-    if (tipo === 'patinete') { this.audio.blip(f[0], 0.06, 'triangle', 0.08); setTimeout(() => this.audio.blip(f[0], 0.06, 'triangle', 0.08), 120); return; }
-    for (const hz of f) this.audio.blip(hz, 0.45, 'square', 0.06);
+  volBuzina(pos) {
+    if (!pos || !this.me.pos) return 1;
+    const d = Math.hypot(pos[0] - this.me.pos[0], pos[2] - this.me.pos[2]);
+    return clamp(1 - d / 140, 0, 1) ** 1.5;
+  },
+  // segura B: a buzina toca sem parar (e os outros ouvem, avisados a cada 0,4 s)
+  buzinaFrame(livre) {
+    const C = this.carro, seg = !!C && livre && this.me.modo === 'carro' && this.input.down('KeyB');
+    const agora = performance.now();
+    if (seg) {
+      if (!this.minhaBuzina) { this.minhaBuzina = { dono: C.dono, prox: 0 }; this.audio.buzinaLiga('eu', C.tipo, 1); }
+      if (agora >= this.minhaBuzina.prox) { this.minhaBuzina.prox = agora + 400; this.acao({ tipo: 'veic_buzina', liga: true }); }
+    } else if (this.minhaBuzina) {
+      this.minhaBuzina = null; this.audio.buzinaDesliga('eu');
+      if (this.me.modo === 'carro') this.acao({ tipo: 'veic_buzina', liga: false });
+    }
+    // buzinas dos outros: param sozinhas se o aviso parar de chegar
+    for (const [d, ate] of Object.entries(this.buzinasRemotas || {})) {
+      const e = this.veic[d];
+      if (agora > ate || !e) { delete this.buzinasRemotas[d]; this.audio.buzinaDesliga('v' + d); }
+      else this.audio.buzinaVol('v' + d, this.volBuzina(e.pose.pos));
+    }
   },
   // ---------------------------------------------------------------- entrar / sair
   veicPerto() {
@@ -262,11 +283,11 @@ export const Veiculos = {
     C.velVec = [C.vx, 0, C.vz];
     // botões
     if (livre && I.hit('KeyL')) { C.luz = !C.luz; this.audio.blip(900, 0.04, 'square', 0.04); }
-    if (livre && I.hit('KeyB')) this.acao({ tipo: 'veic_buzina' });
   },
   // ---------------------------------------------------------------- quadro a quadro
   updateVeiculos(dt, livre) {
     const I = this.input;
+    this.buzinaFrame(livre);
     // meu estado no veículo
     if (this.me.modo === 'carro') {
       const info = this.me.veicInfo, e = info && this.veic[info.dono];
@@ -290,15 +311,20 @@ export const Veiculos = {
     const luzes = [];
     for (const [dono, e] of Object.entries(this.veic)) {
       const P = this.carro?.dono === dono ? { pos: this.carro.pos, rot: this.carro.rot, pitch: this.carro.pitch || 0, roll: this.carro.roll || 0 } : (() => { const q = this.interpVeic(e); return { ...q, pitch: damp(e.pose.pitch || 0, 0, 4, dt), roll: 0 }; })();
-      const antes = e.pose.pos;
+      const antes = e.posAnt || P.pos;
       const dv = Math.hypot(P.pos[0] - antes[0], P.pos[2] - antes[2]) / Math.max(dt, 1e-3);
       const fw = [Math.sin(P.rot), Math.cos(P.rot)], sinal = Math.sign((P.pos[0] - antes[0]) * fw[0] + (P.pos[2] - antes[2]) * fw[1]) || 1;
       e.vel = damp(e.vel || 0, dv * sinal, 10, dt);
-      e.pose = P;
+      e.pose = P; e.posAnt = P.pos.slice();
       e.m.node.at(P.pos[0], P.pos[1], P.pos[2]).rot(P.pitch || 0, P.rot, P.roll || 0);
       const est = this.carro?.dono === dono ? this.carro.esterco : clamp(angDiff(e.rotAnt ?? P.rot, P.rot) / Math.max(dt, 1e-3) * 0.6, -1, 1);
       e.rotAnt = P.rot;
-      for (const w of e.m.rodas) { w.giro = (w.giro || 0) + (e.vel * dt) / w.r; w.n.rot(w.giro, 0, 0); w.piv.rot(0, w.dianteira ? est * 0.45 : 0, 0); }
+      for (const w of e.m.rodas) {
+        // giro de verdade; acima do que o olho acompanha, limita para os raios não parecerem parados ou girando ao contrário
+        let dg = (e.vel * dt) / w.r; const lim = (Math.PI * 2 / w.raios) * 0.42;
+        if (Math.abs(dg) > lim) dg = Math.sign(dg) * lim;
+        w.giro = ((w.giro || 0) + dg) % (Math.PI * 2); w.n.rot(w.giro, 0, 0); w.piv.rot(0, w.dianteira ? est * 0.45 : 0, 0);
+      }
       const luzOn = this.carro?.dono === dono ? this.carro.luz : !!e.info?.luz;
       e.m.farol.visible = luzOn;
       // faróis acendem só um pouquinho (luz fraca, só faz diferença à noite)

@@ -43,6 +43,60 @@ export class Audio {
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(g); g.connect(dest || this.master); o.start(t); o.stop(t + dur + 0.05);
   }
+  // Buzina de carro: duas cornetas elétricas (disco vibrando) tocando juntas, um intervalo de terça.
+  // Onda rica (serra + quadrada), saturada como um alto-falante de buzina e com as ressonâncias da corneta.
+  // Toca enquanto segurar: buzinaLiga(chave, tipo, vol) / buzinaVol(chave, vol) / buzinaDesliga(chave).
+  buzinaLiga(chave, tipo = 'carro', vol = 1) {
+    if (!this.ctx || !this.on) return;
+    this.buzinas ||= new Map();
+    if (this.buzinas.has(chave)) { this.buzinaVol(chave, vol); return; }
+    const c = this.ctx, t = c.currentTime;
+    const P = {
+      moto:        { f: [440, 554], wav: 'square', pico: [1800, 3200], lp: 4200, g: 0.16 },
+      carro:       { f: [415, 494], wav: 'sawtooth', pico: [1500, 2900], lp: 5200, g: 0.2 },
+      som:         { f: [370, 466, 554], wav: 'sawtooth', pico: [1300, 2600], lp: 5600, g: 0.2 },
+      caminhonete: { f: [330, 415], wav: 'sawtooth', pico: [1100, 2400], lp: 4600, g: 0.22 },
+      esportivo:   { f: [466, 587], wav: 'sawtooth', pico: [1700, 3300], lp: 6200, g: 0.18 },
+    }[tipo];
+    const out = c.createGain(); out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(vol, t + 0.02); out.connect(this.master);
+    const fontes = [];
+    if (!P) {
+      // patinete: campainha "trim-trim" repetida enquanto segura
+      const toca = () => { const t0 = c.currentTime; for (const [k, ff] of [[0, 2350], [0.11, 2350]]) for (const [h, gg] of [[1, 0.12], [2.76, 0.05], [5.4, 0.02]]) { const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = ff * h; const g = c.createGain(); g.gain.setValueAtTime(0, t0 + k); g.gain.linearRampToValueAtTime(gg, t0 + k + 0.004); g.gain.exponentialRampToValueAtTime(0.0005, t0 + k + 0.35); o.connect(g); g.connect(out); o.start(t0 + k); o.stop(t0 + k + 0.4); } };
+      toca(); const id = setInterval(toca, 380);
+      this.buzinas.set(chave, { out, fontes, id }); return;
+    }
+    // saturação (a buzina distorce um pouco: é o que dá o "fóóóm" metálico)
+    const sat = c.createWaveShaper(); const n = 1024, curva = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; curva[i] = Math.tanh(x * 3.2) / Math.tanh(3.2); }
+    sat.curve = curva; sat.oversample = '2x';
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 260; hp.Q.value = 0.7;
+    const pk1 = c.createBiquadFilter(); pk1.type = 'peaking'; pk1.frequency.value = P.pico[0]; pk1.Q.value = 2.2; pk1.gain.value = 9;
+    const pk2 = c.createBiquadFilter(); pk2.type = 'peaking'; pk2.frequency.value = P.pico[1]; pk2.Q.value = 3; pk2.gain.value = 7;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = P.lp; lp.Q.value = 0.5;
+    const nivel = c.createGain(); nivel.gain.value = P.g;
+    const mix = c.createGain(); mix.gain.value = 0.55 / P.f.length;
+    mix.connect(sat); sat.connect(hp); hp.connect(pk1); pk1.connect(pk2); pk2.connect(lp); lp.connect(nivel); nivel.connect(out);
+    for (const f of P.f) {
+      for (const [w, d, gg] of [[P.wav, 0, 0.8], ['square', 3, 0.35]]) {
+        const o = c.createOscillator(); o.type = w; o.frequency.setValueAtTime(f * 0.97, t); o.frequency.linearRampToValueAtTime(f, t + 0.04); o.detune.value = d;
+        // tremidinha do diafragma
+        const lfo = c.createOscillator(); lfo.frequency.value = 7 + Math.random() * 2; const lg = c.createGain(); lg.gain.value = f * 0.003; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t);
+        const g = c.createGain(); g.gain.value = gg; o.connect(g); g.connect(mix); o.start(t); fontes.push(o, lfo);
+      }
+    }
+    this.buzinas.set(chave, { out, fontes });
+  }
+  buzinaVol(chave, vol) { const b = this.buzinas?.get(chave); if (b && this.ctx) b.out.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05); }
+  buzinaDesliga(chave) {
+    const b = this.buzinas?.get(chave); if (!b || !this.ctx) return;
+    this.buzinas.delete(chave);
+    const t = this.ctx.currentTime;
+    b.out.gain.cancelScheduledValues(t); b.out.gain.setValueAtTime(b.out.gain.value, t); b.out.gain.linearRampToValueAtTime(0, t + 0.07);
+    if (b.id) clearInterval(b.id);
+    for (const o of b.fontes) { try { o.stop(t + 0.1); } catch {} }
+    setTimeout(() => b.out.disconnect(), 300);
+  }
   noise(dur, freq, gain = 0.3, q = 1, dest = null) {
     if (!this.ctx || !this.on) return;
     const c = this.ctx, t = c.currentTime;

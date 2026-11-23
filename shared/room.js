@@ -245,7 +245,7 @@ export class Room {
     if (a.tipo === 'veic_buzina') {
       if (!pl.veic || pl.veic.lugar !== 0) return fail('');
       const v = this.veiculos.get(pl.veic.dono);
-      return ok('', [{ t: 'veic_buzina', dono: pl.veic.dono, tipo: v?.tipo, pos: v?.pos }]);
+      return ok('', [{ t: 'veic_buzina', dono: pl.veic.dono, por: slot, liga: a.liga !== false, tipo: v?.tipo, pos: v?.pos }]);
     }
     if (a.tipo === 'veic_agua') {
       // caiu no lago: o veículo some e volta para a garagem; quem estava dentro sai nadando

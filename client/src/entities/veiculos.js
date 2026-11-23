@@ -65,7 +65,7 @@ class Montador {
   roda(x, y, z, r, w, dianteira, aro, raios, pinca) {
     const n = new Node('roda'); n.mesh = this.R.createMesh(rodaGeo(r, w, aro, raios, pinca), { rough: 0.55, metal: 0.4 });
     const piv = new Node('pivo_roda'); piv.at(x, y, z); piv.add(n); this.node.add(piv);
-    this.rodas.push({ n, piv, dianteira, r, lado: Math.sign(x) || 1 });
+    this.rodas.push({ n, piv, dianteira, r, raios: raios || 5, lado: Math.sign(x) || 1 });
   }
   fechar(g, opts = {}) {
     const corpo = new Node('carroceria'); corpo.mesh = this.R.createMesh(g, { rough: 0.32, metal: 0.25, ...opts }); this.node.add(corpo);
@@ -288,7 +288,7 @@ function esportivo(R, cor) {
   for (let k = 0; k < 6; k++) g.put(box(0.02, 0.14, 0.3), [-0.5 + k * 0.2, 0.26, -2.1], [0, 0, 0], 1, PRETO);
   for (const s of [-1, 1]) { g.put(cylinder(0.06, 0.06, 0.12, 12), [s * 0.12, 0.34, -2.24], [Math.PI / 2, 0, 0], 1, CROMO); g.put(cylinder(0.045, 0.045, 0.13, 12), [s * 0.12, 0.34, -2.25], [Math.PI / 2, 0, 0], 1, PRETO); }
   placa(g, -2.23, 0.5, 0.9);
-  for (const [x, z, r] of [[0.9, zf, rf], [-0.9, zf, rf], [0.92, zt, rt], [-0.92, zt, rt]]) M.roda(x, r, z, r, z > 0 ? 0.26 : 0.32, z > 0, [0.15, 0.15, 0.16], 10, [0.95, 0.75, 0.1]);
+  for (const [x, z, r] of [[0.99, zf, rf], [-0.99, zf, rf], [1.01, zt, rt], [-1.01, zt, rt]]) M.roda(x, r, z, r, z > 0 ? 0.26 : 0.32, z > 0, [0.15, 0.15, 0.16], 10, [0.95, 0.75, 0.1]);
   M.assentos.push([0.34, 0.06, -0.3, 'banco'], [-0.34, 0.06, -0.3, 'banco']);
   return M.fechar(g);
 }
