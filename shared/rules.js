@@ -6,7 +6,7 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, RENDA_AQUARIO, PEIXARIA, valorItem, nomeItem, valorPeixeItem,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, RENDA_AQUARIO, PEIXARIA, EQUIP, capPeixes, capSaco, valorItem, nomeItem, valorPeixeItem,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
@@ -44,6 +44,7 @@ function newProfileBase(id, nome = 'Explorador') {
     carga: [],          // itens dentro do submarino [{uid, tipo}]
     deposito: [],       // itens guardados na estação
     mao: null,          // peixe na mão {uid, esp, cm}
+    equip: { saco: 0, bolsa: 0, traje: 0 }, // saco de lixo, bolsa de peixes, traje de mergulho
     lixoMao: null,      // lixo catado na mão {uid, tipo}: E guarda no saco · Q joga com o estilingue
     mochila: [],        // até 5 peixes guardados (para arremessar ou vender depois)
     peixaria: null,     // peixe na tábua da bancada de peixe { peixe, cortado }
@@ -123,6 +124,7 @@ export function migrateProfile(p) {
   out.contratos = p.contratos || base.contratos;
   out.estacao.tinta = true; out.extras.lancador = true;
   // mochila virou lista (até 5 peixes)
+  out.equip = { saco: Math.max(0, Math.min(EQUIP.saco.length - 1, p.equip?.saco | 0)), bolsa: Math.max(0, Math.min(EQUIP.bolsa.length - 1, p.equip?.bolsa | 0)), traje: Math.max(0, Math.min(EQUIP.traje.length - 1, p.equip?.traje | 0)) };
   out.mochila = Array.isArray(p.mochila) ? p.mochila : p.mochila ? [p.mochila] : [];
   // v0.8: mais varas, aquários e tanques — converte os níveis antigos para os novos
   if ((p.inventVer || 1) < 2) {
@@ -139,7 +141,7 @@ export function migrateProfile(p) {
     out.vitrine = tqN >= 0 ? { tipo: 'tanque', nivel: tqN, peixes: [] } : { tipo: 'aquario', nivel: aqN, peixes: [] };
     const sobra = [];
     for (const f of [...(out.tanque?.peixes || []), ...(out.aquario?.peixes || [])]) (cabeNoAquario(out, f) ? sobra : out.vitrine.peixes).push(f);
-    for (const f of sobra) (out.mochila.length < MOCHILA.peixes ? out.mochila : out.caixaTermica).push(f);
+    for (const f of sobra) (out.mochila.length < capPeixes(out) ? out.mochila : out.caixaTermica).push(f);
     out.aquario = { nivel: aqN, peixes: [] }; out.tanque = { nivel: tqN, peixes: [] };
   }
   out.aquariosTem = Array.isArray(out.aquariosTem) ? out.aquariosTem : [0];
@@ -441,7 +443,7 @@ export function cabeNoAquario(p, peixe, v = p.vitrine, ocupados = v.peixes?.leng
 function equiparVitrine(p, tipo, nivel) {
   const nova = { tipo, nivel, peixes: [] }, sobra = [];
   for (const f of p.vitrine.peixes) (cabeNoAquario(p, f, nova, nova.peixes.length) ? sobra : nova.peixes).push(f);
-  if (sobra.length > MOCHILA.peixes - p.mochila.length) return `Não cabem ${sobra.length} peixe(s) no ${vitrineSpec(nova).nome} nem na mochila: tire alguns antes`;
+  if (sobra.length > capPeixes(p) - p.mochila.length) return `Não cabem ${sobra.length} peixe(s) no ${vitrineSpec(nova).nome} nem na mochila: tire alguns antes`;
   p.mochila.push(...sobra); p.vitrine = nova;
   return sobra.length ? `${sobra.length} peixe(s) que não cabiam foram para a mochila` : '';
 }
@@ -499,6 +501,13 @@ const ACOES = {
       const n = Number.isInteger(a.nivel) ? a.nivel : p.vara + 1;
       const v = VARA[n - 1]; if (!v || n <= p.vara) return fail(n <= p.vara ? 'Você já tem uma vara igual ou melhor' : 'Vara inexistente');
       custo = v.custo; nome = v.nome; aplicar = () => { p.vara = n; };
+    } else if (cat === 'equip') {
+      const lista = EQUIP[chave]; if (!lista) return fail('Item inexistente');
+      p.equip ||= { saco: 0, bolsa: 0, traje: 0 };
+      const n = Number.isInteger(a.nivel) ? a.nivel : (p.equip[chave] | 0) + 1;
+      const it = lista[n]; if (!it || !it.custo) return fail('Item inexistente');
+      if ((p.equip[chave] | 0) >= n) return fail('Você já tem esse (ou um melhor)');
+      custo = it.custo; nome = it.nome; aplicar = () => { p.equip[chave] = n; };
     } else if (cat === 'pesado') {
       if (p.pesado) return fail('Você já tem o equipamento pesado');
       if (p.vara < PESADO.requerVara) return fail(`Requer a ${VARA[PESADO.requerVara - 1].nome}`);
@@ -740,6 +749,16 @@ const ACOES = {
     const t = vitrineSpec(p.vitrine);
     return okR(`Peixe colocado no ${t.nome} [${p.vitrine.peixes.length}/${t.vagas}]`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
   },
+  aquario_da_bolsa(p, a, ctx) {
+    const e = precisaEstacao(ctx); if (e) return e;
+    const de = a.de === 'caixa' ? p.caixaTermica : p.mochila;
+    const i = de.findIndex((f) => f.uid === a.uid);
+    if (i < 0) return fail('Peixe não encontrado');
+    const motivo = cabeNoAquario(p, de[i]); if (motivo) return fail(motivo);
+    const f = de.splice(i, 1)[0]; p.vitrine.peixes.push(f);
+    const t = vitrineSpec(p.vitrine);
+    return okR(`${ESPECIES[f.esp].nome} colocado no ${t.nome} [${p.vitrine.peixes.length}/${t.vagas}]`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+  },
   aquario_retirar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
     if (p.mao) return fail('Suas mãos estão ocupadas');
@@ -843,9 +862,9 @@ const ACOES = {
   mochila_guardar(p) {
     if (!p.mao) return fail('Nenhum peixe na mão');
     if (ESPECIES[p.mao.esp].pesado && !p.mao.cortado) return fail('Um tubarão inteiro não cabe na mochila (corte ele na bancada de peixe)');
-    if (p.mochila.length >= MOCHILA.peixes) return fail(`Mochila cheia (${p.mochila.length}/${MOCHILA.peixes} peixes)`);
+    if (p.mochila.length >= capPeixes(p)) return fail(`Mochila cheia (${p.mochila.length}/${capPeixes(p)} peixes)`);
     const f = p.mao; p.mochila.push(f); p.mao = null;
-    return okR(`${ESPECIES[f.esp].nome} guardado na mochila [${p.mochila.length}/${MOCHILA.peixes}]`);
+    return okR(`${ESPECIES[f.esp].nome} guardado na mochila [${p.mochila.length}/${capPeixes(p)}]`);
   },
   mochila_tirar(p, a) {
     if (!p.mochila.length) return fail('A mochila está vazia');
@@ -853,7 +872,7 @@ const ACOES = {
     let i = a?.uid ? p.mochila.findIndex((f) => f.uid === a.uid) : p.mochila.length - 1;
     if (i < 0) return fail('Peixe não está na mochila');
     p.mao = p.mochila.splice(i, 1)[0];
-    return okR(`${ESPECIES[p.mao.esp].nome} na mão [mochila ${p.mochila.length}/${MOCHILA.peixes}]`);
+    return okR(`${ESPECIES[p.mao.esp].nome} na mão [mochila ${p.mochila.length}/${capPeixes(p)}]`);
   },
 
   // ---------- brincadeiras ----------
@@ -912,7 +931,7 @@ const ACOES = {
     if (d2(player.pos, [it.x, 0, it.z]) > 2.8) return fail('Chegue mais perto');
     // com as mãos livres o lixo fica na mão (E guarda · Q estilingue); com peixe/lixo na mão vai direto para o saco
     const naMao = !p.mao && !p.lixoMao;
-    if (!naMao && p.saco.length >= LIXO.saco) return fail(`Saco cheio (${p.saco.length}/${LIXO.saco}). Venda no computador da estação.`);
+    if (!naMao && p.saco.length >= capSaco(p)) return fail(`Saco cheio (${p.saco.length}/${capSaco(p)}). Venda no computador da estação.`);
     delete world.items[it.id];
     const obj = { uid: uid(ctx.rnd), tipo: it.tipo };
     if (naMao) p.lixoMao = obj; else p.saco.push(obj);
@@ -920,13 +939,13 @@ const ACOES = {
     if (!it.jogado) world.respawn.push({ em: ctx.now + (LIXO.respawnMinS + ctx.rnd() * (LIXO.respawnMaxS - LIXO.respawnMinS)) * 1000, terra: true });
     const ev = [{ t: 'item_removido', id: it.id, por: player.slot }];
     if (naMao) return okR(`${t.nome} na mão`, ev);
-    return okR(`Catou: ${t.nome} [saco ${p.saco.length}/${LIXO.saco}]`, ev);
+    return okR(`Catou: ${t.nome} [saco ${p.saco.length}/${capSaco(p)}]`, ev);
   },
   lixo_guardar(p) {
     if (!p.lixoMao) return fail('Nenhum lixo na mão');
-    if (p.saco.length >= LIXO.saco) return fail(`Saco cheio (${p.saco.length}/${LIXO.saco}). Venda no computador da estação.`);
+    if (p.saco.length >= capSaco(p)) return fail(`Saco cheio (${p.saco.length}/${capSaco(p)}). Venda no computador da estação.`);
     p.saco.push(p.lixoMao); p.lixoMao = null;
-    return okR(`Guardado no saco [${p.saco.length}/${LIXO.saco}]`);
+    return okR(`Guardado no saco [${p.saco.length}/${capSaco(p)}]`);
   },
   // estilingue de lixo: mesma trajetória em arco do peixe; derruba por 1 s; não machuca o Kraken
   estilingue_atirar(p, a, ctx) {
@@ -1328,10 +1347,11 @@ export function krakenPublico(k, now) {
 // filhote do Kraken vivo: vai para a mochila; se estiver cheia, para a mão; senão, para a caixa térmica
 export function darFilhoteKraken(p, rnd = Math.random) {
   const f = { uid: uid(rnd), esp: 'kraken_filhote', cm: KRAKEN.filhoteCm };
-  if (p.mochila.length < MOCHILA.peixes) { p.mochila.push(f); return 'mochila'; }
+  if (p.mochila.length < capPeixes(p)) { p.mochila.push(f); return 'mochila'; }
   if (!p.mao) { p.mao = f; return 'mão'; }
   p.caixaTermica.push(f); return 'caixa térmica';
 }
+export const rendaPorHora = (f) => Math.round(valorPeixeItem(f) * RENDA_AQUARIO.porHora * 10) / 10;
 // aquário/tanque rende 10% do valor de cada peixe por hora; paga a cada minuto (devolve o que pagou agora)
 export function rendaAquario(p, dtMs) {
   const peixes = p.vitrine?.peixes || [];

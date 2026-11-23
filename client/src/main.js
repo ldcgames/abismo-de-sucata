@@ -21,7 +21,7 @@ import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listar
 import { Pausa, lerConfig, salvarConfig, presetGrafico, limparUrlSala } from './ui/pausa.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
 import { terrainHeight, navSDF, STATIONS, stationById, PLAY_R, SLIDE_R, LAKE_R, depthZone, isNight, hourOfDay, SHAFT_C, CAVES, ESTATUA, chaoEstatua, colidirPedras } from '../shared/world.js';
-import { ESPECIES, SUCATA, CORES_JOGADOR, TROLL, ENERGIA, ARMAS, ARMAS_ORDEM, ESTATUA_PECAS, LIXO, MOCHILA, PEIXARIA, massaPeixe } from '../shared/data.js';
+import { ESPECIES, SUCATA, CORES_JOGADOR, TROLL, ENERGIA, ARMAS, ARMAS_ORDEM, ESTATUA_PECAS, LIXO, MOCHILA, PEIXARIA, massaPeixe, capPeixes, capSaco, multNado } from '../shared/data.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -257,7 +257,7 @@ class Game {
     if (tipo === 'mochila') return this.acao({ tipo: 'mochila_guardar' });
     if (tipo === 'vender') return this.acao({ tipo: 'peixe_vender' });
     if (tipo === 'tinta') { this.me.acao = { tipo: 'bancada', t: 0, dur: 1.4 }; return this.acao({ tipo: 'processar_lula' }); }
-    if (tipo === 'soltar') return this.soltarPeixe();
+    if (tipo === 'doar') return this.doarPeixe();
     if (tipo === 'arremessar') return this.arremessar();
   }
   // bancada de peixe: animação de cortar (2 s, com o som da faca) e depois o servidor marca como cortado
@@ -276,6 +276,8 @@ class Game {
     const som = setInterval(() => { this.audio.blip(170 + Math.random() * 70, 0.05, 'square', 0.06, -80); this.audio.noise?.(0.05, 2400, 0.05, 1); }, 450);
     setTimeout(async () => { clearInterval(som); await this.acao(acao); this.trabalho = null; this.ui.render(); }, s * 1000);
   }
+  // X: oferece o peixe da mão para o amigo mais perto (ele aceita com Y ou recusa com N)
+  async doarPeixe() { if (!this.perfil.mao) return; await this.acao({ tipo: 'doar' }); }
   async soltarPeixe() {
     const f = this.perfil.mao; if (!f) return;
     const r = await this.acao({ tipo: 'peixe_soltar' });
@@ -708,7 +710,7 @@ class Game {
     if (ctl && I.touch.active) { mx -= I.touch.move[0]; mz += I.touch.move[1]; }
     const run = ctl && I.down('ShiftLeft');
     const nad = me.modo === 'nadando';
-    const vmax = nad ? 1.9 : run ? 6.2 : 3.3;
+    const vmax = nad ? 1.9 * multNado(this.perfil) : run ? 6.2 : 3.3;
     const fy = me.camYaw;
     const fwd = [Math.sin(fy), Math.cos(fy)], right = [Math.cos(fy), -Math.sin(fy)];
     let dx = fwd[0] * mz + right[0] * mx, dz = fwd[1] * mz + right[1] * mx;
@@ -860,15 +862,15 @@ class Game {
           txt = `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} na tábua <span class="nota">(${kg.toFixed(1)} kg)</span>`;
           if (livre && I.hit('KeyE')) { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.7 }; this.acao({ tipo: 'peixaria_colocar' }); }
         } else if (p.mao?.cortado) {
-          const cheia = p.mochila.length >= MOCHILA.peixes;
-          txt = cheia ? `Mochila cheia (${MOCHILA.peixes}/${MOCHILA.peixes}): venda no computador da estação` : `<kbd>E</kbd>Guardar o peixe cortado na mochila <span class="nota">(${p.mochila.length}/${MOCHILA.peixes} · venda tudo depois no computador)</span>`;
+          const cheia = p.mochila.length >= capPeixes(p);
+          txt = cheia ? `Mochila cheia (${capPeixes(p)}/${capPeixes(p)}): venda no computador da estação` : `<kbd>E</kbd>Guardar o peixe cortado na mochila <span class="nota">(${p.mochila.length}/${capPeixes(p)} · venda tudo depois no computador)</span>`;
           if (livre && I.hit('KeyE') && !cheia) this.acao({ tipo: 'mochila_guardar' });
         } else if (!p.mao && p.mochila.some((f) => !f.cortado)) {
           const n = p.mochila.filter((f) => !f.cortado).length;
           txt = this.trabalho ? `🔪 Cortando todos… ${Math.ceil((this.trabalho.fim - performance.now()) / 1000)} s` : `<kbd>E</kbd>Cortar todos os peixes da mochila (${n}) <span class="nota">· demora ${PEIXARIA.tudoS} s · <kbd>Z</kbd> tira um para cortar na tábua</span>`;
           if (livre && I.hit('KeyE') && !this.trabalho) this.trabalhoBancada('Cortando', PEIXARIA.tudoS, { tipo: 'peixaria_cortar_tudo' });
         } else if (!p.mao && p.mochila.length) {
-          txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila para cortar <span class="nota">(${p.mochila.length}/${MOCHILA.peixes})</span>`;
+          txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila para cortar <span class="nota">(${p.mochila.length}/${capPeixes(p)})</span>`;
         } else txt = `Bancada de peixe: traga um peixe <b>na mão</b> (ou guarde vários na mochila e corte todos)`;
       } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
@@ -885,28 +887,28 @@ class Game {
       } else if (p.lixoMao && !p.mao) {
         const nm = SUCATA[p.lixoMao.tipo]?.nome || 'Lixo';
         txt = me.mirandoLixo ? `🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para atirar ${nm} com o estilingue · <kbd>Q</kbd> cancelar`
-          : `<kbd>E</kbd>Guardar ${nm} no saco <span class="nota">(${p.saco.length}/${LIXO.saco})</span> · <kbd>Q</kbd>${p.armas.estilingue ? 'Usar no estilingue' : 'Estilingue (compre na loja de armas)'}`;
+          : `<kbd>E</kbd>Guardar ${nm} no saco <span class="nota">(${p.saco.length}/${capSaco(p)})</span> · <kbd>Q</kbd>${p.armas.estilingue ? 'Usar no estilingue' : 'Estilingue (compre na loja de armas)'}`;
         if (livre && I.hit('KeyE')) { me.mirandoLixo = false; this.acao({ tipo: 'lixo_guardar' }); }
       } else if (me.mirandoLixo && !p.mao) {
         txt = `🎯 Estilingue: atirando lixo do saco (${p.saco.length}) · clique para atirar · <kbd>Q</kbd> cancelar`;
       } else if (!p.mao && !me.arma && (this.lixoPerto = this.lixoMaisProximo(2.3))) {
         const t = SUCATA[this.lixoPerto.item.tipo];
-        txt = `<kbd>E</kbd>Catar ${t.nome} <span class="nota">(saco ${p.saco.length}/${LIXO.saco})</span>`;
+        txt = `<kbd>E</kbd>Catar ${t.nome} <span class="nota">(saco ${p.saco.length}/${capSaco(p)})</span>`;
         if (livre && I.hit('KeyE')) this.catar(this.lixoPerto);
       } else if (this.pesca.estado === 'off' && !p.mao && this.pertoDaAgua()) {
         // a dica da vara só aparece no píer ou na beira d'água
         txt = '<kbd>F</kbd>Pegar a vara de pesca';
       } else if (!p.mao && p.mochila.length && this.pesca.estado === 'off') {
-        txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila <span class="nota">(${p.mochila.length}/${MOCHILA.peixes})</span>`;
+        txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila <span class="nota">(${p.mochila.length}/${capPeixes(p)})</span>`;
       }
       if (!p.mao) this.me.mirando = false;
-      if (p.mao && !best && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão abatido: vá até o <b>computador da sua estação</b> e venda por S$ 400 · <kbd>X</kbd> largar · cuidado, um tiro faz você derrubar';
+      if (p.mao && !best && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão abatido: vá até o <b>computador da sua estação</b> e venda por S$ 400 · <kbd>X</kbd> doar (perto de um amigo) · cuidado, um tiro faz você derrubar';
       else if (p.mao && !best) txt = this.me.mirando
         ? '🎯 Mire e clique com o <kbd>botão esquerdo</kbd> para jogar · <kbd>G</kbd> cancelar'
-        : `<kbd>X</kbd>Soltar · <kbd>G</kbd>Pegar para arremessar · <kbd>Z</kbd>${p.mochila.length >= MOCHILA.peixes ? 'Mochila cheia' : `Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`} <span class="nota">(${ESPECIES[p.mao.esp].nome}, ${p.mao.cm} cm)</span>`;
+        : `<kbd>X</kbd>Doar (perto de um amigo) · <kbd>G</kbd>Pegar para arremessar · <kbd>Z</kbd>${p.mochila.length >= capPeixes(p) ? 'Mochila cheia' : `Guardar na mochila (${p.mochila.length}/${capPeixes(p)})`} <span class="nota">(${ESPECIES[p.mao.esp].nome}, ${p.mao.cm} cm)</span>`;
       if (livre && I.hit('KeyF') && !p.mao) { if (this.pesca.estado !== 'off' || this.pertoDaAgua()) this.toggleVara(); else this.ui.aviso('Vá até o píer ou a beira d\'água para pescar', 'info'); }
       if (livre && I.hit('KeyZ')) {
-        if (p.mao) { if (p.mochila.length >= MOCHILA.peixes) this.ui.aviso(`Mochila cheia (${MOCHILA.peixes}/${MOCHILA.peixes} peixes)`, 'ruim'); else { this.me.mirando = false; this.acao({ tipo: 'mochila_guardar' }); } }
+        if (p.mao) { if (p.mochila.length >= capPeixes(p)) this.ui.aviso(`Mochila cheia (${capPeixes(p)}/${capPeixes(p)} peixes)`, 'ruim'); else { this.me.mirando = false; this.acao({ tipo: 'mochila_guardar' }); } }
         else if (p.mochila.length) this.acao({ tipo: 'mochila_tirar' });
         else this.ui.aviso(`Mochila vazia · ${p.baloes}/10 bolsas de tinta`, 'info');
       }
@@ -937,7 +939,7 @@ class Game {
         else { this.me.mirando = !this.me.mirando; if (this.me.mirando) this.input.lock(); }
       }
       if (livre && this.me.mirando && I.mouse.clicked) { this.me.mirando = false; this.arremessar(); }
-      if (livre && I.hit('KeyX')) { this.me.mirando = false; this.soltarPeixe(); }
+      if (livre && I.hit('KeyX')) { this.me.mirando = false; this.doarPeixe(); }
       // estilingue: Q mira com o lixo da mão (ou do saco), clique atira; mesmo arco do peixe
       if (livre && I.hit('KeyQ') && !p.mao && !me.arma && this.pesca.estado === 'off') {
         if (!p.armas.estilingue) this.ui.aviso(p.lixoMao ? `Compre o Estilingue de lixo na loja de armas (S$ ${ARMAS.estilingue.preco})` : 'O estilingue é vendido na loja de armas', 'info');
@@ -949,9 +951,9 @@ class Game {
     } else if (me.modo === 'nadando') {
       const c = !p.mao && this.carcacaPerto();
       if (c) { txt = '<kbd>E</kbd>Pegar o tubarão abatido <span class="nota">(leve até a sua estação e venda por S$ 400)</span>'; if (livre && I.hit('KeyE')) this.acao({ tipo: 'tubarao_pegar', id: c.id }); }
-      else if (p.mao && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão — nade até a margem e vá até o computador da sua estação · <kbd>X</kbd> largar';
+      else if (p.mao && ESPECIES[p.mao.esp]?.cacado) txt = '🦈 Levando o tubarão — nade até a margem e vá até o computador da sua estação · <kbd>X</kbd> doar (perto de um amigo)';
       else txt = 'Nadando — volte à margem ou suba no cais pela escada (<kbd>E</kbd>)';
-      if (livre && p.mao && I.hit('KeyX')) this.soltarPeixe();
+      if (livre && p.mao && I.hit('KeyX')) this.doarPeixe();
     } else if (me.modo === 'sub' || me.modo === 'guindaste') {
       txt = this.subPrompt;
     }
@@ -1029,7 +1031,7 @@ class Game {
   }
   catar(n) {
     if (this.catando) return;
-    if ((this.perfil.mao || this.perfil.lixoMao) && this.perfil.saco.length >= LIXO.saco) { this.ui.aviso(`Saco cheio (${LIXO.saco}/${LIXO.saco}) — venda no computador da estação`, 'ruim'); return; }
+    if ((this.perfil.mao || this.perfil.lixoMao) && this.perfil.saco.length >= capSaco(this.perfil)) { this.ui.aviso(`Saco cheio (${capSaco(this.perfil)}/${capSaco(this.perfil)}) — venda no computador da estação`, 'ruim'); return; }
     this.catando = true;
     // abaixa, pega e levanta
     this.me.yaw = Math.atan2(n.pos[0] - this.me.pos[0], n.pos[2] - this.me.pos[2]);

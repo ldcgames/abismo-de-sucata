@@ -5,7 +5,7 @@ import { Geo, cylinder, torus, sphere } from '../engine/geometry.js';
 import { Kraken } from '../entities/kraken.js';
 import { itemNode } from '../entities/items.js';
 import { Voz } from '../systems/voz.js';
-import { ARMAS, CORRIDA, KRAKEN, LIXO, SUCATA, TUBARAO, textoPremioCorrida, divisaoCorrida } from '../../shared/data.js';
+import { ARMAS, ESPECIES, CORRIDA, KRAKEN, LIXO, SUCATA, TUBARAO, textoPremioCorrida, divisaoCorrida } from '../../shared/data.js';
 import { stationById, tubaraoPos } from '../../shared/world.js';
 import { fishNode } from '../entities/station.js';
 import { lerp } from '../engine/math.js';
@@ -55,6 +55,21 @@ export const Novidades = {
         this.krSnap = { vivo: false, em: KRAKEN.intervaloMs }; this.krSnapEm = performance.now();
         return true;
       }
+      case 'doacao_oferta':
+        if (e.alvo === this.slot) {
+          this.doacao = { id: e.id, ate: performance.now() + e.ms };
+          $('conviteTexto').innerHTML = `🐟 <b>${esc(e.nome)}</b> quer te doar um(a) <b>${esc(ESPECIES[e.esp]?.nome || 'peixe')}</b> (${e.cm} cm${e.cortado ? ', cortado' : ''}).<br><small>Ele vai para a sua mão (ou para a mochila, se a mão estiver ocupada).</small>`;
+          if (!this.convite) $('corridaConvite').hidden = false;
+          this.audio.blip(880, 0.1, 'sine', 0.06, 200);
+        }
+        return true;
+      case 'doacao_resposta':
+        if (e.alvo === this.slot) { if (this.doacao?.id === e.id) { this.doacao = null; if (!this.convite) $('corridaConvite').hidden = true; } }
+        if (e.de === this.slot) {
+          if (e.aceitou) { this.ui.aviso(`🎁 ${e.nome} aceitou o seu peixe!`, 'ok'); this.audio.coin?.(); }
+          else this.ui.aviso(e.expirou ? '⌛ Ninguém respondeu: o peixe continua com você' : `${e.nome} recusou o peixe — ele continua com você`, 'info');
+        }
+        return true;
       case 'renda_aquario': if (e.slot === this.slot) this.ui.aviso(`🐠 Seu aquário rendeu S$ ${fmt(e.v)}`, 'ok', 2500); return true;
       case 'tubarao_surgiu': this.ui.aviso('🦈 Um tubarão está rondando a frente dos píeres! Derrube com as armas e venda por S$ 400.', 'info', 6000); return false;
       case 'tubarao_morto': {
@@ -136,6 +151,17 @@ export const Novidades = {
     if ($('vozFalando')._h !== fh) { $('vozFalando').innerHTML = fh; $('vozFalando')._h = fh; $('vozFalando').hidden = !fh; }
     // corrida
     this.updateCorrida(dt, livre);
+    // doação de peixe: Y aceita, N recusa (mesmas teclas da corrida; o convite de corrida tem prioridade)
+    if (this.doacao && !this.convite) {
+      const resta = this.doacao.ate - performance.now();
+      if (resta <= 0) { this.doacao = null; $('corridaConvite').hidden = true; }
+      else {
+        $('conviteTempo').textContent = `${Math.ceil(resta / 1000)} s`;
+        $('corridaConvite').hidden = false;
+        if (I.hit('KeyY')) this.responderDoacao(true);
+        else if (I.hit('KeyN')) this.responderDoacao(false);
+      }
+    }
     // convite: Y aceita, N recusa
     if (this.convite) {
       const resta = this.convite.ate - performance.now();
@@ -221,6 +247,11 @@ export const Novidades = {
     $('conviteTexto').innerHTML = `<b>${esc(e.nome)}</b> chamou você para uma <b>corrida de submarino</b>!<br><span class="premio">${esc(textoPremioCorrida(n))}</span><br><small>Se nem todos aceitarem, o prêmio muda conforme quantos correrem (2 corredores: ganha/perde S$ ${CORRIDA.premio2}).</small>`;
     $('corridaConvite').hidden = false;
     this.audio.blip(660, 0.1, 'square', 0.06, 300); setTimeout(() => this.audio.blip(990, 0.12, 'square', 0.06), 140);
+  },
+  async responderDoacao(aceitar) {
+    const d = this.doacao; if (!d) return;
+    this.doacao = null; $('corridaConvite').hidden = true;
+    await this.acao({ tipo: 'doar_responder', id: d.id, aceitar });
   },
   async responderConvite(aceitar) {
     const c = this.convite; if (!c) return;

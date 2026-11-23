@@ -760,3 +760,40 @@ test('lixo do estilingue fica onde cai (some só na água)', () => {
   ev = []; for (let k = 0; k < 40 && w.projeteis.length; k++) ev.push(...spL(w, new Map(), 0.05, k * 50));
   assert.ok(!ev.some((e) => e.t === 'item_novo'), 'na água some');
 });
+
+test('equipamentos: saco 20, bolsas 10/20, trajes 2×/3×; doar peixe para amigo perto; pôr no aquário direto da bolsa', async () => {
+  const { EQUIP, capPeixes, capSaco, multNado } = await import('../shared/data.js');
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0);
+  const A = r.players.get('N'), B = r.players.get('L');
+  const st = STATIONS.find((s) => s.id === 'N'); A.modo = 'terra'; A.pos = [st.pad[0], 1.6, st.pad[1]];
+  A.profile.dinheiro = 20000;
+  assert.equal(capSaco(A.profile), 15); assert.equal(capPeixes(A.profile), 5); assert.equal(multNado(A.profile), 1);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'equip', chave: 'bolsa', nivel: 2 }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'equip', chave: 'saco', nivel: 1 }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'equip', chave: 'traje', nivel: 2 }, T0).res.ok, true);
+  assert.equal(A.profile.dinheiro, 20000 - 2500 - 2000 - 6000);
+  assert.equal(capPeixes(A.profile), 20); assert.equal(capSaco(A.profile), 20); assert.equal(multNado(A.profile), 3);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'equip', chave: 'bolsa', nivel: 1 }, T0).res.ok, false, 'não compra pior');
+  assert.equal(EQUIP.traje[1].custo.dinheiro, 3000); assert.equal(EQUIP.bolsa[1].custo.dinheiro, 1500);
+  // doar: longe de todo mundo
+  A.profile.mao = { uid: 'p1', esp: 'tilapia', cm: 20 };
+  B.modo = 'terra'; B.pos = [A.pos[0] + 30, 1.6, A.pos[2]];
+  assert.match(r.action('N', { tipo: 'doar' }, T0).res.msg, /ninguém perto/);
+  // perto: oferece, B aceita com Y
+  B.pos = [A.pos[0] + 1.5, 1.6, A.pos[2]];
+  const of = r.action('N', { tipo: 'doar' }, T0 + 10).res;
+  assert.equal(of.ok, true); const ev = of.events.find((e) => e.t === 'doacao_oferta'); assert.equal(ev.alvo, 'L');
+  assert.equal(A.profile.mao.uid, 'p1', 'continua com quem doou até aceitar');
+  const ac = r.action('L', { tipo: 'doar_responder', id: ev.id, aceitar: true }, T0 + 20).res;
+  assert.equal(ac.ok, true); assert.equal(A.profile.mao, null); assert.equal(B.profile.mao.uid, 'p1');
+  assert.deepEqual(ac.events[0].perfis.sort(), ['L', 'N']);
+  // recusa: fica com quem ofereceu
+  B.profile.mao = null; A.profile.mao = { uid: 'p2', esp: 'tilapia', cm: 20 };
+  const ev2 = r.action('N', { tipo: 'doar' }, T0 + 30).res.events[0];
+  assert.equal(r.action('L', { tipo: 'doar_responder', id: ev2.id, aceitar: false }, T0 + 40).res.ok, true);
+  assert.equal(A.profile.mao.uid, 'p2'); assert.equal(B.profile.mao, null);
+  // aquário direto da bolsa
+  A.profile.mao = null; A.profile.mochila.push({ uid: 'p3', esp: 'lambari', cm: 6 });
+  assert.equal(r.action('N', { tipo: 'aquario_da_bolsa', uid: 'p3', de: 'mochila' }, T0 + 50).res.ok, true);
+  assert.ok(A.profile.vitrine.peixes.some((f) => f.uid === 'p3'));
+});

@@ -4,7 +4,7 @@
 
 import { avancarMissao, applyAction, createWorld, tickWorld, stepProjectiles, checkSurface, checkDiscovery, estaNaEstacao, tickKraken, krakenPublico, tickTubarao, tubaraoPublico, uid, darFilhoteKraken, rendaAquario } from './rules.js';
 import { STATIONS, stationById, hourOfDay, terrainHeight, estacaoParaMundo, BARRACA_CORRIDA, LAKE_R } from './world.js';
-import { CORES_JOGADOR, KRAKEN, CORRIDA, divisaoCorrida } from './data.js';
+import { CORES_JOGADOR, KRAKEN, CORRIDA, divisaoCorrida, DOACAO, ESPECIES, capPeixes } from './data.js';
 
 export const MAX_JOGADORES = 5;
 export const RECONEXAO_MS = 90_000; // vaga reservada por 90 s após queda
@@ -112,6 +112,10 @@ export class Room {
   action(slot, a, now = Date.now()) {
     const pl = this.players.get(slot);
     if (!pl) return { res: { ok: false, msg: 'Jogador fora da sala' }, events: [] };
+    if (a?.tipo === 'doar' || a?.tipo === 'doar_responder') {
+      const res = this.doacaoAcao(slot, pl, a, now);
+      return { res, events: res.events || [], dirty: res.ok && a.tipo === 'doar_responder' && !!a.aceitar };
+    }
     if (typeof a?.tipo === 'string' && a.tipo.startsWith('corrida_')) {
       const res = this.corridaAcao(slot, pl, a, now);
       return { res, events: res.events || [], dirty: false };
@@ -134,6 +138,7 @@ export class Room {
     ev.push(...tickKraken(this.world, now, this.rnd));
     ev.push(...tickTubarao(this.world, now, this.rnd));
     ev.push(...this.tickCorrida(now));
+    if (this.doacoes) for (const [alvo, d] of this.doacoes) if (d.ate < now) { this.doacoes.delete(alvo); ev.push({ t: 'doacao_resposta', id: d.id, de: d.de, alvo, aceitou: false, expirou: true }); }
     for (const [slot, pl] of this.players) {
       if (!pl.conectado && now - pl.caiuEm > RECONEXAO_MS) {
         this.players.delete(slot);
@@ -157,6 +162,44 @@ export class Room {
         pl.profile.dinheiro += KRAKEN.premio; e.filhote[slot] = darFilhoteKraken(pl.profile, this.rnd); e.perfis.push(slot);
       }
     }
+  }
+
+  // ------------------------------------------------------------------ doar o peixe da mão para um amigo perto
+  // X perto de alguém oferece; o amigo aceita (Y) ou recusa (N). O peixe só sai da sua mão quando ele aceita.
+  doacaoAcao(slot, pl, a, now) {
+    const fail = (msg) => ({ ok: false, msg, events: [] });
+    const ok = (msg, events = []) => ({ ok: true, msg, events });
+    this.doacoes ||= new Map();
+    if (a.tipo === 'doar') {
+      const f = pl.profile.mao; if (!f) return fail('Pegue um peixe na mão para doar');
+      if (pl.modo === 'sub') return fail('Saia do submarino para doar');
+      let alvo = null, dmin = DOACAO.alcance;
+      for (const [s2, o] of this.players) {
+        if (s2 === slot || !o.conectado || o.modo === 'sub' || !o.pos) continue;
+        const d = Math.hypot(o.pos[0] - pl.pos[0], o.pos[1] - pl.pos[1], o.pos[2] - pl.pos[2]);
+        if (d < dmin) { dmin = d; alvo = s2; }
+      }
+      if (alvo === null) return fail('Não tem ninguém perto para doar');
+      const pend = this.doacoes.get(alvo);
+      if (pend && pend.ate > now) return fail(`${this.players.get(alvo).profile.nome} já tem uma doação esperando resposta`);
+      const d = { id: uid(this.rnd), de: slot, alvo, uid: f.uid, ate: now + DOACAO.expiraMs };
+      this.doacoes.set(alvo, d);
+      return ok(`Oferecendo ${ESPECIES[f.esp].nome} para ${this.players.get(alvo).profile.nome}… esperando ele aceitar`, [{ t: 'doacao_oferta', id: d.id, de: slot, alvo, nome: pl.profile.nome, esp: f.esp, cm: f.cm, cortado: !!f.cortado, ms: DOACAO.expiraMs }]);
+    }
+    const d = this.doacoes.get(slot);
+    if (!d || d.id !== a.id || d.ate < now) return fail('Essa doação já acabou');
+    this.doacoes.delete(slot);
+    const doador = this.players.get(d.de);
+    if (!a.aceitar) return ok('Você recusou o peixe', [{ t: 'doacao_resposta', id: d.id, de: d.de, alvo: slot, nome: pl.profile.nome, aceitou: false }]);
+    const gp = doador?.profile;
+    if (!gp?.mao || gp.mao.uid !== d.uid) return fail('O peixe não está mais com ele');
+    const f = gp.mao, p = pl.profile, cacado = ESPECIES[f.esp].cacado;
+    let onde;
+    if (!p.mao) { p.mao = f; onde = 'na mão'; }
+    else if (!cacado && p.mochila.length < capPeixes(p)) { p.mochila.push(f); onde = 'na mochila'; }
+    else return fail(cacado ? 'Esvazie as mãos para receber o tubarão' : 'Suas mãos e a mochila estão cheias');
+    gp.mao = null;
+    return ok(`Você recebeu ${ESPECIES[f.esp].nome} (${f.cm} cm) ${onde}!`, [{ t: 'doacao_resposta', id: d.id, de: d.de, alvo: slot, nome: p.nome, aceitou: true, esp: f.esp, perfis: [d.de, slot] }]);
   }
 
   // ------------------------------------------------------------------ corrida de submarino

@@ -76,7 +76,8 @@ if (mao) {
   if (await ev(() => !!__jogo.perfil.mao)) {
     await ev(() => { __jogo.input.press('KeyX'); __jogo.step(1); });
     await sleep(400);
-    check(await ev(() => __jogo.perfil.mao === null), 'X solta o peixe (sai do inventário)');
+    check(await ev(() => !!__jogo.perfil.mao && /ninguém perto/i.test(document.getElementById('avisos').textContent)), 'X doa: sozinho avisa "não tem ninguém perto" e o peixe fica na mão');
+    await ev(() => __jogo.acao({ tipo: 'peixe_soltar' })); await sleep(200);
   }
 }
 
@@ -238,14 +239,18 @@ const tub = await ev(async () => {
   const prompt = document.getElementById('prompt').textContent;
   g.input.press('KeyE'); g.step(1); await new Promise((r) => setTimeout(r, 300)); g.step(2);
   const mao = g.perfil.mao?.esp;
+  // X agora é "doar": sozinho, não tem ninguém perto — o tubarão continua na mão
+  const avisos0 = document.getElementById('avisos')?.textContent || '';
   g.input.press('KeyX'); g.step(1); await new Promise((r) => setTimeout(r, 300)); g.step(2);
-  const largou = !g.perfil.mao && g.carcacas.size === 1;
+  const avisoX = (document.getElementById('avisos')?.textContent || '').replace(avisos0, '');
+  const largou = g.perfil.mao?.esp === 'tubarao_cacado' && /ninguém perto/i.test(avisoX);
+  await g.acao({ tipo: 'peixe_soltar' }); g.step(2); // limpa a mão para o resto do teste
   g.me.pos = antes.pos; g.me.modo = antes.modo; pl.pos = antes.pos.slice(); pl.modo = antes.modo; g.step(2);
   return { nadando, carc: g.carcacas.size, prompt, mao, largou };
 });
 check(tub.nadando, 'tubarão aparece nadando na frente dos píeres', JSON.stringify(tub));
 check(/Pegar o tubarão/.test(tub.prompt) && tub.mao === 'tubarao_cacado', 'tubarão abatido boia; nadando até ele, E pega', JSON.stringify(tub));
-check(tub.largou, 'X larga o tubarão (volta a boiar)', JSON.stringify(tub));
+check(tub.largou, 'X doa: sem ninguém perto avisa e o tubarão continua na mão', JSON.stringify(tub));
 const brk = await ev(() => {
   const g = __jogo; g.me.emote = { i: 5, t: 0 }; for (let i = 0; i < 30; i++) g.step(1);
   return { hp: g.myChar.pose.hp, anim: g.animNome(), fatias: document.querySelectorAll('#rodaEmotes .fatia').length };

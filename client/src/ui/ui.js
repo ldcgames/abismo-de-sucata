@@ -3,8 +3,8 @@
 import {
   SUB_UP, SUB_ORDEM, VARA, PESADO, AQUARIOS, TANQUES, ESTACAO, DEPOSITO, EXTRAS, CONTRATOS, SUCATA, RESTAURO, ESPECIES,
   COMPONENTES, CORES_JOGADOR, valorPeixe, valorPeixeItem, valorItem, nomeItem, PEIXARIA, RESTAURO_TUDO_S, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
-} from '../../shared/data.js';
-import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, vitrineSpec, depositoVagas, multDinheiro } from '../../shared/rules.js';
+  EQUIP, capPeixes, capSaco, multNado } from '../../shared/data.js';
+import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, vitrineSpec, depositoVagas, multDinheiro , rendaPorHora } from '../../shared/rules.js';
 import { STATIONS } from '../../shared/world.js';
 
 const $ = (id) => document.getElementById(id);
@@ -30,9 +30,9 @@ export class UI {
   // ------------------------------------------------------------ HUD contínuo
   hud(p, info) {
     const comps = Object.entries(p.comps).map(([k, n]) => `<span>${COMPONENTES[k]}: <b>${n}</b></span>`).join('');
-    const moc = `<div>🎒 Mochila: <b>${p.mochila.length}/${MOCHILA.peixes}</b> peixe(s)${p.mochila.length ? ' (' + p.mochila.map((f) => esc(ESPECIES[f.esp].nome)).join(', ') + ')' : ''} · bolsas de tinta <b>${p.baloes}/${MOCHILA.bolsas}</b></div>`;
+    const moc = `<div>🎒 Mochila: <b>${p.mochila.length}/${capPeixes(p)}</b> peixe(s)${p.mochila.length ? ' (' + p.mochila.map((f) => esc(ESPECIES[f.esp].nome)).join(', ') + ')' : ''} · bolsas de tinta <b>${p.baloes}/${MOCHILA.bolsas}</b></div>`;
     const mult = multDinheiro(p);
-    const extra = `<div>🗑️ Saco: <b>${p.saco.length}/${LIXO.saco}</b> · 🗿 Estátua <b>${p.estatua.colocadas.length}/${ESTATUA_PECAS.length}</b> · multiplicador <b class="${mult > 1 ? 'mult' : ''}">×${mult}</b></div>`;
+    const extra = `<div>🗑️ Saco: <b>${p.saco.length}/${capSaco(p)}</b> · 🗿 Estátua <b>${p.estatua.colocadas.length}/${ESTATUA_PECAS.length}</b> · multiplicador <b class="${mult > 1 ? 'mult' : ''}">×${mult}</b></div>`;
     const mis = (p.missoes?.ativas || []).map((m) => `<div class="missao">🎯 ${esc(m.txt)} <b>${m.tipo === 'fundo' ? `${m.feito}/${m.n} m` : `${m.feito}/${m.n}`}</b> <span class="premio">S$ ${fmt(m.premio)}</span></div>`).join('');
     // componentes (metal, cobre...) não são mais usados: só aparecem se o jogador ainda tiver algum guardado
     const html = `<div class="din">S$ ${fmt(p.dinheiro)}</div>${Object.values(p.comps).some((n) => n > 0) ? `<div class="comps">${comps}</div>` : ""}${moc}${extra}<div class="missoes">${mis}</div>`;
@@ -86,7 +86,7 @@ export class UI {
   esconderSubHud() { $('subHud').hidden = true; $('sonar').hidden = true; $('medidor').hidden = true; $('legendaSub').hidden = true; }
 
   maoUi(p, naEstacao) {
-    // o painel com vários botões foi substituído pelo aviso "X Soltar · G Pegar para arremessar"
+    // o painel com vários botões foi substituído pelo aviso "X Doar · G Pegar para arremessar"
     $('maoUi').hidden = true; return;
     // eslint-disable-next-line no-unreachable
     const el = $('maoUi');
@@ -99,18 +99,18 @@ export class UI {
     if (el._k === k) return;
     el._k = k; el.hidden = false;
     if (e.cacado) {
-      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixeItem(f)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="soltar">Largar (X)</button></div>`;
+      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixeItem(f)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="doar">Doar (X)</button></div>`;
       el.querySelectorAll('button').forEach((b) => (b.onclick = () => this.g.acaoMao(b.dataset.a)));
       return;
     }
     el.innerHTML = `<div>🐟 <b>${esc(e.nome)}${f.cortado ? ' (cortado)' : ''}</b> — ${f.cm} cm · vale S$ ${valorPeixeItem(f)}</div>
       <div class="bt">
         <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">${esc(vNome)}</button>
-        <button data-a="mochila" ${(tub && !f.cortado) || p.mochila.length >= MOCHILA.peixes ? 'disabled' : ''}>Mochila (${p.mochila.length}/${MOCHILA.peixes})</button>
+        <button data-a="mochila" ${(tub && !f.cortado) || p.mochila.length >= capPeixes(p) ? 'disabled' : ''}>Mochila (${p.mochila.length}/${capPeixes(p)})</button>
         <button data-a="vender" ${!naEstacao ? 'disabled' : ''}>Vender</button>
         ${e.tinta ? `<button data-a="tinta" ${!naEstacao || !p.estacao.tinta ? 'disabled' : ''} title="${p.estacao.tinta ? '' : 'Construa a bancada de tinta'}">Extrair tinta</button>` : ''}
         <button data-a="arremessar">Arremessar (G)</button>
-        <button data-a="soltar">Soltar (X)</button>
+        <button data-a="doar">Doar (X)</button>
       </div>${motivo && !tub ? `<div class="nota">Aquário: ${esc(motivo)}</div>` : ''}`;
     el.querySelectorAll('button').forEach((b) => (b.onclick = () => this.g.acaoMao(b.dataset.a)));
   }
@@ -135,7 +135,7 @@ export class UI {
     let html = '';
     if (this.aberto === 'terminal') {
       $('painelTitulo').textContent = 'Computador da estação';
-      setAbas([['sub', 'Submarino'], ['vara', 'Pesca'], ['estacao', 'Estação'], ['aquario', 'Aquário e tanque'], ['vender', 'Vender'], ['contratos', 'Contratos']]);
+      setAbas([['sub', 'Submarino'], ['vara', 'Pesca'], ['equip', 'Equipamentos'], ['estacao', 'Estação'], ['aquario', 'Aquário e tanque'], ['vender', 'Vender'], ['contratos', 'Contratos']]);
       html = this['aba_' + this.aba](p);
     } else if (this.aberto === 'deposito' || this.aberto === 'reciclador' || this.aberto === 'restauro') {
       $('painelTitulo').textContent = { deposito: 'Depósito e carga', reciclador: 'Recicladora', restauro: 'Bancada de restauro' }[this.aberto];
@@ -203,6 +203,26 @@ export class UI {
     h += `<div class="card"><h3>${ex.nome}</h3><div class="nv">${ex.desc}</div><div class="custo">${custoTxt(ex.custo)}</div>${p.extras.lancador ? '<div class="val"><b>Instalado</b></div>' : this.btn('Instalar', { tipo: 'comprar', cat: 'extra', chave: 'lancador' }, falta.length > 0, falta.join(', '))}</div>`;
     return h + `</div><p class="nota">Profundidade máxima segura atual: <b>${fmt(st.maxProf)} m</b>. Abaixo disso o casco sofre estresse; a 100% o lastro de emergência leva você para cima.</p>`;
   }
+  aba_equip(p) {
+    const eq = p.equip || {};
+    const grupos = [
+      ['saco', '🗑️ Saco de lixo', (it) => `guarda <b>${it.cap}</b> lixos`],
+      ['bolsa', '🎒 Bolsa de peixes', (it) => `guarda <b>${it.cap}</b> peixes`],
+      ['traje', '🤿 Traje de mergulho', (it) => it.mult > 1 ? `nada <b>${it.mult}× mais rápido</b> que o normal` : 'velocidade normal'],
+    ];
+    let h = `<p class="nota">Agora: saco de ${capSaco(p)} lixos · bolsa de ${capPeixes(p)} peixes · nado ${multNado(p)}×. Pode comprar direto o melhor.</p>`;
+    for (const [k, tit, desc] of grupos) {
+      h += `<h3>${tit}</h3><div class="grade">`;
+      EQUIP[k].forEach((it, n) => {
+        if (!it.custo) return;
+        const tem = (eq[k] | 0) >= n, atual = (eq[k] | 0) === n, f = faltando(p, it.custo);
+        h += `<div class="card"><h3>${esc(it.nome)}</h3><div class="val">${desc(it)}</div><div class="custo">${custoTxt(it.custo)}</div>
+          ${atual ? '<div class="val"><b>✔ Em uso</b></div>' : tem ? '<div class="nota">Você já tem um melhor</div>' : this.btn('Comprar', { tipo: 'comprar', cat: 'equip', chave: k, nivel: n }, f.length > 0, f.join(', '))}</div>`;
+      });
+      h += '</div>';
+    }
+    return h;
+  }
   aba_vara(p) {
     const vs = varaStats(p);
     let h = `<p class="nota">Sua vara: <b>${esc(vs.nome)}</b> — peixes até <b>${vs.maxCm} cm</b>, linha ${vs.linhaKg} kg, alcance ${vs.alcance} m, isca até ${vs.prof} m de fundo.</p><div class="grade">`;
@@ -241,7 +261,20 @@ export class UI {
       const m = cabeNoAquario(p, p.mao);
       h += `<div class="convite">Na mão: ${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm) ${this.btn('Colocar aqui', { tipo: 'peixe_aquario' }, !!m, m || '')} ${m ? `<span class="falta">${esc(m)}</span>` : ''}</div>`;
     }
+    { let rh = 0; for (const f of v.peixes) rh += rendaPorHora(f); if (v.peixes.length) h += `<p class="nota">💰 Rendendo <b>S$ ${fmt(Math.round(rh * 10) / 10)} por hora</b> (cada peixe rende 10% do valor dele por hora).</p>`; }
     h += this.listaPeixes(p, 'vitrine') || '<p class="nota">Vazio. Pesque um peixe que caiba e coloque aqui (E na frente dele).</p>';
+    // peixes que estão na bolsa (mochila) e na caixa térmica: dá para escolher e pôr no aquário
+    const fora = [...p.mochila.map((f) => ['mochila', f]), ...p.caixaTermica.map((f) => ['caixa', f])];
+    h += `<h3>Na sua bolsa (fora do aquário)</h3>`;
+    if (!fora.length) h += '<p class="nota">Nenhum peixe na bolsa. Guarde peixes com Z e eles aparecem aqui para colocar no aquário.</p>';
+    else {
+      h += '<div class="lista">';
+      for (const [de, f] of fora) {
+        const m = cabeNoAquario(p, f);
+        h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)}${f.cortado ? ' (cortado)' : ''} — ${f.cm} cm <span class="renda">rende S$ ${fmt(rendaPorHora(f))}/h no aquário</span>${de === 'caixa' ? ' <span class="nota">(caixa térmica)</span>' : ''}</div><div class="acoes">${m ? `<span class="falta">${esc(m)}</span>` : ''}${this.btn('Colocar no aquário', { tipo: 'aquario_da_bolsa', uid: f.uid, de }, !!m, m || '')}</div></div>`;
+      }
+      h += '</div>';
+    }
     // na frente do aquário/tanque: só os peixes (pegar e colocar). Comprar e equipar é no computador.
     if (naFrente) return h + '<p class="nota">Para comprar ou trocar o aquário/tanque, use o computador da estação (aba Aquário e tanque).</p>';
     const card = (tipo, i, it, extra, compra) => {
@@ -266,7 +299,7 @@ export class UI {
     const pegar = (f) => onde === 'mochila' ? { tipo: 'mochila_tirar', uid: f.uid } : onde === 'caixa' ? { tipo: 'caixa_mao', uid: f.uid } : { tipo: 'aquario_retirar', uid: f.uid };
     const m = multDinheiro(p);
     let h = '<div class="lista">';
-    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)}${f.cortado ? ' (cortado)' : ''} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(f) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
+    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)}${f.cortado ? ' (cortado)' : ''} — ${f.cm} cm${onde === 'vitrine' ? ` <span class="renda">rende S$ ${fmt(rendaPorHora(f))}/h</span>` : ''}</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(f) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
     return h + '</div>';
   }
   sacoVenda(p) {
@@ -274,7 +307,7 @@ export class UI {
     let tot = 0; const cont = {};
     for (const x of p.saco) { tot += valorItem(x); const k = nomeItem(x); cont[k] = (cont[k] || 0) + 1; }
     const m = multDinheiro(p);
-    return `<h3>Saco de recicláveis (${p.saco.length}/${LIXO.saco})</h3><div class="convite">${Object.entries(cont).map(([t, n]) => `${n}× ${esc(t)}`).join(' · ')} ${this.btn(`Vender tudo — S$ ${fmt(Math.round(tot * m))}${m > 1 ? ` (×${m})` : ''}`, { tipo: 'vender_saco' })}</div>`;
+    return `<h3>Saco de recicláveis (${p.saco.length}/${capSaco(p)})</h3><div class="convite">${Object.entries(cont).map(([t, n]) => `${n}× ${esc(t)}`).join(' · ')} ${this.btn(`Vender tudo — S$ ${fmt(Math.round(tot * m))}${m > 1 ? ` (×${m})` : ''}`, { tipo: 'vender_saco' })}</div>`;
   }
   aba_vender(p) {
     // tudo o que dá para vender num lugar só: peixes (mão, mochila, aquário, tanque), lixo catado e a carga do submarino
@@ -294,10 +327,10 @@ export class UI {
     const m = multDinheiro(p);
     if (p.mao) {
       const e = ESPECIES[p.mao.esp];
-      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)}${p.mao.cortado ? ' (cortado)' : ''} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(p.mao) * m))}`, { tipo: 'peixe_vender' })}${e.pesado && !p.mao.cortado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
+      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)}${p.mao.cortado ? ' (cortado)' : ''} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(p.mao) * m))}`, { tipo: 'peixe_vender' })}${e.pesado && !p.mao.cortado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${capPeixes(p)})`, { tipo: 'mochila_guardar' }, p.mochila.length >= capPeixes(p), 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
     }
     // aquário e tanque não aparecem aqui: para vender, tire o peixe de lá antes (aba Aquário → Pegar na mão)
-    for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${MOCHILA.peixes})`], ['caixa', 'Caixa térmica (peixes antigos)']]) {
+    for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${capPeixes(p)})`], ['caixa', 'Caixa térmica (peixes antigos)']]) {
       const l = this.listaPeixes(p, onde);
       if (l) h += `<h3>${tit}</h3>` + l;
     }
@@ -335,7 +368,7 @@ export class UI {
     }
     if (modo === 'restauro') h += `<p class="nota">Restaurar é <b>de graça</b> e funciona com qualquer item: lixo da margem, latas, pneus, peças do fundo… direto do submarino, do depósito ou do saco. O item restaurado vende pelo <b>dobro</b> no computador.</p>`;
     h += `<h3>No submarino (${p.carga.length})</h3><div class="lista">${p.carga.filter(filtro).map((it) => this.linhaItem(it, 'carga', p, modo === 'deposito' ? 'tudo' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
-    if (modo === 'restauro') h += `<h3>No saco de lixo (${p.saco.length}/${LIXO.saco})</h3><div class="lista">${p.saco.map((it) => this.linhaItem(it, 'saco', p, modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
+    if (modo === 'restauro') h += `<h3>No saco de lixo (${p.saco.length}/${capSaco(p)})</h3><div class="lista">${p.saco.map((it) => this.linhaItem(it, 'saco', p, modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     h += `<h3>No depósito (${p.deposito.length}/${depositoVagas(p)})</h3><div class="lista">${p.deposito.filter(filtro).map((it) => this.linhaItem(it, 'deposito', p, modo === 'deposito' ? 'deposito' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     return h;
   }

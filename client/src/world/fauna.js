@@ -24,6 +24,60 @@ export function makeFishGeo(esp, detail = 1) {
     if (esp === 'barrigudo' && z < -0.2) c = [1, 0.45, 0.15];
     return [...c, 0];
   };
+  if (e.forma === 'kraken') {
+    // Filhote de Kraken (monstro, não lula): cabeça curta e larga cheia de placas e espinhos, olhos enormes amarelos,
+    // 8 braços grossos abertos em coroa que se enrolam para fora, 2 tentáculos de caça com clava de ganchos.
+    const esc = base.map((c) => c * 0.45), claro = mix(base, [1, 0.78, 0.62], 0.5);
+    const manto = lathe([[0, -0.46], [0.07, -0.43], [0.14, -0.35], [0.185, -0.23], [0.195, -0.11], [0.18, -0.01], [0.14, 0.05], [0.09, 0.08], [0, 0.09]], seg + 6);
+    g.put(manto, [0, 0.02, 0], [Math.PI / 2, 0, 0], [1, 0.88, 1], (x, y, z) => {
+      const placa = Math.abs(Math.sin(z * 34)) < 0.18 || Math.abs(Math.sin(Math.atan2(y, x) * 6)) < 0.12; // sulcos das placas
+      const mancha = Math.sin(x * 61) * Math.sin(z * 47) * Math.sin(y * 53) > 0.35;
+      let c = mix(claro, base, Math.max(0, Math.min(1, (y + 0.06) * 5)));
+      if (placa) c = mix(c, esc, 0.6); if (mancha) c = mix(c, [0.95, 0.65, 0.2], 0.35);
+      return [...c, 0];
+    });
+    // espinhos: crista no dorso + duas fileiras laterais
+    for (let k = 0; k < 8; k++) {
+      const z = -0.4 + k * 0.055, t = (k + 1) / 9, r = 0.19 * Math.sin(Math.PI * t) * 0.88 + 0.02;
+      const h = 0.07 * Math.sin(Math.PI * t) + 0.02;
+      g.put(lathe([[0.022, 0], [0.012, h * 0.6], [0, h]], 7), [0, r, z], [-0.45, 0, 0], 1, [...esc, 0]);
+      for (const s2 of [-1, 1]) if (k % 2 === 0) g.put(lathe([[0.014, 0], [0.007, 0.03], [0, 0.045]], 6), [s2 * r * 0.95, r * 0.25, z], [0, 0, -s2 * 1.2], 1, [...esc, 0]);
+    }
+    // olhos enormes com pálpebra grossa e pupila em fenda
+    for (const s2 of [-1, 1]) {
+      g.put(sphere(0.068, 14, 12), [s2 * 0.15, 0.04, 0.0], [0, 0, 0], 1, [1.0, 0.82, 0.1, 0]);
+      g.put(sphere(0.03, 10, 8), [s2 * 0.208, 0.04, 0.012], [0, 0, 0], [0.35, 1.5, 1], [0.02, 0.01, 0.01, 0]);
+      g.put(sphere(0.078, 12, 10), [s2 * 0.142, 0.085, -0.005], [0, 0, s2 * 0.25], [1.05, 0.42, 1.1], [...esc, 0]);
+    }
+    // bico
+    g.put(lathe([[0.03, 0], [0.018, 0.04], [0, 0.065]], 8), [0, -0.05, 0.08], [Math.PI / 2 + 0.3, 0, 0], 1, [0.12, 0.08, 0.05, 0]);
+    // 8 braços grossos em coroa, enrolando para fora na ponta
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const ca = Math.cos(a), sa = Math.sin(a), pts = [];
+      for (let k = 0; k <= 14; k++) {
+        const t = k / 14;
+        const sai = 0.09 + Math.sin(t * Math.PI * 0.62) * 0.22;              // abre em leque
+        const curl = t > 0.55 ? (t - 0.55) * 9 : 0;                           // enrola na ponta
+        const rr = sai + Math.sin(curl) * 0.05, zz = 0.06 + t * 0.34 - (1 - Math.cos(curl)) * 0.06;
+        pts.push([ca * rr, sa * rr * 0.8 - 0.02, zz]);
+      }
+      g.add(tube(pts, 0.05, 8, (t) => 0.05 * (1 - t * 0.82) + 0.004), null, [...base, 0]);
+      for (let k = 1; k < 12; k++) {       // ventosas na face de dentro
+        const q = pts[k], w = 0.016 * (1 - k / 14) + 0.004;
+        g.put(sphere(w, 6, 4), [q[0] * 0.9, q[1] * 0.9, q[2] + 0.005], [0, 0, 0], [1, 1, 0.55], [...claro, 0]);
+      }
+    }
+    // 2 tentáculos de caça mais longos, com clava cheia de ganchos
+    for (const s2 of [-1, 1]) {
+      const pts = []; for (let k = 0; k <= 12; k++) { const t = k / 12; pts.push([s2 * (0.03 + t * 0.06 + Math.sin(t * 6) * 0.025), -0.05 - t * 0.04, 0.07 + t * 0.4]); }
+      g.add(tube(pts, 0.022, 7, (t) => 0.024 * (1 - t * 0.5)), null, [...base, 0]);
+      const fim = pts[12];
+      g.put(sphere(0.042, 12, 8), fim, [0, 0, 0], [0.85, 0.6, 1.5], [...esc, 0]);
+      for (let k = 0; k < 5; k++) g.put(lathe([[0.008, 0], [0.004, 0.02], [0, 0.032]], 5), [fim[0] - s2 * 0.025, fim[1] + 0.012, fim[2] - 0.05 + k * 0.025], [0, 0, s2 * 1.1], 1, [0.95, 0.9, 0.82, 0]);
+    }
+    return g;
+  }
   if (e.forma === 'lula') {
     // manto + barbatanas + tentáculos
     const mantle = lathe([[0, -0.05], [0.07, 0.0], [0.09, 0.15], [0.07, 0.35], [0.0, 0.48]], seg);

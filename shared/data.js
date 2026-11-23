@@ -85,7 +85,7 @@ export const ESPECIES = {
   tubarao:   { nome: 'Tubarão-touro-do-lago', cm: [250, 420], prof: [25, 150], hora: 'noite', chance: 2.2, valor: 3000, cor: [0.42, 0.46, 0.5], forca: 9, forma: 'tubarao', pesado: true },
   // o tubarão que ronda os píeres: não se pesca, só cai na bala. Vale sempre S$ 400.
   // filhote do Kraken: vem vivo (dá para pôr no aquário). Vale S$ 600; cortado, S$ 1.200
-  kraken_filhote: { nome: 'Filhote de Kraken', cm: [30, 30], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 600, valorFixo: 600, cor: [0.62, 0.2, 0.42], forca: 2, forma: 'lula', especial: true },
+  kraken_filhote: { nome: 'Filhote de Kraken', cm: [30, 30], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 600, valorFixo: 600, cor: [0.5, 0.1, 0.14], forca: 2, forma: 'kraken', especial: true },
   tubarao_cacado: { nome: 'Tubarão do lago (abatido)', cm: [330, 330], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 400, valorFixo: 400, cor: [0.4, 0.45, 0.5], forca: 9, forma: 'tubarao', pesado: true, cacado: true },
 };
 // massa aproximada (kg) a partir do comprimento
@@ -211,6 +211,16 @@ export const TANQUES = [
 export const CAIXA_TERMICA = { vagas: 3 };
 // mochila: até 5 peixes (para arremessar ou vender) + até 10 bolsas de tinta
 export const MOCHILA = { peixes: 5, bolsas: 10 };
+// equipamentos do jogador (dá para comprar qualquer nível maior direto)
+export const EQUIP = {
+  saco: [{ nome: 'Saco de lixo', cap: 15 }, { nome: 'Mochila de lixo grande', cap: 20, custo: D(2000) }],
+  bolsa: [{ nome: 'Mochila de peixes', cap: 5 }, { nome: 'Bolsa de peixes média', cap: 10, custo: D(1500) }, { nome: 'Bolsa de peixes grande', cap: 20, custo: D(2500) }],
+  traje: [{ nome: 'Sem traje', mult: 1 }, { nome: 'Traje de mergulho', mult: 2, custo: D(3000) }, { nome: 'Traje de mergulho profissional', mult: 3, custo: D(6000) }],
+};
+export const capPeixes = (p) => (EQUIP.bolsa[p?.equip?.bolsa | 0] || EQUIP.bolsa[0]).cap;
+export const capSaco = (p) => (EQUIP.saco[p?.equip?.saco | 0] || EQUIP.saco[0]).cap;
+export const multNado = (p) => (EQUIP.traje[p?.equip?.traje | 0] || EQUIP.traje[0]).mult;
+export const DOACAO = { alcance: 3.5, expiraMs: 20e3 };
 
 // ---------------- ESTAÇÃO (BASE) ----------------
 export const ESTACAO = {
