@@ -6,7 +6,7 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, PEIXARIA, valorItem, nomeItem, valorPeixeItem,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, RENDA_AQUARIO, PEIXARIA, valorItem, nomeItem, valorPeixeItem,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
@@ -176,8 +176,8 @@ export function subStats(p) {
 }
 export function varaStats(p) {
   const v = VARA[p.vara - 1];
-  if (p.pesado) return { ...v, nome: v.nome + ' + equipamento pesado', maxCm: PESADO.maxCm, linhaKg: PESADO.linhaKg, prof: PESADO.prof, pesado: true };
-  return { ...v, pesado: false };
+  if (p.pesado) return { ...v, nome: v.nome + ' + equipamento pesado', maxCm: Math.max(v.maxCm, PESADO.maxCm), linhaKg: Math.max(v.linhaKg, PESADO.linhaKg), prof: Math.max(v.prof, PESADO.prof), pesado: true, freio: Math.max(v.freio || 0, 0.55) };
+  return { ...v, pesado: !!v.pesado, freio: v.freio || 0 };
 }
 export function cargaUso(p) {
   let kg = 0, L = 0;
@@ -412,6 +412,7 @@ export function sortearPeixe(p, bobber, hora, rnd = Math.random) {
     if (linha < e.prof[0] || linha > e.prof[1] + 4) continue;
     if (e.hora === 'dia' && noite) continue;
     if (e.hora === 'noite' && !noite) continue;
+    if (e.cacado || e.especial || !e.chance) continue;
     if (e.pesado && !vs.pesado) continue; // tubarão nem chega perto de iscas pequenas
     cand.push([id, e.chance]);
   }
@@ -719,10 +720,10 @@ const ACOES = {
     // tempo mínimo de briga plausível (anti-trapaça): 1,2 s + 0,4 s por kg
     const minimo = 1200 + Math.min(12000, ps.peixe.kg * 400);
     if (ctx.now - ps.mordida < minimo * 0.6) return fail('Puxada rápida demais');
-    if (a.resultado !== 'ok') return fail(a.resultado === 'arrebentou' ? 'A linha arrebentou!' : 'O peixe escapou!');
+    if (a.resultado !== 'ok' && !(a.resultado === 'arrebentou' && varaStats(p).inquebravel)) return fail(a.resultado === 'arrebentou' ? 'A linha arrebentou!' : 'O peixe escapou!');
     const vs = varaStats(p);
     const e = ESPECIES[ps.peixe.esp];
-    if (ps.peixe.cm > vs.maxCm || ps.peixe.kg > vs.linhaKg) {
+    if (!vs.inquebravel && (ps.peixe.cm > vs.maxCm || ps.peixe.kg > vs.linhaKg)) {
       return fail(`A linha arrebentou! Era um(a) ${e.nome} de ${ps.peixe.cm} cm — grande demais para a ${vs.nome}.`, { escapou: { esp: ps.peixe.esp, cm: ps.peixe.cm } });
     }
     p.mao = { uid: uid(ctx.rnd), esp: ps.peixe.esp, cm: ps.peixe.cm };
@@ -1301,7 +1302,7 @@ export function danoKraken(k, dano, slot, now) {
   k.dano[slot] = (k.dano[slot] || 0) + dano;
   if (k.hp > 0) return [];
   k.vivo = false; k.proximo = now + KRAKEN.intervaloMs; k.avisado = false;
-  return [{ t: 'kraken_morto', por: slot, pos: centroKraken({ ...k, vivo: true }, now) }];
+  return [{ t: 'kraken_morto', por: slot, pos: centroKraken({ ...k, vivo: true }, now), dano: { ...k.dano } }];
 }
 // nasce a cada 20 min (aviso 1 min antes), fica 1 min e volta para o abismo
 export function tickKraken(w, now, rnd = Math.random) {
@@ -1322,6 +1323,27 @@ export function krakenPublico(k, now) {
   if (!k) return null;
   if (!k.vivo) return { vivo: false, em: Math.max(0, (k.proximo || 0) - now) };
   return { vivo: true, t: (now - k.ini) / 1000, resta: Math.max(0, k.fim - now), hp: k.hp, hpMax: k.hpMax, a0: k.a0 };
+}
+
+// filhote do Kraken vivo: vai para a mochila; se estiver cheia, para a mão; senão, para a caixa térmica
+export function darFilhoteKraken(p, rnd = Math.random) {
+  const f = { uid: uid(rnd), esp: 'kraken_filhote', cm: KRAKEN.filhoteCm };
+  if (p.mochila.length < MOCHILA.peixes) { p.mochila.push(f); return 'mochila'; }
+  if (!p.mao) { p.mao = f; return 'mão'; }
+  p.caixaTermica.push(f); return 'caixa térmica';
+}
+// aquário/tanque rende 10% do valor de cada peixe por hora; paga a cada minuto (devolve o que pagou agora)
+export function rendaAquario(p, dtMs) {
+  const peixes = p.vitrine?.peixes || [];
+  if (!peixes.length) { p.rendaAq = 0; return 0; }
+  let v = 0; for (const f of peixes) v += valorPeixeItem(f);
+  p.rendaAq = (p.rendaAq || 0) + v * RENDA_AQUARIO.porHora * dtMs / 3600e3;
+  p.rendaAqT = (p.rendaAqT || 0) + dtMs;
+  if (p.rendaAqT < RENDA_AQUARIO.pagaMs) return 0;
+  p.rendaAqT = 0;
+  const pago = Math.floor(p.rendaAq);
+  if (pago > 0) { p.dinheiro += pago; p.rendaAq -= pago; }
+  return pago;
 }
 
 // ------------------------------------------------------------------ tubarão do lago
@@ -1349,7 +1371,7 @@ export function danoTubarao(w, dano, slot, now) {
   const c = centroTubarao(w, now);
   tb.hp = Math.max(0, tb.hp - dano);
   if (tb.hp > 0) return [];
-  tb.vivo = false; tb.proximo = now + TUBARAO.intervaloMs;
+  tb.vivo = false; tb.esperando = true; tb.proximo = 0; // o próximo só começa a contar quando alguém pegar este (tirar da água)
   return [{ t: 'tubarao_morto', por: slot, carcaca: novaCarcaca(w, c) }];
 }
 // quem leva o tubarão abatido e é acertado deixa ele cair ali mesmo
@@ -1359,11 +1381,12 @@ function largarCarcaca(w, alvo, slot) {
   p.mao = null;
   return [{ t: 'carcaca_nova', carcaca: novaCarcaca(w, alvo.pos), de: slot, perfis: [slot] }];
 }
-// um só por vez: o próximo só começa a contar 20 min depois que o anterior morrer
+// um só por vez: depois de abatido, o próximo só começa a contar (5 min) quando a carcaça for pega
 export function tickTubarao(w, now, rnd = Math.random) {
   const tb = w.tubarao || (w.tubarao = { vivo: false, proximo: 0, hp: 0 });
   w.carcacas ||= {};
-  if (!tb.proximo) tb.proximo = now + TUBARAO.intervaloMs;
+  if (!tb.vivo && tb.esperando) { if (Object.keys(w.carcacas).length) return []; tb.esperando = false; tb.proximo = now + TUBARAO.intervaloMs; }
+  if (!tb.proximo || tb.proximo - now > TUBARAO.intervaloMs) tb.proximo = now + TUBARAO.intervaloMs;
   if (!tb.vivo && now >= tb.proximo) {
     Object.assign(tb, { vivo: true, ini: now, a0: rnd() * Math.PI * 2, hp: TUBARAO.hp });
     return [{ t: 'tubarao_surgiu' }];

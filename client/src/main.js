@@ -1257,15 +1257,18 @@ class Game {
     } else if (P.estado === 'brigando') {
       // minijogo de tensão: o peixe puxa em arrancadas; recolher sobe a tensão
       const forca = P.forcaPeixe * (0.6 + 0.5 * Math.max(0, Math.sin(this.t * 2.7) + Math.sin(this.t * 6.1) * 0.5));
-      const pesoRel = P.kg / Math.max(0.1, vs.linhaKg);
-      const reelV = 1 / (1.5 + 0.45 * P.kg);
+      const pesoRel = Math.min(1.5, P.kg / Math.max(0.1, vs.linhaKg));
+      const freio = vs.freio || 0;
+      // o molinete (freio) segura parte da força do peixe e ajuda a recolher peixe pesado
+      const reelV = 1 / (1.2 + 0.25 * Math.min(P.kg, 30) * (1 - 0.6 * freio));
       if (clicando) {
         P.dist -= reelV * dt * (1 - P.tensao / 160);
-        P.tensao += (forca * 18 + 14 + pesoRel * 60) * dt;
+        P.tensao += ((forca * 10 + 8) * (1 - 0.85 * freio) + pesoRel * 25) * dt;
+        if (vs.inquebravel) P.tensao = Math.min(P.tensao, 92);
         if (Math.random() < 0.3) this.audio.reel();
       } else {
-        P.tensao -= 40 * dt;
-        P.dist += forca * 0.04 * dt;
+        P.tensao -= 55 * dt;
+        P.dist += forca * 0.02 * (1 - 0.7 * freio) * dt;
       }
       P.tensao = clamp(P.tensao, 0, 120); P.dist = clamp(P.dist, 0, 1.2);
       $('bTensao').style.width = `${Math.min(100, P.tensao)}%`; $('bTensao').style.background = P.tensao > 80 ? 'var(--ruim)' : P.tensao > 55 ? 'var(--amb)' : 'var(--ok)';

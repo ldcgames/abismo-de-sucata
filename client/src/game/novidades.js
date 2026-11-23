@@ -42,22 +42,24 @@ export const Novidades = {
     switch (e.t) {
       case 'kraken_aviso': this.ui.aviso(`🐙 O KRAKEN vai surgir no meio do lago em ${Math.round(e.em / 1000)} s! Prepare as armas.`, 'info', 6000); this.audio.alarm?.(); return true;
       case 'kraken_surgiu':
-        this.ui.aviso('🐙 O KRAKEN DO ABISMO SURGIU! Atire nele dos píeres — se ele cair, todo mundo da sala ganha S$ 1.000', 'ruim', 7000);
+        this.ui.aviso('🐙 O KRAKEN DO ABISMO SURGIU! Atire nele dos píeres — quem acertar ganha S$ 1.000 + um filhote de Kraken quando ele cair', 'ruim', 7000);
         this.audio.blip(55, 1.4, 'sawtooth', 0.22, -20); this.audio.noise?.(1.6, 220, 0.3, 1); this.shake = 0.5;
         return true;
       case 'kraken_fugiu': this.ui.aviso('🐙 O Kraken voltou para o abismo… ele volta em 20 minutos.', 'info', 5000); return true;
       case 'kraken_morto': {
         const quem = e.por === this.slot ? 'Você' : this.remotos[e.por]?.nome || 'Alguém';
         if (e.pos) { this.explosao(e.pos, true); for (let k = 0; k < 4; k++) this.particles.ink([e.pos[0] + (Math.random() - 0.5) * 8, e.pos[1], e.pos[2] + (Math.random() - 0.5) * 8], 120); }
-        this.ui.aviso(`🐙 KRAKEN DERROTADO! ${quem} deu o último tiro — todos da sala ganharam S$ ${fmt(e.premio || KRAKEN.premio)}`, 'ok', 7000);
+        const meu = e.filhote?.[this.slot];
+        this.ui.aviso(`🐙 KRAKEN DERROTADO! ${quem} deu o último tiro.` + (meu ? ` Você ganhou S$ ${fmt(e.premio || KRAKEN.premio)} + um FILHOTE DE KRAKEN vivo (na ${meu}) — vale S$ 600, dá para pôr no aquário!` : ' Só quem acertou ele ganha o prêmio.'), 'ok', 9000);
         this.audio.coin(); setTimeout(() => this.audio.coin(), 180); setTimeout(() => this.audio.coin(), 360);
         this.krSnap = { vivo: false, em: KRAKEN.intervaloMs }; this.krSnapEm = performance.now();
         return true;
       }
+      case 'renda_aquario': if (e.slot === this.slot) this.ui.aviso(`🐠 Seu aquário rendeu S$ ${fmt(e.v)}`, 'ok', 2500); return true;
       case 'tubarao_surgiu': this.ui.aviso('🦈 Um tubarão está rondando a frente dos píeres! Derrube com as armas e venda por S$ 400.', 'info', 6000); return false;
       case 'tubarao_morto': {
         const quem = e.por === this.slot ? 'Você' : this.remotos[e.por]?.nome || 'Alguém';
-        this.ui.aviso(`🦈 ${quem} derrubou o tubarão! Ele está boiando — nade até lá e aperte E para pegar (vale S$ ${TUBARAO.valor}).`, 'ok', 6000);
+        this.ui.aviso(`🦈 ${quem} derrubou o tubarão! Ele está boiando — nade até lá e aperte E para pegar (vale S$ ${TUBARAO.valor}). Outro só aparece 5 min depois que alguém pegar este.`, 'ok', 6000);
         if (e.carcaca) { this.particles.splash(e.carcaca.pos[0], e.carcaca.pos[2], this.t, 0.6); this.sincronizarCarcacas([...[...this.carcacas.values()].map((x) => x.c), e.carcaca]); }
         this.tbSnap = { ...(this.tbSnap || {}), vivo: false };
         return false;
@@ -103,7 +105,7 @@ export const Novidades = {
     const kh = $('krakenHud');
     if (kl && kl.resta > 0) {
       kh.hidden = false;
-      const h = `<div class="tit">🐙 KRAKEN DO ABISMO <span>some em ${mmss(kl.resta)}</span></div><div class="barra"><i style="width:${(100 * kl.hp / kl.hpMax).toFixed(1)}%"></i></div><small>${fmt(kl.hp)} / ${fmt(kl.hpMax)} · derrube para todos ganharem S$ ${fmt(KRAKEN.premio)}</small>`;
+      const h = `<div class="tit">🐙 KRAKEN DO ABISMO <span>some em ${mmss(kl.resta)}</span></div><div class="barra"><i style="width:${(100 * kl.hp / kl.hpMax).toFixed(1)}%"></i></div><small>${fmt(kl.hp)} / ${fmt(kl.hpMax)} · quem acertar ganha S$ ${fmt(KRAKEN.premio)} + filhote</small>`;
       if (kh._h !== h) { kh.innerHTML = h; kh._h = h; }
     } else if (k && !k.vivo && k.em - dk * 1000 < KRAKEN.avisoMs && k.em - dk * 1000 > 0) {
       kh.hidden = false;

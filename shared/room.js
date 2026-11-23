@@ -2,7 +2,7 @@
 // Usada pelo servidor WebSocket (multiplayer real) e pelo servidor local do navegador (modo solo).
 // A sala NÃO é dona da progressão: cada jogador traz o próprio perfil, que é salvo fora daqui.
 
-import { avancarMissao, applyAction, createWorld, tickWorld, stepProjectiles, checkSurface, checkDiscovery, estaNaEstacao, tickKraken, krakenPublico, tickTubarao, tubaraoPublico, uid } from './rules.js';
+import { avancarMissao, applyAction, createWorld, tickWorld, stepProjectiles, checkSurface, checkDiscovery, estaNaEstacao, tickKraken, krakenPublico, tickTubarao, tubaraoPublico, uid, darFilhoteKraken, rendaAquario } from './rules.js';
 import { STATIONS, stationById, hourOfDay, terrainHeight, estacaoParaMundo, BARRACA_CORRIDA, LAKE_R } from './world.js';
 import { CORES_JOGADOR, KRAKEN, CORRIDA, divisaoCorrida } from './data.js';
 
@@ -141,16 +141,21 @@ export class Room {
       }
       if (pl.stunUntil && pl.stunUntil <= now && !pl._stunAvisado) { pl._stunAvisado = true; ev.push({ t: 'fim_atordoado', alvo: slot }); }
       if (pl.stunUntil > now) pl._stunAvisado = false;
+      if (pl.profile && pl.conectado !== false) { const r = rendaAquario(pl.profile, dt * 1000); if (r > 0) ev.push({ t: 'renda_aquario', slot, v: r, perfis: [slot] }); }
     }
     return ev;
   }
 
-  // Kraken derrotado: todo mundo que está na sala ganha o prêmio (sem multiplicador)
+  // Kraken derrotado: todo mundo que acertou ele ganha o prêmio (sem multiplicador) e um filhote vivo
   premiarKraken(evs) {
     for (const e of evs) {
       if (e.t !== 'kraken_morto' || e.premio) continue;
-      e.premio = KRAKEN.premio; e.perfis = [];
-      for (const [slot, pl] of this.players) { pl.profile.dinheiro += KRAKEN.premio; e.perfis.push(slot); }
+      e.premio = KRAKEN.premio; e.perfis = []; e.filhote = {};
+      const quem = new Set(Object.keys(e.dano || {}).filter((s) => (e.dano[s] || 0) > 0)); quem.add(String(e.por));
+      for (const [slot, pl] of this.players) {
+        if (!quem.has(String(slot))) continue;
+        pl.profile.dinheiro += KRAKEN.premio; e.filhote[slot] = darFilhoteKraken(pl.profile, this.rnd); e.perfis.push(slot);
+      }
     }
   }
 

@@ -210,7 +210,7 @@ export class UI {
       const n = i + 1;
       const tem = p.vara >= n, atual = p.vara === n;
       const falta = faltando(p, v.custo);
-      h += `<div class="card"><h3>${v.nome}</h3><div class="val">até ${v.maxCm} cm · linha ${v.linhaKg} kg · alcance ${v.alcance} m · fundo ${v.prof} m</div><div class="custo">${custoTxt(v.custo)}</div>
+      h += `<div class="card"><h3>${v.nome}</h3><div class="val">${v.inquebravel ? '<b>Pega qualquer peixe e a linha nunca arrebenta</b>' : `até ${v.maxCm} cm · linha ${v.linhaKg} kg`} · alcance ${v.alcance} m · fundo ${v.prof} m · molinete ${Math.round((v.freio || 0) * 100)}%${v.pesado ? ' · fisga tubarão' : ''}</div><div class="custo">${custoTxt(v.custo)}</div>
         ${atual ? '<div class="val"><b>Em uso</b></div>' : tem ? '<div class="nota">Você já tem uma melhor</div>' : this.btn('Comprar', { tipo: 'comprar', cat: 'vara', nivel: n }, falta.length > 0, falta.join(', '))}</div>`;
     });
     const fp = faltando(p, PESADO.custo);

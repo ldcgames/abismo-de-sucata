@@ -84,6 +84,8 @@ export const ESPECIES = {
   peixe_lua: { nome: 'Peixe-lua-dourado (lendário)', cm: [80, 180], prof: [30, 110], hora: 'noite', chance: 1, valor: 1600, cor: [1.0, 0.84, 0.32], forca: 5.0, forma: 'peixe' },
   tubarao:   { nome: 'Tubarão-touro-do-lago', cm: [250, 420], prof: [25, 150], hora: 'noite', chance: 2.2, valor: 3000, cor: [0.42, 0.46, 0.5], forca: 9, forma: 'tubarao', pesado: true },
   // o tubarão que ronda os píeres: não se pesca, só cai na bala. Vale sempre S$ 400.
+  // filhote do Kraken: vem vivo (dá para pôr no aquário). Vale S$ 600; cortado, S$ 1.200
+  kraken_filhote: { nome: 'Filhote de Kraken', cm: [30, 30], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 600, valorFixo: 600, cor: [0.62, 0.2, 0.42], forca: 2, forma: 'lula', especial: true },
   tubarao_cacado: { nome: 'Tubarão do lago (abatido)', cm: [330, 330], prof: [9999, 9999], hora: 'qualquer', chance: 0, valor: 400, valorFixo: 400, cor: [0.4, 0.45, 0.5], forca: 9, forma: 'tubarao', pesado: true, cacado: true },
 };
 // massa aproximada (kg) a partir do comprimento
@@ -168,15 +170,20 @@ export const ENERGIA = { motor: 0.22, farol: 0.03, sonarPing: 0.4, ociosa: 0.005
 // ---------------- VARA DE PESCA ----------------
 // Pode comprar qualquer vara melhor direto (não precisa passar por todas). Só dinheiro.
 const D = (dinheiro) => ({ dinheiro, comps: {} });
+// freio = quanto o molinete segura a força do peixe (0 a 1). inquebravel = a linha nunca arrebenta.
 export const VARA = [
-  { nome: 'Vara de bambu', maxCm: 35, linhaKg: 6, alcance: 16, prof: 8, custo: null, cor: [0.75, 0.62, 0.32] },
-  { nome: 'Vara telescópica', maxCm: 50, linhaKg: 9, alcance: 20, prof: 14, custo: D(90), cor: [0.3, 0.3, 0.32] },
-  { nome: 'Vara de fibra', maxCm: 70, linhaKg: 14, alcance: 24, prof: 22, custo: D(250), cor: [0.85, 0.85, 0.9] },
-  { nome: 'Vara de fibra reforçada', maxCm: 100, linhaKg: 22, alcance: 28, prof: 32, custo: D(600), cor: [0.2, 0.45, 0.85] },
-  { nome: 'Vara de carbono + molinete', maxCm: 140, linhaKg: 35, alcance: 32, prof: 45, custo: D(1200), cor: [0.12, 0.12, 0.13] },
-  { nome: 'Vara de titânio', maxCm: 190, linhaKg: 60, alcance: 36, prof: 62, custo: D(2600), cor: [0.62, 0.64, 0.68] },
-  { nome: 'Vara oceânica', maxCm: 260, linhaKg: 110, alcance: 40, prof: 85, custo: D(5000), cor: [0.85, 0.35, 0.12] },
-  { nome: 'Vara lendária do abismo', maxCm: 340, linhaKg: 200, alcance: 46, prof: 110, custo: D(11000), cor: [0.9, 0.75, 0.25] },
+  { nome: 'Vara de bambu', maxCm: 35, linhaKg: 6, alcance: 16, prof: 8, custo: null, cor: [0.75, 0.62, 0.32], freio: 0 },
+  { nome: 'Vara telescópica', maxCm: 50, linhaKg: 9, alcance: 20, prof: 14, custo: D(90), cor: [0.3, 0.3, 0.32], freio: 0.05 },
+  { nome: 'Vara de fibra', maxCm: 70, linhaKg: 14, alcance: 24, prof: 22, custo: D(250), cor: [0.85, 0.85, 0.9], freio: 0.12 },
+  { nome: 'Vara de fibra reforçada', maxCm: 100, linhaKg: 22, alcance: 28, prof: 32, custo: D(600), cor: [0.2, 0.45, 0.85], freio: 0.2 },
+  { nome: 'Vara de carbono + molinete', maxCm: 140, linhaKg: 35, alcance: 32, prof: 45, custo: D(1200), cor: [0.12, 0.12, 0.13], freio: 0.28 },
+  { nome: 'Vara de titânio', maxCm: 190, linhaKg: 60, alcance: 36, prof: 62, custo: D(2600), cor: [0.62, 0.64, 0.68], freio: 0.36 },
+  { nome: 'Vara oceânica', maxCm: 260, linhaKg: 110, alcance: 40, prof: 85, custo: D(5000), cor: [0.85, 0.35, 0.12], freio: 0.44 },
+  { nome: 'Vara lendária do abismo', maxCm: 340, linhaKg: 200, alcance: 46, prof: 110, custo: D(11000), cor: [0.9, 0.75, 0.25], freio: 0.52 },
+  // varas de ponta: já fisgam bichos gigantes (tubarão) sem precisar do equipamento pesado
+  { nome: 'Vara de grafeno', maxCm: 450, linhaKg: 900, alcance: 48, prof: 130, custo: D(25000), cor: [0.15, 0.2, 0.28], freio: 0.7, pesado: true },
+  { nome: 'Vara do campeão (molinete elétrico)', maxCm: 600, linhaKg: 2000, alcance: 52, prof: 150, custo: D(45000), cor: [0.75, 0.1, 0.15], freio: 0.8, pesado: true },
+  { nome: 'Vara divina do abismo (nunca arrebenta)', maxCm: 99999, linhaKg: 999999, alcance: 56, prof: 160, custo: D(90000), cor: [0.55, 0.95, 1.0], freio: 1, pesado: true, inquebravel: true },
 ];
 export const PESADO = { nome: 'Equipamento pesado (guincho de pesca + gancho de aço)', maxCm: 450, linhaKg: 600, prof: 150, custo: D(15000), requerVara: 7 };
 
@@ -302,8 +309,10 @@ export const ARMAS_LOJA = ['estilingue', ...ARMAS_ORDEM]; // ordem de compra na 
 // Um só por vez: nasce 20 min depois do anterior morrer e fica rondando a frente dos píeres (barbatana de fora)
 // até alguém derrubar. 200 de vida. Morto, boia: quem estiver com a mão livre pega (E) e vende por S$ 400.
 // Quem leva o tubarão e é acertado (tiro, peixe, estilingue) deixa ele cair ali mesmo.
-export const TUBARAO = { intervaloMs: 20 * 60e3, hp: 200, raio: 2.1, valor: 400, pegarRaio: 3.2 };
-export const KRAKEN = { intervaloMs: 20 * 60e3, duracaoMs: 60e3, avisoMs: 60e3, hp: 3000, premio: 1000, raio: 6.2, tamanho: 5 };
+export const TUBARAO = { intervaloMs: 5 * 60e3, hp: 200, raio: 2.1, valor: 400, pegarRaio: 3.2 };
+export const KRAKEN = { intervaloMs: 20 * 60e3, duracaoMs: 60e3, avisoMs: 60e3, hp: 3000, premio: 1000, raio: 6.2, tamanho: 5, filhoteCm: 30 };
+// cada peixe no aquário/tanque rende 10% do valor dele por hora (pago a cada minuto enquanto a sala está aberta)
+export const RENDA_AQUARIO = { porHora: 0.10, pagaMs: 60e3 };
 
 // ---------------- CORRIDA DE SUBMARINO ----------------
 // 2 jogadores: vencedor ganha S$ 200 e o perdedor paga S$ 200.

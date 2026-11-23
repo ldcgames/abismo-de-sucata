@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Room } from '../shared/room.js';
 import { newProfile, subStats, sortearPeixe, cabeNoAquario, migrateProfile } from '../shared/rules.js';
 import { navSDF, terrainHeight, STATIONS, SHAFT_C, CAVES, stationById, LAKE_R } from '../shared/world.js';
-import { SUCATA, TROLL, AQUARIOS, VARA, TANQUES } from '../shared/data.js';
+import { SUCATA, TROLL, AQUARIOS, VARA, TANQUES, valorPeixeItem } from '../shared/data.js';
 
 const T0 = 1_000_000;
 // perfis de teste com nome e cor diferentes (a sala não aceita repetidos)
@@ -462,7 +462,7 @@ test('estilingue de lixo: 400, Q joga o lixo da mão ou do saco, derruba só 1 s
   assert.match(r.action('N', { tipo: 'estilingue_atirar', dir: [1, 0.1, 0] }, T0 + 9000).res.msg, /Sem lixo/);
 });
 
-test('Kraken: aviso, surge a cada 20 min por 1 min, vida pelo dano das armas e S$ 1.000 para todos', () => {
+test('Kraken: aviso, surge a cada 20 min por 1 min, vida pelo dano das armas, S$ 1.000 + filhote para quem acertou', () => {
   const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0);
   r.tick(T0, 0.05);
   assert.equal(r.world.kraken.proximo, T0 + KRAKEN.intervaloMs);
@@ -489,8 +489,10 @@ test('Kraken: aviso, surge a cada 20 min por 1 min, vida pelo dano das armas e S
   const din = ['N', 'L'].map((s) => r.players.get(s).profile.dinheiro);
   r.world.kraken.hp = 5;
   const fim = r.action('N', { tipo: 'atirar', arma: 'pistola', dir: d }, tk + 500).res.events.find((e) => e.t === 'kraken_morto');
-  assert.ok(fim, 'derrotado'); assert.deepEqual(fim.perfis.sort(), ['L', 'N']);
-  assert.deepEqual(['N', 'L'].map((s) => r.players.get(s).profile.dinheiro), din.map((v) => v + KRAKEN.premio));
+  assert.ok(fim, 'derrotado'); assert.deepEqual(fim.perfis.sort(), ['N'], 'só quem acertou ganha');
+  assert.deepEqual(['N', 'L'].map((s) => r.players.get(s).profile.dinheiro), [din[0] + KRAKEN.premio, din[1]]);
+  const filhote = r.players.get('N').profile.mochila.find((f) => f.esp === 'kraken_filhote');
+  assert.ok(filhote, 'ganha um filhote vivo'); assert.equal(valorPeixeItem(filhote), 600); assert.equal(valorPeixeItem({ ...filhote, cortado: true }), 1200);
   assert.equal(r.world.kraken.proximo, tk + 500 + KRAKEN.intervaloMs, 'volta em 20 min');
   // se ninguém matar, some depois de 1 min
   const r2 = mkRoom(); r2.join(np('c'), 'N', T0); r2.tick(T0, 0.05); r2.tick(T0 + KRAKEN.intervaloMs, 0.05);
@@ -591,7 +593,8 @@ test('tubarão do lago: um por vez, 200 de vida, boia morto, pegar, derrubar que
     morto = res.events.find((e) => e.t === 'tubarao_morto'); tiros++; t += 500;
   }
   assert.equal(tiros, Math.ceil(TUBARAO.hp / ARMAS.pistola.danoKraken), '200 de vida ÷ 8 por tiro de pistola');
-  assert.equal(r.world.tubarao.proximo, t - 500 + TUBARAO.intervaloMs, 'outro só 20 min depois de morrer');
+  assert.equal(r.world.tubarao.esperando, true, 'o próximo espera alguém pegar este');
+  assert.ok(!r.tick(t + 3 * TUBARAO.intervaloMs, 0.05).some((e) => e.t === 'tubarao_surgiu'), 'com o tubarão morto boiando, não nasce outro');
   const c = morto.carcaca; assert.equal(c.pos[1], 0, 'boia na água');
   // B nada até lá e pega (mão livre)
   B.modo = 'nadando'; B.pos = [c.pos[0] + 1, -0.5, c.pos[2]];
@@ -614,6 +617,22 @@ test('tubarão do lago: um por vez, 200 de vida, boia morto, pegar, derrubar que
   const d0 = A.profile.dinheiro;
   assert.equal(r.action('N', { tipo: 'peixe_vender' }, t + 2000).res.ok, true);
   assert.equal(A.profile.dinheiro, d0 + TUBARAO.valor);
+  // pegou e tirou da água: só agora começam os 5 min do próximo
+  const t2 = t + 3000; r.tick(t2, 0.05);
+  assert.equal(r.world.tubarao.proximo, t2 + TUBARAO.intervaloMs);
+  assert.ok(!r.tick(t2 + TUBARAO.intervaloMs - 1000, 0.05).some((e) => e.t === 'tubarao_surgiu'));
+  assert.ok(r.tick(t2 + TUBARAO.intervaloMs, 0.05).some((e) => e.t === 'tubarao_surgiu'), 'nasce 5 min depois');
+});
+
+test('vara divina nunca arrebenta; aquário rende 10% do valor dos peixes por hora', async () => {
+  const { RENDA_AQUARIO } = await import('../shared/data.js');
+  const { varaStats, rendaAquario } = await import('../shared/rules.js');
+  const p = newProfile('x', 0); p.vara = VARA.length;
+  const vs = varaStats(p); assert.equal(vs.inquebravel, true); assert.equal(vs.pesado, true);
+  p.vitrine.peixes = [{ uid: 'k', esp: 'kraken_filhote', cm: 30 }];
+  const d0 = p.dinheiro; let pago = 0;
+  for (let k = 0; k < 60; k++) pago += rendaAquario(p, 60e3);
+  assert.equal(pago, 60, '600 × 10% = 60 por hora'); assert.equal(p.dinheiro, d0 + 60); assert.equal(RENDA_AQUARIO.porHora, 0.1);
 });
 
 test('estilingue tira 1 de vida do Kraken/tubarão; decorações saem e voltam sem pagar de novo', () => {

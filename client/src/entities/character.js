@@ -410,7 +410,7 @@ export class Character {
 // Vara de pesca (malha) — presa à mão; a ponta é um nó para a linha
 export function makeRod(R, nivel = 1, pesado = false) {
   const g = new Geo();
-  const len = 1.6 + nivel * 0.25;
+  const len = 1.6 + Math.min(nivel, 8) * 0.25;
   const cols = [[0.7, 0.6, 0.35], [0.25, 0.35, 0.5], [0.12, 0.12, 0.13], [0.6, 0.15, 0.1]];
   const c = cols[(nivel - 1) % 4];
   g.put(cylinder(0.022, 0.006, len, 8), [0, len / 2, 0], [0, 0, 0], 1, c);
