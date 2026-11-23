@@ -8,7 +8,7 @@ import { Fauna, makeFishGeo } from './world/fauna.js';
 import { computeEnv } from './world/env.js';
 import { Character, makeRod } from './entities/character.js';
 import { buildSubModel, SubController } from './entities/submarine.js';
-import { Station, fishNode, textQuad } from './entities/station.js';
+import { Station, fishNode, fishCutNode, textQuad } from './entities/station.js';
 import { itemNode, itemMesh } from './entities/items.js';
 import { weaponNode, rocketGeo } from './entities/weapons.js';
 import { Statue } from './entities/statue.js';
@@ -273,7 +273,7 @@ class Game {
   // calcula a direção do arremesso para o peixe cair exatamente onde a mira (centro da tela) aponta,
   // com a mesma física do servidor, e devolve a trajetória para desenhar
   miraPeixe(lixo = false) {
-    const tub = !lixo && !!ESPECIES[this.perfil.mao?.esp]?.pesado;
+    const tub = !lixo && !!ESPECIES[this.perfil.mao?.esp]?.pesado && !this.perfil.mao?.cortado;
     const v = TROLL.peixeVelocidade * (tub ? 0.75 : 1), alc = (tub ? TROLL.tubaraoAlcance : TROLL.peixeAlcance) + 6;
     const c = this.cam.pos, f = this.camForwardVis();
     // 1) ponto mirado: terreno, água ou um amigo
@@ -323,7 +323,7 @@ class Game {
     const p = this.perfil;
     if (!p.mao) return;
     if (this.me.modo !== 'terra') { this.ui.aviso('Arremesse de terra firme ou do cais', 'ruim'); return; }
-    const tub = !!ESPECIES[p.mao.esp].pesado;
+    const tub = !!ESPECIES[p.mao.esp].pesado && !p.mao.cortado;
     const dir = this.miraPeixe().dir;
     this.me.yaw = Math.atan2(dir[0], dir[2]);
     this.me.acao = { tipo: tub ? 'arremesso_tubarao' : 'arremesso', t: 0, dur: 0.8 };
@@ -821,7 +821,13 @@ class Game {
           const kg = massaPeixe(p.mao.esp, p.mao.cm);
           txt = kg > PEIXARIA.minKg ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} na tábua <span class="nota">(${kg.toFixed(1)} kg)</span>` : `Peixe pequeno demais para cortar (${kg.toFixed(1)} kg) — precisa ter mais de ${PEIXARIA.minKg} kg`;
           if (livre && I.hit('KeyE') && kg > PEIXARIA.minKg) { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.7 }; this.acao({ tipo: 'peixaria_colocar' }); }
-        } else txt = p.mao?.cortado ? 'Peixe já cortado: venda no computador da estação' : `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b> (da mochila: <kbd>Z</kbd>)`;
+        } else if (p.mao?.cortado) {
+          const cheia = p.mochila.length >= MOCHILA.peixes;
+          txt = cheia ? `Mochila cheia (${MOCHILA.peixes}/${MOCHILA.peixes}): venda no computador da estação` : `<kbd>E</kbd>Guardar o peixe cortado na mochila <span class="nota">(${p.mochila.length}/${MOCHILA.peixes} · venda tudo depois no computador)</span>`;
+          if (livre && I.hit('KeyE') && !cheia) this.acao({ tipo: 'mochila_guardar' });
+        } else if (!p.mao && p.mochila.length) {
+          txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila para cortar <span class="nota">(${p.mochila.length}/${MOCHILA.peixes})</span>`;
+        } else txt = `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b>`;
       } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
         if (best.id === 'aquario' && p.mao) txt = `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no aquário`;
@@ -1274,15 +1280,15 @@ class Game {
 
   // peixe na mão (local ou remoto)
   updateHeld(ch, mao, quem) {
-    const key = mao ? mao.uid : null;
+    const key = mao ? mao.uid + (mao.cortado ? ':c' : '') : null;
     if (ch._heldKey === key) return;
     if (ch._held) { ch._held.parent?.remove(ch._held); ch._held = null; }
     ch._heldKey = key;
     if (!mao) return;
-    const tub = ESPECIES[mao.esp].pesado;
+    const tub = ESPECIES[mao.esp].pesado && !mao.cortado;
     // na mão o peixe aparece pelo menos com 16 cm para ser visível (o tamanho real vale para as regras)
     const L = tub ? mao.cm / 100 : Math.max(mao.cm, 16) / 100;
-    const n = fishNode(this.R, mao.esp, L * 100);
+    const n = mao.cortado ? fishCutNode(this.R, mao.esp, Math.min(L * 100, 150)) : fishNode(this.R, mao.esp, L * 100);
     const holder = new Node('segurando');
     holder.add(n);
     if (tub) {

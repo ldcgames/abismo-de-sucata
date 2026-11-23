@@ -83,6 +83,15 @@ export function fishNode(R, esp, cm) {
   const n = new Node('peixe_' + esp); n.mesh = fishMesh(R, esp); n.sc(cm / 100); return n;
 }
 
+// peixe cortado (cabeça, rabo e três filés), ao longo do eixo z como o peixe inteiro, centrado na origem
+export function fishCutNode(R, esp, cm) {
+  const fg = new Geo(), L = cm / 100, cor = ESPECIES[esp].cor;
+  fg.put(sphere(0.12 * L + 0.05, 10, 8), [0, 0, -L * 0.42], [0, 0, 0], [1, 0.8, 1.2], cor);
+  fg.put(box(0.06, 0.2 * L + 0.06, 0.18 * L + 0.05), [0, 0, L * 0.45], [0, 0, 0], 1, cor);
+  for (let k = 0; k < 3; k++) fg.put(rbox(0.18 * L + 0.12, 0.05, 0.16 * L + 0.08, 0.02), [(k - 1) * 0.04, -0.04, -L * 0.18 + k * (0.2 * L + 0.05)], [0, 0, 0], 1, [0.97, 0.58, 0.5]);
+  const n = new Node('peixe_cortado_' + esp); n.mesh = R.createMesh(fg, { rough: 0.5 }); return n;
+}
+
 export class Station {
   constructor(R, slot) {
     this.R = R; this.slot = slot;
@@ -475,11 +484,7 @@ export class Station {
         const n = fishNode(R, f.esp, cm); n.at(bx, 2.62, bz).rot(0, 0, Math.PI / 2); this.dyn.add(n);
       } else {
         // cortado: cabeça, rabo e três filés rosados
-        const fg = new Geo(), L = cm / 100;
-        fg.put(sphere(0.12 * L + 0.05, 10, 8), [bx, 2.62, bz - L * 0.42], [0, 0, 0], [1, 0.8, 1.2], ESPECIES[f.esp].cor);
-        fg.put(box(0.06, 0.2 * L + 0.06, 0.18 * L + 0.05), [bx, 2.62, bz + L * 0.45], [0, 0, 0], 1, ESPECIES[f.esp].cor);
-        for (let k = 0; k < 3; k++) fg.put(rbox(0.18 * L + 0.12, 0.05, 0.16 * L + 0.08, 0.02), [bx + (k - 1) * 0.04, 2.58, bz - L * 0.18 + k * (0.2 * L + 0.05)], [0, 0, 0], 1, [0.97, 0.58, 0.5]);
-        const fn = new Node('peixe_cortado'); fn.mesh = R.createMesh(fg, { rough: 0.5 }); this.dyn.add(fn);
+        const fn = fishCutNode(R, f.esp, cm); fn.at(bx, 2.62, bz); this.dyn.add(fn);
       }
     }
     if (est?.luzinhas) {

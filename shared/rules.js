@@ -734,6 +734,16 @@ const ACOES = {
     p.dinheiro += v;
     return okR(`Vendido: ${ESPECIES[f.esp].nome} por S$ ${v}`, de === 'aquario' || de === 'tanque' ? [{ t: 'visual_estacao', slot: ctx.player.slot }] : [], { de });
   },
+  // vende de uma vez o peixe da mão e todos os da mochila (e da caixa térmica antiga)
+  peixe_vender_tudo(p, a, ctx) {
+    const e = precisaEstacao(ctx); if (e) return e;
+    const todos = [...(p.mao ? [p.mao] : []), ...p.mochila, ...p.caixaTermica];
+    if (!todos.length) return fail('Nenhum peixe na mão ou na mochila');
+    let v = 0; for (const f of todos) v += comMult(p, valorPeixeItem(f));
+    p.mao = null; p.mochila = []; p.caixaTermica = [];
+    p.dinheiro += v;
+    return okR(`Vendidos ${todos.length} peixe(s) por S$ ${v}`, [], { n: todos.length });
+  },
   // decorações: depois de compradas dá para tirar (desequipar) e colocar de volta, sem pagar de novo
   deco_alternar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
@@ -774,7 +784,7 @@ const ACOES = {
 
   mochila_guardar(p) {
     if (!p.mao) return fail('Nenhum peixe na mão');
-    if (ESPECIES[p.mao.esp].pesado) return fail('Um tubarão não cabe na mochila');
+    if (ESPECIES[p.mao.esp].pesado && !p.mao.cortado) return fail('Um tubarão inteiro não cabe na mochila (corte ele na bancada de peixe)');
     if (p.mochila.length >= MOCHILA.peixes) return fail(`Mochila cheia (${p.mochila.length}/${MOCHILA.peixes} peixes)`);
     const f = p.mao; p.mochila.push(f); p.mao = null;
     return okR(`${ESPECIES[f.esp].nome} guardado na mochila [${p.mochila.length}/${MOCHILA.peixes}]`);

@@ -286,13 +286,15 @@ export class UI {
     const m = multDinheiro(p);
     if (p.mao) {
       const e = ESPECIES[p.mao.esp];
-      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)}${p.mao.cortado ? ' (cortado)' : ''} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(p.mao) * m))}`, { tipo: 'peixe_vender' })}${e.pesado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
+      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)}${p.mao.cortado ? ' (cortado)' : ''} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(p.mao) * m))}`, { tipo: 'peixe_vender' })}${e.pesado && !p.mao.cortado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
     }
     // aquário e tanque não aparecem aqui: para vender, tire o peixe de lá antes (aba Aquário → Pegar na mão)
     for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${MOCHILA.peixes})`], ['caixa', 'Caixa térmica (peixes antigos)']]) {
       const l = this.listaPeixes(p, onde);
       if (l) h += `<h3>${tit}</h3>` + l;
     }
+    const todos = [...(p.mao ? [p.mao] : []), ...p.mochila, ...p.caixaTermica];
+    if (todos.length > 1) { const tot = todos.reduce((s, f) => s + Math.round(valorPeixeItem(f) * m), 0); h = `<div class="convite">${this.btn(`Vender todos os peixes (${todos.length}) — S$ ${fmt(tot)}`, { tipo: 'peixe_vender_tudo' })}</div>` + h; }
     return h;
   }
   linhaItem(it, de, p, modo = 'tudo') {

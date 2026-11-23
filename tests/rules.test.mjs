@@ -666,9 +666,17 @@ test('bancada de peixe (S$ 2.000): só peixe na mão de mais de 2 kg; tábua (E)
   assert.equal(r.action('N', { tipo: 'peixaria_pegar' }, T0).res.ok, true);
   assert.equal(p.mao.cortado, true);
   assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, false, 'cortado não vai para o aquário');
+  // cortado vai para a mochila; tubarão cortado também cabe
+  assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, true); assert.equal(p.mao, null);
+  p.mao = { uid: 'tc', esp: 'tubarao_cacado', cm: 330 };
+  assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, false, 'tubarão inteiro não cabe');
+  p.mao.cortado = true;
+  assert.equal(r.action('N', { tipo: 'mochila_guardar' }, T0).res.ok, true, 'tubarão cortado cabe');
   pl.pos = [st.pad[0], 1.6, st.pad[1]];
   const { valorPeixe } = await import('../shared/data.js');
-  const d0 = p.dinheiro, v = valorPeixe('tucunare', 70);
-  assert.equal(r.action('N', { tipo: 'peixe_vender' }, T0).res.ok, true);
-  assert.equal(p.dinheiro, d0 + v * 2);
+  const d0 = p.dinheiro, v = valorPeixe('tucunare', 70) * 2 + 800;
+  const res = r.action('N', { tipo: 'peixe_vender_tudo' }, T0).res;
+  assert.equal(res.ok, true, res.msg);
+  assert.equal(p.mochila.length, 0);
+  assert.equal(p.dinheiro, d0 + v);
 });

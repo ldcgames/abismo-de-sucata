@@ -106,6 +106,13 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.6
+
+- O peixe (ou tubarão) cortado na bancada agora vai **picado para a mão**: cabeça, rabo e filés.
+- Na bancada, com o peixe cortado na mão: **E** guarda na mochila. Tubarão cortado também cabe na mochila (inteiro não).
+- **Z** tira o próximo peixe da mochila para cortar. Corte vários e venda tudo junto.
+- Novo botão **Vender todos os peixes** no computador (mão + mochila), com o total em S$.
+
 ## Novidades da v0.9.5
 
 - **Recicladora saiu da loja** (componentes não são mais necessários; o HUD só mostra componentes se você ainda tiver algum).
