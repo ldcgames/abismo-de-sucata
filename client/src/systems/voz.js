@@ -35,6 +35,16 @@ export class Voz {
       for (const p of this.peers.values()) if (p.tr) p.tr.sender.replaceTrack(this.mic).catch(() => {});
     }
     this.mic.enabled = true; this.ligado = true;
+    // medidor do próprio microfone (para mexer a boca do seu personagem enquanto fala)
+    if (!this.medidor) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const an = ctx.createAnalyser(); an.fftSize = 512;
+        ctx.createMediaStreamSource(new MediaStream([this.mic])).connect(an);
+        this.medidor = { ctx, an, buf: new Float32Array(an.fftSize), ate: 0 };
+      } catch { /* sem medidor */ }
+    }
+    this.medidor?.ctx.resume?.();
     this.destravarAudio();
     return { ok: true, ligado: true };
   }
@@ -63,6 +73,13 @@ export class Voz {
       p.vol = vol;
     }
     for (const slot of [...this.peers.keys()]) if (!remotos[slot]) this.fechar(slot);
+  }
+  // eu estou falando agora? (microfone ligado e com som)
+  euFalando() {
+    const m = this.medidor; if (!this.ligado || !m) return false;
+    m.an.getFloatTimeDomainData(m.buf); let s = 0; for (const x of m.buf) s += x * x;
+    if (Math.sqrt(s / m.buf.length) > 0.02) m.ate = performance.now() + 250;
+    return performance.now() < m.ate;
   }
   // quem está falando agora (nível de áudio recebido) e perto o bastante para ouvir
   falando() {

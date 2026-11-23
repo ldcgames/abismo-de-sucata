@@ -1,5 +1,12 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v1.4: pescador sem peças grudadas, boca falando
+
+- Boia separada pelo volume (toro ajustado aos pontos amarelos): a parte de baixo e as sombras da boia não grudam mais no braço.
+- Andar com passo do tamanho das pernas dele (sem patinar), gingado de gordinho, braços um pouco abertos para não atravessar a boia, balanço de braço menor.
+- Sentado: cadeira mais baixa e quadril na altura certa (o bumbum não atravessa mais o assento).
+- Boca mexe quando a pessoa fala no chat de voz (seu microfone e o dos amigos): a mandíbula fecha e abre a partir da boca do modelo, sem abrir além dela (sem buraco).
+
 ## Novidades da v1.3: pescador caprichado
 
 - Mais fiel ao modelo: ~97 mil triângulos (antes 37 mil) e a textura original em 4K.

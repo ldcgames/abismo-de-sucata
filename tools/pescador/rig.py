@@ -58,6 +58,18 @@ idx=np.where(reg)[0]; Gs=G[idx][:,idx]; nco,cc=connected_components(Gs,directed=
 bcomp=set(cc[np.isin(idx,np.where(boia)[0])])
 boia2=np.zeros(npnt,bool); boia2[idx[np.isin(cc,list(bcomp))]]=True
 boia=boia|boia2
+# volume da boia (toro elíptico ajustado pelos pontos amarelos): pega também a parte de baixo/sombra da boia
+corpoAnel=amarelo&zonaAnel&((np.abs(Pp[:,0])>0.15)|(Pp[:,2]<0))
+qa=Pp[corpoAnel]
+y0,y1=np.percentile(qa[:,1],[3,97]); x0,x1=np.percentile(qa[:,0],[2,98]); z0,z1=np.percentile(qa[:,2],[2,98])
+rr=(y1-y0)/2; cy=(y0+y1)/2; cx=(x0+x1)/2; cz=(z0+z1)/2; ea=(x1-x0)/2-rr; eb=(z1-z0)/2-rr
+phi=np.arctan2((Pp[:,2]-cz)/eb,(Pp[:,0]-cx)/ea)
+cen=np.stack([cx+ea*np.cos(phi),np.full(npnt,cy),cz+eb*np.sin(phi)],1)
+dAnel=np.linalg.norm(Pp-cen,axis=1)
+pele=(h>=3)&(h<=16)&(s>70)&(s<190)&(v>140)
+noAnel=(dAnel<rr*1.12)&~pele
+print('anel: centro',np.round([cx,cy,cz],3),'semi-eixos',np.round([ea,eb],3),'raio do tubo',round(rr,3),'novos',(noAnel&~boia).sum())
+boia=boia|noAnel
 print('boia',boia.sum(),'de',npnt)
 lab[boia]=0
 # ---- pesos: bone principal + vizinhos na hierarquia
@@ -73,6 +85,14 @@ for p in range(npnt):
     w=np.exp(-(dd-dd.min())/sg); 
     for c,x in zip(cand,w): W[p,c]=x
 W[boia]=0; W[boia,0]=1
+# mandíbula (boca abre e fecha quando fala): queixo e lábio de baixo, com transição suave
+ORD.append('jaw'); PAI['jaw']='head'; J['jaw']=(0,0.5,-0.05)
+W=np.concatenate([W,np.zeros((npnt,1))],1); ji=len(ORD)-1; hi=ORD.index('head')
+yy=Pp[:,1]; xx=np.abs(Pp[:,0]); zz=Pp[:,2]
+ss=lambda a,b,x: np.clip((x-a)/(b-a),0,1)**2*(3-2*np.clip((x-a)/(b-a),0,1))
+wj=(1-ss(0.474,0.49,yy))*ss(0.34,0.39,yy)*(1-ss(0.1,0.17,xx))*ss(-0.02,0.06,zz)
+wj[lab!=hi]=0; wj[boia]=0
+W[:,ji]=wj*W[:,hi]+0; W[:,hi]*=(1-wj)
 # mão/dedos: rígido na mão; cabeça: rígida (chapéu)
 W/=W.sum(1,keepdims=True)
 top=np.argsort(-W,1)[:,:4]; tw4=np.take_along_axis(W,top,1); tw4/=tw4.sum(1,keepdims=True)

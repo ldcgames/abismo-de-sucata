@@ -223,7 +223,7 @@ export class Character {
     this.t += dt;
     const P = (n, v, r = 12) => this.setPose(n, v, r, dt);
     const sp = st.speed || 0;
-    const stride = sp > 3.5 ? 1.55 : 1.05;
+    const stride = (sp > 3.5 ? 1.55 : 1.05) * (this.kPasso || 1);
     if (st.grounded) this.phase += (sp * dt) / stride * Math.PI;
     const ph = this.phase;
     const run = clamp((sp - 2.5) / 2.5, 0, 1), walk = clamp(sp / 1.6, 0, 1);
@@ -248,12 +248,12 @@ export class Character {
       const amp = 0.5 * walk + 0.35 * run;
       thigh = [Math.sin(ph) * amp, Math.sin(ph + Math.PI) * amp];
       knee = [Math.max(0, -Math.cos(ph)) * (0.9 * walk + 0.6 * run) + 0.05, Math.max(0, -Math.cos(ph + Math.PI)) * (0.9 * walk + 0.6 * run) + 0.05];
-      shP = [Math.sin(ph) * amp * 0.9, Math.sin(ph + Math.PI) * amp * 0.9];
+      shP = [Math.sin(ph) * amp * 0.9 * (this.kBraco || 1), Math.sin(ph + Math.PI) * amp * 0.9 * (this.kBraco || 1)];
       elb = [-0.25 - run * 0.9, -0.25 - run * 0.9];
       shR = [0.08, 0.08];
       hipsY = 0.92 + Math.abs(Math.cos(ph)) * 0.04 * walk - 0.03 * run;
       spineP = 0.05 * walk + 0.2 * run; chestY = Math.sin(ph) * 0.12 * walk;
-      hipsRoll = Math.sin(ph) * 0.03 * walk;
+      hipsRoll = Math.sin(ph) * (this.gordinho ? 0.07 : 0.03) * walk; // gordinho gingando de um lado para o outro
       // o quadril gira um pouco com a passada e o peito compensa (contrapeso), cabeça estável
       hipsYaw = Math.sin(ph) * 0.1 * walk; chestY -= hipsYaw * 0.9; headY = -chestY * 0.4;
       // pé plano no chão na fase de apoio, empurra com a ponta ao sair e entra de calcanhar
@@ -337,7 +337,7 @@ export class Character {
         }
         case 2: // sentado na cadeira de praia (dá para pescar sentado)
           if (st.escorrega) { hipsY = 0.36; thigh = [1.45, 1.45]; knee = [1.7, 1.7]; shP = [-0.5, -0.5]; elb = [-0.9, -0.9]; shR = [0.15, 0.15]; spineP = 0.12; ank = [0.2, 0.2]; break; }
-          hipsY = 0.56; hipsYaw = 0; hipsRoll = 0; thigh = [1.42, 1.36]; knee = [1.36, 1.25]; ank = [0.06, 0.12]; spineP = -0.16; chestP = breathe * 0.6;
+          hipsY = this.sentaY ? this.sentaY / this.kQuadril : 0.56; hipsYaw = 0; hipsRoll = 0; thigh = [1.42, 1.36]; knee = [1.36, 1.25]; ank = [0.06, 0.12]; spineP = -0.16; chestP = breathe * 0.6;
           if (!ocupado) { shP = [-0.42, -0.42]; elb = [-0.75, -0.75]; shR = [0.32, 0.32]; headY = Math.sin(t * 0.3) * 0.25; headP = 0.05 * w2; }
           break;
         case 3: // aceno
@@ -382,6 +382,10 @@ export class Character {
     const rQueda = stun ? 9 : 6;
     this.xEyes.visible = stun; this.stars.visible = stun;
     if (stun) this.stars.rot(0, this.t * 6, 0);
+    // braços um pouco abertos para não atravessar a boia/barriga (modelo do pescador)
+    if (this.bracoAbre && !stun) { shR = [shR[0] + this.bracoAbre, shR[1] + this.bracoAbre]; }
+    // boca: abre e fecha enquanto a pessoa fala (só fecha a partir da pose do modelo, sem abrir além dela)
+    if (this.jaw) { const alvo = st.fala ? 0.5 + 0.5 * Math.sin(this.t * 16) * Math.sin(this.t * 5.3 + 1) : 0; this.jaw.rot(-P('jaw', alvo, 18) * 0.17, 0, 0); }
     // aplica com suavização
     const r = 14;
     this.hips.at(0, P('hy', hipsY * (this.kQuadril || 1), stun ? rQueda : flip !== null ? 40 : r), 0);

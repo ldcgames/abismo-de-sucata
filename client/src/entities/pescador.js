@@ -60,7 +60,11 @@ export function vestirPescador(ch, R, corCamisa = null) {
   for (const no of [ch.hips, ch.chest, ch.head, ...ch.arms.flatMap((a) => [a.sh, a.el, a.hd]), ...ch.legs.flatMap((l) => [l.th, l.kn, l.an])]) no.mesh = null;
   ch.xEyes.visible = false; ch.xEyes.mesh = null;
   ch.stars.at(0, 0.42, 0);
-  ch.cadeira.sc([1.65, 0.62, 1.25]); ch.cadeira.at(0, 0, -0.12);
+  ch.cadeira.sc([1.65, 0.48, 1.25]); ch.cadeira.at(0, 0, -0.12);
+  // mandíbula: abre e fecha a boca quando a pessoa fala no chat de voz
+  ch.jaw = new Node('mandibula'); set(ch.jaw, sub('jaw', 'head')); ch.head.add(ch.jaw);
+  // ajustes de animação para o corpo dele (pernas curtas, barrigão e boia)
+  ch.kPasso = 0.56; ch.bracoAbre = 0.2; ch.kBraco = 0.6; ch.gordinho = true; ch.sentaY = 0.4;
   ch.kQuadril = J.hips[1] / 0.92;
   // malha com pele
   const geo = decodificar();
@@ -68,7 +72,7 @@ export function vestirPescador(ch, R, corCamisa = null) {
   // dupla face: a malha gerada por IA tem triângulos virados para dentro em alguns pontos (pareciam furos)
   pele.mesh = R.createMesh(geo, { rough: 0.72, metal: 0, doubleSide: true, semFlip: true, tint: corCamisa });
   pele.mesh.center = [0, 0.8, 0]; pele.mesh.radius = 1.4;
-  const ossos = [ch.hips, ch.spine, ch.chest, ch.neck, ch.head, ch.arms[0].sh, ch.arms[0].el, ch.arms[0].hd, ch.arms[1].sh, ch.arms[1].el, ch.arms[1].hd, ch.legs[0].th, ch.legs[0].kn, ch.legs[0].an, ch.legs[1].th, ch.legs[1].kn, ch.legs[1].an];
+  const ossos = [ch.hips, ch.spine, ch.chest, ch.neck, ch.head, ch.arms[0].sh, ch.arms[0].el, ch.arms[0].hd, ch.arms[1].sh, ch.arms[1].el, ch.arms[1].hd, ch.legs[0].th, ch.legs[0].kn, ch.legs[0].an, ch.legs[1].th, ch.legs[1].kn, ch.legs[1].an, ch.jaw];
   const invBind = PESCADOR.ossos.map((k) => { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; m[12] = -J[k][0]; m[13] = -J[k][1]; m[14] = -J[k][2]; return m; });
   pele.skin = { bones: ossos, invBind };
   ch.root.add(pele);

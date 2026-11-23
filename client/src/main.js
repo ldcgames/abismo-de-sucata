@@ -555,7 +555,7 @@ class Game {
     ch.root.at(this.me.pos[0], this.me.pos[1], this.me.pos[2]).rot(0, this.me.yaw, 0);
     if (this.me.modo !== 'terra' || p.mao || this.me.arma) this.me.mirandoLixo = false;
     this.me.segura = p.mao ? (ESPECIES[p.mao.esp].pesado ? 'tubarao' : this.me.mirando ? 'mira' : 'peixe') : this.me.mirandoLixo ? 'mira' : p.lixoMao ? 'peixe' : this.pesca.estado !== 'off' ? 'vara' : this.me.arma && (this.me.modo === 'terra') ? 'arma' : null;
-    ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, escorrega: !!this.me.escorrega, miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
+    ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, escorrega: !!this.me.escorrega, fala: !!this.voz?.euFalando?.(), miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
     this.coice = damp(this.coice || 0, 0, 14, dt);
     this.updateArmaMao(ch, this.me.modo === 'terra' ? this.me.arma : null);
     this.desenharMira((this.me.mirando && !!this.perfil.mao || this.me.mirandoLixo) && this.me.modo === 'terra');
@@ -1730,6 +1730,7 @@ class Game {
     return { pos: v3.lerp(A.pos, C.pos, k), rot: A.rot + angDiff(A.rot, C.rot) * k };
   }
   updateRemotes(dt) {
+    this.falandoAgora = new Set(this.voz?.falando?.() || []);
     for (const [slot, r] of Object.entries(this.remotos)) {
       const ip = this.interp(r, 'p');
       const ch = r.char;
@@ -1742,7 +1743,7 @@ class Game {
       const segura = r.mao ? (ESPECIES[r.mao.esp]?.pesado ? 'tubarao' : r.anim === 'mira' ? 'mira' : 'peixe') : r.pescaVis ? 'vara' : r.arma && r.modo === 'terra' ? 'arma' : null;
       const em = r.anim === 'escorrega' ? [0, 2] : /^emote(\d)$/.exec(r.anim || '');
       if (em) { if (!r.emote || r.emote.i !== +em[1]) r.emote = { i: +em[1], t: 0 }; r.emote.t += dt; } else r.emote = null;
-      ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote, escorrega: r.anim === 'escorrega' });
+      ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote, escorrega: r.anim === 'escorrega', fala: !!this.falandoAgora?.has(slot) });
       this.updateHeld(ch, r.mao, slot);
       this.updateLixoMao(ch, r.modo === 'terra' ? r.lixo : null);
       this.updateArmaMao(ch, r.modo === 'terra' ? r.arma : null);
