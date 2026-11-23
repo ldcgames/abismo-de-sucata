@@ -282,7 +282,7 @@ export class Room {
       tinta: pl.tinta, atordoado: Math.max(0, pl.stunUntil - now), imune: Math.max(0, pl.imuneUntil - now),
       mao: p.mao, mochila: p.mochila || [], pescaVis: pl.pescaVis || null, arma: pl.arma || null,
       dinheiro: p.dinheiro, lixo: p.lixoMao?.tipo || null, peixaria: p.peixaria || null, mic: !!pl.mic, corrida: pl.corrida || null,
-      estacao: { ...p.estacao, aquario: p.aquario, tanque: p.tanque, vara: p.vara, pesado: p.pesado, cargaN: p.carga.length },
+      estacao: { ...p.estacao, aquario: p.aquario, tanque: p.tanque, vitrine: p.vitrine, vara: p.vara, pesado: p.pesado, cargaN: p.carga.length },
     };
   }
   snapshot(now = Date.now()) {

@@ -106,6 +106,14 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.7
+
+- **Só um aquário OU tanque na estação** (o equipado), entre a oficina e a placa com o nome. Comprar um novo já equipa e o anterior some. Os peixes passam para o novo; os que não couberem vão para a mochila.
+- **Equipar** qualquer aquário ou tanque já comprado (aba Aquário e tanque no computador, ou E na frente dele). Dá para voltar para um aquário se não gostar do tanque.
+- Tanques grandes crescem para trás, por cima da grama, com sapata de concreto. A placa da estação foi para perto da barraca da corrida, para o maior tanque caber inteiro.
+- Os peixes de qualquer tamanho até o limite vão no tanque (o limite de 20 cm mínimo saiu). Tubarões só em tanque.
+- Perfis antigos: o aquário e o tanque viram uma vitrine só (fica equipado o tanque, se tiver).
+
 ## Novidades da v0.9.6
 
 - O peixe (ou tubarão) cortado na bancada agora vai **picado para a mão**: cabeça, rabo e filés.

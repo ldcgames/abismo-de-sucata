@@ -222,8 +222,7 @@ class Game {
     return res;
   }
   async acaoMao(tipo) {
-    if (tipo === 'aquario') return this.acao({ tipo: 'peixe_aquario', destino: 'aquario' });
-    if (tipo === 'tanque') return this.acao({ tipo: 'peixe_aquario', destino: 'tanque' });
+    if (tipo === 'aquario' || tipo === 'tanque') return this.acao({ tipo: 'peixe_aquario' });
     if (tipo === 'caixa') return this.acao({ tipo: 'peixe_caixa' });
     if (tipo === 'mochila') return this.acao({ tipo: 'mochila_guardar' });
     if (tipo === 'vender') return this.acao({ tipo: 'peixe_vender' });
@@ -567,7 +566,7 @@ class Game {
       // a base só existe quando tem alguém nela (as outras vagas ficam livres, sem construção)
       st.ativa = s.id === this.slot || !!this.remotos[s.id];
       let est = null, cor = 0, nome = '';
-      if (s.id === this.slot) { est = { ...p.estacao, aquario: p.aquario, tanque: p.tanque, depositoN: p.deposito.length, peixariaEst: p.peixaria || null }; cor = p.cor; nome = p.nome; }
+      if (s.id === this.slot) { est = { ...p.estacao, aquario: p.aquario, tanque: p.tanque, vitrine: p.vitrine, depositoN: p.deposito.length, peixariaEst: p.peixaria || null }; cor = p.cor; nome = p.nome; }
       else if (this.remotos[s.id]) { const r = this.remotos[s.id]; est = { ...r.estacao, depositoN: r.estacao.cargaN || 0, peixariaEst: r.peixaria || null }; cor = r.cor; nome = r.nome; }
       st.updateVisual(est, cor, nome);
       st.animateFish(dt, this.t);
@@ -653,7 +652,6 @@ class Game {
       for (const b of s.colisores()) {
         if (b.auto === 'rec' && !est?.reciclador) continue;
         if (b.auto === 'tin' && !est?.tinta) continue;
-        if (b.auto === 'tq' && !(est?.tanque && est.tanque.nivel >= 0)) continue;
         const r = 0.35;
         const dx = l[0] - b.x, dz = l[2] - b.z;
         const ox = b.w / 2 + r - Math.abs(dx), oz = b.d / 2 + r - Math.abs(dz);
@@ -830,7 +828,7 @@ class Game {
         } else txt = `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b>`;
       } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
-        if (best.id === 'aquario' && p.mao) txt = `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no aquário`;
+        if (best.id === 'aquario') txt = p.mao ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no ${best.txt}` : `<kbd>E</kbd>${best.txt}: ver peixes e trocar aquário/tanque`;
         if (best.id === 'tinta') txt = p.mao && ESPECIES[p.mao.esp].tinta ? `<kbd>E</kbd>Fabricar bolsas com a lula (+2) · você tem ${p.baloes}/10` : `Fábrica de bolsas: traga uma LULA na mão · bolsas ${p.baloes}/10`;
         if (livre && I.hit('KeyE')) this.interagir(best.id);
       } else if (!p.mao && Math.hypot(me.pos[0] - ESTATUA.x, me.pos[2] - ESTATUA.z) < 11) {
@@ -922,8 +920,8 @@ class Game {
     else if (id === 'corrida') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('corrida'); }
     else if (id === 'deposito' || id === 'reciclador' || id === 'restauro') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.8 }; this.ui.abrir(id); }
     else if (id === 'aquario' || id === 'tanque') {
-      if (p.mao) this.acao({ tipo: 'peixe_aquario', destino: id });
-      else this.ui.abrir(id);
+      if (p.mao) this.acao({ tipo: 'peixe_aquario' });
+      else this.ui.abrir('aquario');
     } else if (id === 'tinta') {
       if (p.mao && ESPECIES[p.mao.esp].tinta) { this.me.acao = { tipo: 'bancada', t: 0, dur: 1.5 }; this.acao({ tipo: 'processar_lula' }); }
       else this.ui.aviso('Leia a placa: pesque uma lula à noite (linha funda) e traga na mão até a mesa', 'info');

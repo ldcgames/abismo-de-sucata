@@ -70,7 +70,7 @@ if (mao) {
   // aquário nano: só aceita ≤ 12 cm
   await ev(() => { const g = __jogo; if (g.pesca.estado !== 'off') g.cancelarPesca(); const q = g.stations[g.slot].pontos(g.perfil.estacao).find((x) => x.id === 'aquario'); g.me.pos = q.pos.slice(); g.me.pos[1] = 1.55; g.step(2); g.input.press('KeyE'); g.step(1); });
   await sleep(400);
-  const aq = await ev(() => __jogo.perfil.aquario.peixes.length);
+  const aq = await ev(() => __jogo.perfil.vitrine.peixes.length);
   if (mao.cm <= 12) check(aq === 1, 'peixe pequeno entra no aquário nano [1/1]');
   else check(aq === 0 && (await ev(() => !!__jogo.perfil.mao)), 'peixe maior que 12 cm é recusado pelo aquário nano');
   if (await ev(() => !!__jogo.perfil.mao)) {

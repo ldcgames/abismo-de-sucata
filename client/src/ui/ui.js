@@ -4,7 +4,7 @@ import {
   SUB_UP, SUB_ORDEM, VARA, PESADO, AQUARIOS, TANQUES, ESTACAO, DEPOSITO, EXTRAS, CONTRATOS, SUCATA, RESTAURO, ESPECIES,
   COMPONENTES, CORES_JOGADOR, valorPeixe, valorPeixeItem, valorItem, nomeItem, PEIXARIA, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
 } from '../../shared/data.js';
-import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, depositoVagas, multDinheiro } from '../../shared/rules.js';
+import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, vitrineSpec, depositoVagas, multDinheiro } from '../../shared/rules.js';
 import { STATIONS } from '../../shared/world.js';
 
 const $ = (id) => document.getElementById(id);
@@ -93,9 +93,9 @@ export class UI {
     if (!p.mao) { el.hidden = true; el._k = null; return; }
     const f = p.mao, e = ESPECIES[f.esp];
     const tub = !!e.pesado;
-    const motivo = cabeNoAquario(p, f, 'aquario');
-    const motivoT = p.tanque.nivel >= 0 ? cabeNoAquario(p, f, 'tanque') : 'sem tanque';
-    const k = JSON.stringify([f.uid, naEstacao, motivo, motivoT, p.estacao.tinta]);
+    const motivo = cabeNoAquario(p, f);
+    const vNome = vitrineSpec(p.vitrine).nome.split(' (')[0];
+    const k = JSON.stringify([f.uid, f.cortado, naEstacao, motivo, vNome, p.mochila.length, p.estacao.tinta]);
     if (el._k === k) return;
     el._k = k; el.hidden = false;
     if (e.cacado) {
@@ -105,9 +105,8 @@ export class UI {
     }
     el.innerHTML = `<div>🐟 <b>${esc(e.nome)}${f.cortado ? ' (cortado)' : ''}</b> — ${f.cm} cm · vale S$ ${valorPeixeItem(f)}</div>
       <div class="bt">
-        <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">Aquário</button>
-        ${p.tanque.nivel >= 0 ? `<button data-a="tanque" ${!naEstacao || motivoT ? 'disabled' : ''} title="${esc(motivoT || '')}">Tanque</button>` : ''}
-        <button data-a="mochila" ${tub || p.mochila.length >= MOCHILA.peixes ? 'disabled' : ''}>Mochila (${p.mochila.length}/${MOCHILA.peixes})</button>
+        <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">${esc(vNome)}</button>
+        <button data-a="mochila" ${(tub && !f.cortado) || p.mochila.length >= MOCHILA.peixes ? 'disabled' : ''}>Mochila (${p.mochila.length}/${MOCHILA.peixes})</button>
         <button data-a="vender" ${!naEstacao ? 'disabled' : ''}>Vender</button>
         ${e.tinta ? `<button data-a="tinta" ${!naEstacao || !p.estacao.tinta ? 'disabled' : ''} title="${p.estacao.tinta ? '' : 'Construa a bancada de tinta'}">Extrair tinta</button>` : ''}
         <button data-a="arremessar">Arremessar (G)</button>
@@ -143,9 +142,9 @@ export class UI {
       abas.innerHTML = '';
       html = this.listaSucata(p, this.aberto);
     } else if (this.aberto === 'aquario' || this.aberto === 'tanque') {
-      $('painelTitulo').textContent = this.aberto === 'aquario' ? 'Seu aquário' : 'Seu tanque de concreto';
+      $('painelTitulo').textContent = vitrineSpec(p.vitrine).nome;
       abas.innerHTML = '';
-      html = this.painelAquario(p, this.aberto);
+      html = this.aba_aquario(p, true);
     } else if (this.aberto === 'inventario') {
       $('painelTitulo').textContent = 'Inventário';
       abas.innerHTML = '';
@@ -231,35 +230,35 @@ export class UI {
     h += `<div class="card"><h3>Depósito</h3><div class="val">Vagas: <b>${depositoVagas(p)}</b></div>${prox ? `<div class="custo">Ampliar para ${prox.vagas}: ${custoTxt(prox.custo)}</div>${this.btn('Ampliar', { tipo: 'comprar', cat: 'estacao', chave: 'deposito' }, faltando(p, prox.custo).length > 0)}` : '<div class="val">Máximo</div>'}</div>`;
     return h + '</div>';
   }
-  aba_aquario(p) {
-    const a = AQUARIOS[p.aquario.nivel];
-    let h = `<p class="nota">Aquários são decoração e guardam seus peixes. Para vender ou arremessar, clique em <b>Pegar na mão</b> primeiro. Pode comprar qualquer um maior direto. Atual: <b>${esc(a.nome)}</b> [${p.aquario.peixes.length}/${a.vagas}] · peixes até ${a.maxCm} cm.</p>`;
-    h += this.listaPeixes(p, 'aquario');
+  aba_aquario(p, naFrente = false) {
+    const v = p.vitrine, a = vitrineSpec(v);
+    let h = `<p class="nota">Na estação fica <b>um só</b>: o aquário ou tanque equipado (entre a oficina e a placa com o seu nome). Equipe qualquer um que você já comprou: o outro some e os peixes passam para o novo (os que não couberem vão para a mochila). Para vender, clique em <b>Pegar na mão</b> primeiro.</p>`;
+    h += `<h3>Equipado: ${esc(a.nome)} [${v.peixes.length}/${a.vagas}] · até ${a.maxCm} cm${v.tipo === 'tanque' ? ' · aceita tubarões' : ''}</h3>`;
+    if (p.mao && naFrente) {
+      const m = cabeNoAquario(p, p.mao);
+      h += `<div class="convite">Na mão: ${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm) ${this.btn('Colocar aqui', { tipo: 'peixe_aquario' }, !!m, m || '')} ${m ? `<span class="falta">${esc(m)}</span>` : ''}</div>`;
+    }
+    h += this.listaPeixes(p, 'vitrine') || '<p class="nota">Vazio. Pesque um peixe que caiba e coloque aqui (E na frente dele).</p>';
+    const card = (tipo, i, it, extra, compra) => {
+      const tem = (tipo === 'tanque' ? p.tanquesTem : p.aquariosTem).includes(i), eq = v.tipo === tipo && v.nivel === i;
+      return `<div class="card"><h3>${esc(it.nome)}</h3><div class="val">${it.vagas} vagas · até <b>${it.maxCm} cm</b>${extra}</div>${tem ? '' : `<div class="custo">${custoTxt(it.custo)}</div>`}
+        ${eq ? '<div class="val"><b>✔ Equipado na estação</b></div>' : tem ? this.btn('Equipar', { tipo: 'vitrine_equipar', tipo2: tipo, nivel: i }) : compra}</div>`;
+    };
     h += '<h3>Aquários</h3><div class="grade">';
-    AQUARIOS.forEach((aq, i) => {
-      if (i === 0) return;
-      const f = faltando(p, aq.custo), atual = p.aquario.nivel === i, tem = p.aquario.nivel > i;
-      h += `<div class="card"><h3>${esc(aq.nome)}</h3><div class="val">${aq.vagas} vagas · até <b>${aq.maxCm} cm</b></div><div class="custo">${custoTxt(aq.custo)}</div>
-        ${atual ? '<div class="val"><b>Na sua estação</b></div>' : tem ? '<div class="nota">Você já tem um maior</div>' : this.btn('Comprar', { tipo: 'comprar', cat: 'aquario', nivel: i }, f.length > 0, f.join(', '))}</div>`;
-    });
-    h += '</div>';
-    const t = TANQUES[p.tanque.nivel];
-    h += `<h3>Tanque de peixes ${t ? `— atual: ${esc(t.nome)} [${p.tanque.peixes.length}/${t.vagas}]` : ''}</h3>`;
-    if (t) h += this.listaPeixes(p, 'tanque');
-    h += '<div class="grade">';
+    AQUARIOS.forEach((aq, i) => { const f = faltando(p, aq.custo); h += card('aquario', i, aq, '', this.btn('Comprar e equipar', { tipo: 'comprar', cat: 'aquario', nivel: i }, f.length > 0, f.join(', '))); });
+    h += '</div><h3>Tanques de peixe</h3><div class="grade">';
     TANQUES.forEach((tq, i) => {
-      const f = faltando(p, tq.custo), atual = p.tanque.nivel === i, tem = p.tanque.nivel > i, prox = p.tanque.nivel === i - 1;
-      const req = p.aquario.nivel < tq.requerAquario;
-      h += `<div class="card"><h3>${esc(tq.nome)}</h3><div class="val">${tq.vagas} vagas · animais até <b>${tq.maxCm} cm</b> (inclui tubarões)</div><div class="custo">${custoTxt(tq.custo)}</div>
-        ${atual ? '<div class="val"><b>Na sua estação</b></div>' : tem ? '<div class="nota">Você já evoluiu</div>' : !prox ? '<div class="nota">Evolua o tanque anterior primeiro</div>' : (req ? `<div class="falta">Requer o ${esc(AQUARIOS[tq.requerAquario].nome)} (ou maior)</div>` : '') + this.btn(p.tanque.nivel < 0 ? 'Construir' : 'Evoluir', { tipo: 'comprar', cat: 'tanque' }, f.length > 0 || req, f.join(', '))}</div>`;
+      const f = faltando(p, tq.custo), prox = p.tanque.nivel === i - 1, req = p.aquario.nivel < tq.requerAquario;
+      const compra = !prox ? '<div class="nota">Compre o tanque anterior primeiro</div>' : (req ? `<div class="falta">Requer o ${esc(AQUARIOS[tq.requerAquario].nome)} (ou maior)</div>` : '') + this.btn('Comprar e equipar', { tipo: 'comprar', cat: 'tanque' }, f.length > 0 || req, f.join(', '));
+      h += card('tanque', i, tq, ' (inclui tubarões)', compra);
     });
     return h + '</div>';
   }
   // peixes guardados num lugar: Pegar (para a mão) sempre; Vender só da mochila (do aquário/tanque tem que tirar antes)
   listaPeixes(p, onde) {
-    const lista = onde === 'aquario' ? p.aquario.peixes : onde === 'tanque' ? p.tanque.peixes : onde === 'mochila' ? p.mochila : p.caixaTermica;
+    const lista = onde === 'vitrine' ? p.vitrine.peixes : onde === 'mochila' ? p.mochila : p.caixaTermica;
     if (!lista.length) return '';
-    const pegar = (f) => onde === 'mochila' ? { tipo: 'mochila_tirar', uid: f.uid } : onde === 'caixa' ? { tipo: 'caixa_mao', uid: f.uid } : { tipo: 'aquario_retirar', uid: f.uid, de: onde };
+    const pegar = (f) => onde === 'mochila' ? { tipo: 'mochila_tirar', uid: f.uid } : onde === 'caixa' ? { tipo: 'caixa_mao', uid: f.uid } : { tipo: 'aquario_retirar', uid: f.uid };
     const m = multDinheiro(p);
     let h = '<div class="lista">';
     for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)}${f.cortado ? ' (cortado)' : ''} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(f) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
@@ -326,18 +325,6 @@ export class UI {
     h += `<h3>No depósito (${p.deposito.length}/${depositoVagas(p)})</h3><div class="lista">${p.deposito.filter(filtro).map((it) => this.linhaItem(it, 'deposito', p, modo === 'deposito' ? 'deposito' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     return h;
   }
-  painelAquario(p, qual) {
-    const alvo = qual === 'tanque' ? p.tanque : p.aquario;
-    const t = qual === 'tanque' ? TANQUES[p.tanque.nivel] : AQUARIOS[p.aquario.nivel];
-    if (!t) return '<p class="nota">Você ainda não tem um tanque. Construa no terminal.</p>';
-    let h = `<p>${t.nome}: <b>[${alvo.peixes.length}/${t.vagas}]</b> · tamanho máximo ${t.maxCm} cm</p>`;
-    if (p.mao) {
-      const m = cabeNoAquario(p, p.mao, qual);
-      h += `<div class="convite">Na mão: ${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm) ${this.btn('Colocar aqui', { tipo: 'peixe_aquario', destino: qual }, !!m, m || '')} ${m ? `<span class="falta">${esc(m)}</span>` : ''}</div>`;
-    }
-    h += '<div class="lista">' + (alvo.peixes.map((f) => `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)} — ${f.cm} cm</div><div class="acoes">${this.btn('Retirar', { tipo: 'aquario_retirar', de: qual, uid: f.uid }, !!p.mao)}</div></div>`).join('') || '<p class="nota">Vazio. Pesque um peixe que caiba e coloque aqui.</p>') + '</div>';
-    return h;
-  }
   lojaArmas(p) {
     let h = `<p class="nota">Compre em ordem: primeiro o estilingue, depois a pistola e assim por diante. As pessoas não perdem vida: cada acerto só derruba o amigo no chão, e as armas de fogo ainda jogam ele para longe. O <b>dano</b> vale para o Kraken (3.000 de vida) e o tubarão (200 de vida). Armas: teclas <kbd>1</kbd>–<kbd>5</kbd>, <kbd>H</kbd> guarda, botão esquerdo atira, a sniper mira com o botão direito.</p><div class="grade">`;
     ARMAS_LOJA.forEach((k) => {
@@ -373,7 +360,7 @@ export class UI {
     const st = subStats(p), u = cargaUso(p), vs = varaStats(p);
     let h = `<div class="grade"><div class="card"><h3>Submarino</h3><div class="val">Carga: ${fmt(u.kg)}/${st.cargaKg} kg · ${fmt(u.L)}/${st.cargaL} L</div>${p.carga.map((it) => `<div class="rar-${SUCATA[it.tipo].rar}">• ${esc(SUCATA[it.tipo].nome)}</div>`).join('') || '<div class="nota">vazio</div>'}</div>
       <div class="card"><h3>Peixes</h3><div>Na mão: ${p.mao ? `${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm)` : '—'}</div>${p.caixaTermica.length ? `<div>Caixa térmica (antiga): ${p.caixaTermica.map((f) => `${esc(ESPECIES[f.esp].nome)} ${f.cm} cm`).join(', ')}</div>` : ''}
-      <div>Aquário [${p.aquario.peixes.length}/${AQUARIOS[p.aquario.nivel].vagas}] · Tanque ${p.tanque.nivel >= 0 ? `[${p.tanque.peixes.length}/${TANQUES[p.tanque.nivel].vagas}]` : '—'}</div><div>Balões de tinta: ${p.baloes}</div></div>
+      <div>${esc(vitrineSpec(p.vitrine).nome)} [${p.vitrine.peixes.length}/${vitrineSpec(p.vitrine).vagas}]</div><div>Balões de tinta: ${p.baloes}</div></div>
       <div class="card"><h3>Equipamento</h3><div>${esc(vs.nome)} (até ${vs.maxCm} cm)</div><div>Casco ${fmt(st.maxProf)} m · Bateria ${st.bateria} kWh</div><div>Faróis ${st.farol} m · Sonar ${st.sonar} m</div><div>Garra ${st.bracoKg} kg · O₂ ${st.oxigenio} s</div></div>
       <div class="card"><h3>Descobertas</h3><div>Profundidade máxima: ${fmt(p.profMax)} m</div><div>Espécies: ${p.descobertas.filter((d) => d.startsWith('peixe:')).length}/${Object.keys(ESPECIES).length}</div><div>Lugares: ${p.descobertas.filter((d) => d.startsWith('lugar:')).length}</div><div>Depósito: ${p.deposito.length}/${depositoVagas(p)}</div></div></div>`;
     return h;

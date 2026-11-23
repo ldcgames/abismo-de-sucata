@@ -51,6 +51,9 @@ function newProfileBase(id, nome = 'Explorador') {
     caixaTermica: [],   // peixes guardados temporariamente
     aquario: { nivel: 0, peixes: [] },
     tanque: { nivel: -1, peixes: [] },
+    // v0.9.7: só UM aquário OU tanque fica na estação (o equipado). Os peixes moram nele.
+    vitrine: { tipo: 'aquario', nivel: 0, peixes: [] },
+    aquariosTem: [0], tanquesTem: [],
     baloes: 1,          // bolsas de tinta (começa com 1; máximo 10 na mochila)
     contratos: { ativos: [], concluidos: [] },
     saco: [],           // lixo catado na margem (garrafas PET, latinhas…)
@@ -128,6 +131,19 @@ export function migrateProfile(p) {
     if (out.tanque) out.tanque = { ...out.tanque, nivel: { [-1]: -1, 0: 1, 1: 3 }[out.tanque.nivel] ?? out.tanque.nivel };
     out.inventVer = 2;
   }
+  // v0.9.7: aquário e tanque viram uma vitrine só (a melhor que a pessoa tem fica equipada)
+  if (!p.vitrine || !Array.isArray(p.vitrine.peixes)) {
+    const aqN = out.aquario?.nivel ?? 0, tqN = out.tanque?.nivel ?? -1;
+    out.aquariosTem = [...new Set([0, aqN])];
+    out.tanquesTem = tqN >= 0 ? Array.from({ length: tqN + 1 }, (_, i) => i) : [];
+    out.vitrine = tqN >= 0 ? { tipo: 'tanque', nivel: tqN, peixes: [] } : { tipo: 'aquario', nivel: aqN, peixes: [] };
+    const sobra = [];
+    for (const f of [...(out.tanque?.peixes || []), ...(out.aquario?.peixes || [])]) (cabeNoAquario(out, f) ? sobra : out.vitrine.peixes).push(f);
+    for (const f of sobra) (out.mochila.length < MOCHILA.peixes ? out.mochila : out.caixaTermica).push(f);
+    out.aquario = { nivel: aqN, peixes: [] }; out.tanque = { nivel: tqN, peixes: [] };
+  }
+  out.aquariosTem = Array.isArray(out.aquariosTem) ? out.aquariosTem : [0];
+  out.tanquesTem = Array.isArray(out.tanquesTem) ? out.tanquesTem : [];
   out.saco = Array.isArray(p.saco) ? p.saco : [];
   out.peixaria = p.peixaria && p.peixaria.peixe && ESPECIES[p.peixaria.peixe.esp] ? p.peixaria : null;
   out.lixoMao = p.lixoMao && typeof p.lixoMao === 'object' && SUCATA[p.lixoMao.tipo]?.terra ? p.lixoMao : null;
@@ -409,24 +425,24 @@ export function sortearPeixe(p, bobber, hora, rnd = Math.random) {
 }
 
 // ------------------------------------------------------------------ aquário
-export function cabeNoAquario(p, peixe, destino = 'aquario') {
-  if (destino === 'aquario') {
-    const a = AQUARIOS[p.aquario.nivel];
-    if (p.aquario.peixes.length >= a.vagas) return `${a.nome} lotado [${p.aquario.peixes.length}/${a.vagas}]`;
-    if (peixe.cm > a.maxCm) return `${ESPECIES[peixe.esp].nome} de ${peixe.cm} cm não cabe: máximo ${a.maxCm} cm no ${a.nome}`;
-    if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
-    if (peixe.cortado) return 'Peixe cortado é para vender';
-    if (ESPECIES[peixe.esp].pesado) return 'Tubarões só no tanque de peixes';
-    return null;
-  }
+export function vitrineSpec(v) { return v?.tipo === 'tanque' ? TANQUES[v.nivel] : AQUARIOS[v?.nivel || 0]; }
+// cabe no aquário/tanque equipado? (ou num outro, para trocar) — devolve o motivo de não caber, ou null
+export function cabeNoAquario(p, peixe, v = p.vitrine, ocupados = v.peixes?.length || 0) {
+  const t = vitrineSpec(v);
   if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
   if (peixe.cortado) return 'Peixe cortado é para vender';
-  if (p.tanque.nivel < 0) return 'Você ainda não tem tanque de peixes';
-  const t = TANQUES[p.tanque.nivel];
-  if (p.tanque.peixes.length >= t.vagas) return `${t.nome} lotado [${p.tanque.peixes.length}/${t.vagas}]`;
-  if (peixe.cm > t.maxCm) return `Grande demais: máximo ${t.maxCm} cm no ${t.nome}`;
-  if (peixe.cm < 20) return 'Peixe pequeno demais para o tanque (use o aquário)';
+  if (ocupados >= t.vagas) return `${t.nome} lotado [${ocupados}/${t.vagas}]`;
+  if (peixe.cm > t.maxCm) return `${ESPECIES[peixe.esp].nome} de ${peixe.cm} cm não cabe: máximo ${t.maxCm} cm no ${t.nome}`;
+  if (ESPECIES[peixe.esp].pesado && v.tipo !== 'tanque') return 'Tubarões só num tanque de peixes';
   return null;
+}
+// troca o aquário/tanque da estação. Os peixes que não couberem no novo vão para a mochila.
+function equiparVitrine(p, tipo, nivel) {
+  const nova = { tipo, nivel, peixes: [] }, sobra = [];
+  for (const f of p.vitrine.peixes) (cabeNoAquario(p, f, nova, nova.peixes.length) ? sobra : nova.peixes).push(f);
+  if (sobra.length > MOCHILA.peixes - p.mochila.length) return `Não cabem ${sobra.length} peixe(s) no ${vitrineSpec(nova).nome} nem na mochila: tire alguns antes`;
+  p.mochila.push(...sobra); p.vitrine = nova;
+  return sobra.length ? `${sobra.length} peixe(s) que não cabiam foram para a mochila` : '';
 }
 
 // ------------------------------------------------------------------ AÇÕES
@@ -487,13 +503,13 @@ const ACOES = {
       custo = PESADO.custo; nome = PESADO.nome; aplicar = () => { p.pesado = true; };
     } else if (cat === 'aquario') {
       // qualquer aquário maior, direto (os peixes que já estão nele continuam cabendo)
-      const n = Number.isInteger(a.nivel) ? a.nivel : p.aquario.nivel + 1;
-      const aq = AQUARIOS[n]; if (!aq || n <= p.aquario.nivel) return fail(n <= p.aquario.nivel ? 'Você já tem um aquário igual ou maior' : 'Aquário inexistente');
-      custo = aq.custo; nome = aq.nome; aplicar = () => { p.aquario.nivel = n; };
+      const n = Number.isInteger(a.nivel) ? a.nivel : p.aquario.nivel + 1; // qualquer aquário que ainda não tenha
+      const aq = AQUARIOS[n]; if (!aq) return fail('Aquário inexistente'); if (p.aquariosTem.includes(n)) return fail('Você já tem esse aquário: use Equipar');
+      custo = aq.custo; nome = aq.nome; aplicar = () => { p.aquario.nivel = Math.max(p.aquario.nivel, n); if (!p.aquariosTem.includes(n)) p.aquariosTem.push(n); const m = equiparVitrine(p, 'aquario', n); return m ? ' — ' + (m.startsWith('Não cabem') ? 'continua equipado o anterior (' + m + ')' : m) : ''; };
     } else if (cat === 'tanque') {
       const prox = TANQUES[p.tanque.nivel + 1]; if (!prox) return fail('Tanque no nível máximo');
       if (p.aquario.nivel < prox.requerAquario) return fail(`Requer o ${AQUARIOS[prox.requerAquario].nome} (ou maior)`);
-      custo = prox.custo; nome = prox.nome; aplicar = () => { p.tanque.nivel += 1; };
+      custo = prox.custo; nome = prox.nome; aplicar = () => { p.tanque.nivel += 1; const n = p.tanque.nivel; if (!p.tanquesTem.includes(n)) p.tanquesTem.push(n); const m = equiparVitrine(p, 'tanque', n); return m ? ' — ' + (m.startsWith('Não cabem') ? 'continua equipado o anterior (' + m + ')' : m) : ''; };
     } else if (cat === 'estacao') {
       if (chave === 'deposito') {
         const prox = DEPOSITO[p.estacao.deposito + 1]; if (!prox) return fail('Depósito no máximo');
@@ -509,8 +525,8 @@ const ACOES = {
       custo = it.custo; nome = it.nome; aplicar = () => { p.extras[chave] = true; };
     } else return fail('Categoria inválida');
     if (!podePagar(p, custo)) return fail('Faltam: ' + faltando(p, custo).join(', '));
-    pagar(p, custo); aplicar();
-    return okR(`Comprado: ${nome}`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+    pagar(p, custo); const extra = aplicar() || '';
+    return okR(`Comprado: ${nome}${extra}`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
   },
 
   // ---------- sucata ----------
@@ -685,23 +701,32 @@ const ACOES = {
   peixe_aquario(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
     if (!p.mao) return fail('Nenhum peixe na mão');
-    const destino = a.destino === 'tanque' ? 'tanque' : 'aquario';
-    const motivo = cabeNoAquario(p, p.mao, destino);
+    const motivo = cabeNoAquario(p, p.mao);
     if (motivo) return fail(motivo);
-    const alvo = destino === 'tanque' ? p.tanque : p.aquario;
-    alvo.peixes.push(p.mao); p.mao = null;
-    const cap = destino === 'tanque' ? TANQUES[p.tanque.nivel].vagas : AQUARIOS[p.aquario.nivel].vagas;
-    return okR(`Peixe colocado no ${destino === 'tanque' ? 'tanque' : 'aquário'} [${alvo.peixes.length}/${cap}]`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+    p.vitrine.peixes.push(p.mao); p.mao = null;
+    const t = vitrineSpec(p.vitrine);
+    return okR(`Peixe colocado no ${t.nome} [${p.vitrine.peixes.length}/${t.vagas}]`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
   },
   aquario_retirar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
     if (p.mao) return fail('Suas mãos estão ocupadas');
-    const alvo = a.de === 'tanque' ? p.tanque : p.aquario;
+    const alvo = p.vitrine;
     const i = alvo.peixes.findIndex((f) => f.uid === a.uid);
     if (i < 0) return fail('Peixe não encontrado');
     if (ESPECIES[alvo.peixes[i].esp].pesado && !p.extras.luvas) return fail('Você precisa das luvas hidráulicas para segurar um tubarão');
     p.mao = alvo.peixes[i]; alvo.peixes.splice(i, 1);
     return okR('Peixe na mão', [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+  },
+  // equipa qualquer aquário ou tanque já comprado: o anterior some da estação (os peixes passam para o novo)
+  vitrine_equipar(p, a, ctx) {
+    const e = precisaEstacao(ctx); if (e) return e;
+    const tipo = a.tipo2 === 'tanque' ? 'tanque' : 'aquario', nivel = a.nivel | 0;
+    const tem = tipo === 'tanque' ? p.tanquesTem : p.aquariosTem;
+    if (!tem.includes(nivel)) return fail('Você ainda não comprou esse');
+    if (p.vitrine.tipo === tipo && p.vitrine.nivel === nivel) return fail('Já está equipado');
+    const m = equiparVitrine(p, tipo, nivel);
+    if (m.startsWith('Não cabem')) return fail(m);
+    return okR(`Equipado: ${vitrineSpec(p.vitrine).nome}` + (m ? ' — ' + m : ''), [{ t: 'visual_estacao', slot: ctx.player.slot }]);
   },
   peixe_caixa(p, a, ctx) {
     if (!p.mao) return fail('Nenhum peixe na mão');
@@ -722,7 +747,7 @@ const ACOES = {
     let f, de;
     if (a.uid && a.uid !== p.mao?.uid) {
       // vende da mochila (ou da caixa térmica antiga). Do aquário/tanque não: tem que tirar o peixe antes
-      if (p.aquario.peixes.some((x) => x.uid === a.uid) || p.tanque.peixes.some((x) => x.uid === a.uid)) return fail('Esse peixe está no aquário: tire ele primeiro (Pegar na mão) e depois venda');
+      if (p.vitrine.peixes.some((x) => x.uid === a.uid)) return fail('Esse peixe está no aquário: tire ele primeiro (Pegar na mão) e depois venda');
       const fontes = [['mochila', p.mochila], ['caixa', p.caixaTermica]];
       for (const [nome, lista] of fontes) { const i = lista.findIndex((x) => x.uid === a.uid); if (i >= 0) { f = lista.splice(i, 1)[0]; de = nome; break; } }
       if (!f) return fail('Peixe não encontrado');

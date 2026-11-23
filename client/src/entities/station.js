@@ -43,12 +43,14 @@ export function textQuad(R, lines, w = 4, h = 1.4, opts = {}) {
 }
 
 // casca de uma casinha aberta para o pátio (paredes de madeira, telhado de zinco inteiro)
-// posição do tanque de peixes no plano local: a janela fica sempre em z = -6.5 (atrás da loja de armas)
-// e o lado esquerdo nunca passa de x = 8.6, para não invadir o caminho
-export function tanqueLayout(nivel) {
-  // fica atrás da barraca da corrida: janela em z = -10.1, lado esquerdo em x = 8.6
-  const t = TANQUES[nivel]; const [w, , d] = t.dims;
-  return { x: 8.6 + 0.45 + w / 2, z: -10.1 - d / 2, w, d, t };
+// aquário OU tanque equipado: entre a oficina e a placa com o nome. A frente fica sempre em z = -9.6
+// (de frente para o pátio) e o lado direito nunca passa de x = 7.6 (o poste da placa, que fica perto da
+// barraca da corrida). Os grandes crescem para trás, por cima da grama.
+export const VITRINE_FRENTE = -9.6, PLACA_X = 10;
+export function vitrineLayout(v) {
+  const t = v?.tipo === 'tanque' ? TANQUES[v.nivel] : AQUARIOS[v?.nivel || 0];
+  const [w, , d] = t.dims, borda = v?.tipo === 'tanque' ? 0.5 : 0.15;
+  return { x: Math.min(1.3, PLACA_X - 2.4 - borda - w / 2), z: VITRINE_FRENTE - borda - d / 2, w, d, t, borda };
 }
 function casinha(g, hx, hz, cor) {
   // piso
@@ -293,11 +295,11 @@ export class Station {
     this.sign = new Node('placa');
     const fr = textQuad(this.R, [this.st.nome, nome || 'vaga livre'], 4.2, 1.5); fr.at(0, 0, -0.04).rot(0, Math.PI, 0);
     const bk = textQuad(this.R, [this.st.nome, nome || 'vaga livre'], 4.2, 1.5); bk.at(0, 0, 0.04);
-    this.sign.add(fr, bk); this.sign.at(6, 3.4, -12.5);
+    this.sign.add(fr, bk); this.sign.at(PLACA_X, 3.4, -12.5);
     this.root.add(this.sign);
     // poste da placa
     if (!this.signPost) {
-      const g = new Geo(); for (const s of [-1, 1]) g.put(box(0.12, 3.4, 0.12), [6 + s * 2.0, 2.4, -12.45], [0, 0, 0], 1, WOOD_DK);
+      const g = new Geo(); for (const s of [-1, 1]) g.put(box(0.12, 3.4, 0.12), [PLACA_X + s * 2.0, 2.4, -12.45], [0, 0, 0], 1, WOOD_DK);
       this.signPost = new Node('poste'); this.signPost.mesh = this.R.createMesh(g, { rough: 0.9, kind: MAT.MADEIRA }); this.root.add(this.signPost);
     }
   }
@@ -500,8 +502,8 @@ export class Station {
     }
     // aquário
     this.estVis = est;
-    this.buildAquarium(est?.aquario || { nivel: 0, peixes: [] });
-    if (est?.tanque && est.tanque.nivel >= 0) this.buildTank(est.tanque);
+    const vit = est?.vitrine || { tipo: 'aquario', nivel: 0, peixes: [] };
+    if (vit.tipo === 'tanque') this.buildTank(vit); else this.buildAquarium(vit);
   }
 
   buildAquarium(aq) {
@@ -509,7 +511,7 @@ export class Station {
     const t = AQUARIOS[aq.nivel];
     const [w, h, d] = t.dims;
     const est = t.estilo || 'simples';
-    const x = 8, z = 6, standH = est === 'redondo' ? 0.85 : 1.0;
+    const { x, z } = vitrineLayout({ tipo: 'aquario', nivel: aq.nivel }), standH = est === 'redondo' ? 0.85 : 1.0;
     const baseY = 1.55 + standH;
     const g = new Geo();
     const verdes = [[0.2, 0.6, 0.25], [0.3, 0.72, 0.2], [0.12, 0.45, 0.2], [0.5, 0.75, 0.25]];
@@ -587,12 +589,14 @@ export class Station {
     const R = this.R;
     const t = TANQUES[tq.nivel];
     const [w, h, d] = t.dims;
-    const { x, z } = tanqueLayout(tq.nivel);
+    const { x, z } = vitrineLayout({ tipo: 'tanque', nivel: tq.nivel });
     const g = new Geo();
     const est = t.estilo || 'concreto';
     if (est === 'lona') return this.buildTankLona(tq, t, x, z);
     const wall = est === 'abissal' ? 0.45 : 0.35;
     const CONC = est === 'abissal' ? [0.2, 0.22, 0.26] : CONC0;
+    // sapata de concreto (quando o tanque passa da plataforma e entra na grama)
+    g.put(box(w + wall * 2 + 0.2, 3.2, d + wall * 2 + 0.2), [x, -0.15, z], [0, 0, 0], 1, CONC);
     // paredes de concreto e moldura de aço da janela frontal
     g.put(rbox(w + wall * 2, 0.4, d + wall * 2, 0.05), [x, 1.6, z], [0, 0, 0], 1, CONC);
     g.put(rbox(w + wall * 2, h, wall, 0.05), [x, 1.8 + h / 2, z - d / 2 - wall / 2], [0, 0, 0], 1, CONC);
@@ -629,6 +633,7 @@ export class Station {
     const [w, h, d] = t.dims;
     const g = new Geo();
     const LONA = [0.16, 0.42, 0.78];
+    g.put(box(w + 0.4, 3.2, d + 0.4), [x, 0.0, z], [0, 0, 0], 1, CONC0); // sapata
     g.put(rbox(w + 0.3, 0.12, d + 0.3, 0.03), [x, 1.62, z], [0, 0, 0], 1, [0.45, 0.42, 0.38]); // estrado
     for (const [ax, az, lw, ld] of [[0, -d / 2, w, 0.06], [0, d / 2, w, 0.06], [-w / 2, 0, 0.06, d], [w / 2, 0, 0.06, d]]) g.put(box(lw, h, ld), [x + ax, 1.68 + h / 2, z + az], [0, 0, 0], 1, LONA);
     for (const sx of [-1, 0, 1]) for (const sz of [-1, 1]) g.put(cylinder(0.05, 0.05, h + 0.1, 8), [x + sx * w / 2, 1.68 + h / 2, z + sz * (d / 2 + 0.06)], [0, 0, 0], 1, METAL);
@@ -675,7 +680,6 @@ export class Station {
     const P = (nome, x, y, z, r = 2.6, extra = {}) => ({ id: nome, pos: this.toWorld(x, y, z), r, ...extra });
     const list = [
       P('terminal', -4, 1.6, 9.6, 2.8, { txt: 'Terminal: comprar, vender e contratos' }),
-      P('aquario', 8, 1.6, 6.9, 2.6, { txt: 'Aquário' }),
       P('deposito', -7.5, 1.6, -2.5, 2.8, { txt: 'Depósito' }),
       P('berco', 2.4, 1.6, this.zCradle, 3.4, { txt: 'Entrar no submarino' }),
     ];
@@ -684,24 +688,24 @@ export class Station {
     list.push(P('tinta', 13.4, 1.6, 2.5, 2.2, { txt: 'Fábrica de bolsas de tinta (leia a placa)' }));
     list.push(P('armas', BARRACA_ARMAS.x + 0.9, 1.6, BARRACA_ARMAS.z - 1.2, 2.0, { txt: 'Computador da loja de armas: comprar armas e balas' }));
     list.push(P('corrida', BARRACA_CORRIDA.x - 0.6, 1.6, BARRACA_CORRIDA.z, 2.0, { txt: 'Corrida de submarino: chamar amigos' }));
-    if (est?.tanque && est.tanque.nivel >= 0) list.push(P('tanque', tanqueLayout(est.tanque.nivel).x - TANQUES[est.tanque.nivel].dims[0] / 2 + 1.3, 1.6, -8.9, 2.4, { txt: TANQUES[est.tanque.nivel].nome }));
+    { const L = vitrineLayout(est?.vitrine || this.estVis?.vitrine); list.push(P('aquario', Math.max(L.x, L.x - L.w / 2 + 1.2), 1.6, VITRINE_FRENTE + 0.9, 2.4, { txt: L.t.nome })); }
     return list;
   }
   // colisores (caixas no plano local) para o personagem
   colisores() {
     const est = this.estVis;
-    const aq = AQUARIOS[est?.aquario?.nivel || 0].dims, tl = est?.tanque && est.tanque.nivel >= 0 ? tanqueLayout(est.tanque.nivel) : null;
+    const vl = vitrineLayout(est?.vitrine);
     return [
       { x: -11, z: -9.1, w: 11, d: 0.4 }, { x: -16.4, z: -5, w: 0.4, d: 8 }, { x: -5.6, z: -5, w: 0.4, d: 8 },
       { x: -11, z: -8, w: 3.4, d: 1.2 }, { x: -7.4, z: -3.5, w: 1, d: 3.2 },
-      { x: -4, z: 9, w: 1.3, d: 0.8 }, { x: 8, z: 6, w: aq[0] + 0.2, d: aq[2] + 0.15, auto: 'aq' },
+      { x: -4, z: 9, w: 1.3, d: 0.8 }, { x: vl.x, z: vl.z, w: vl.w + vl.borda * 2 + 0.2, d: vl.d + vl.borda * 2 + 0.2 },
       { x: 0, z: this.zCradle, w: 2.4, d: 5.4 }, { x: this.xPivot, z: this.zPivot, w: 2.6, d: 2.6 },
-      { x: 3.2, z: this.zCradle - 1, w: 0.9, d: 0.6 }, ...(tl ? [{ x: tl.x, z: tl.z, w: tl.w + 0.9, d: tl.d + 0.9 }] : []),
+      { x: 3.2, z: this.zCradle - 1, w: 0.9, d: 0.6 },
       { x: -14, z: 10, w: 2.6, d: 2.4, auto: 'rec' },
       { x: 15.75, z: 2.5, w: 0.3, d: 4.0 }, { x: 13.6, z: 0.58, w: 4.4, d: 0.3 }, { x: 13.6, z: 4.42, w: 4.4, d: 0.3 }, { x: 15.15, z: 2.5, w: 0.9, d: 2.6 },
       { x: BARRACA_ARMAS.x + 2.15, z: BARRACA_ARMAS.z, w: 0.3, d: 4.0 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_ARMAS.x + 1.55, z: BARRACA_ARMAS.z + 0.6, w: 0.9, d: 2.0 }, { x: BARRACA_ARMAS.x + 1.5, z: BARRACA_ARMAS.z - 1.35, w: 0.9, d: 0.9 }, { x: BARRACA_ARMAS.x + 0.45, z: BARRACA_ARMAS.z + 1.45, w: 0.7, d: 0.5 },
-      { x: 12, z: 14, w: 0.3, d: 0.3 }, { x: 6, z: -12.5, w: 4.4, d: 0.3 },
+      { x: 12, z: 14, w: 0.3, d: 0.3 }, { x: PLACA_X, z: -12.5, w: 4.4, d: 0.3 },
       { x: BARRACA_CORRIDA.x + 2.15, z: BARRACA_CORRIDA.z, w: 0.3, d: 4.0 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_CORRIDA.x + 0.2, z: BARRACA_CORRIDA.z, w: 0.85, d: 0.85 },
       ...(est?.banco ? [{ x: -8, z: 13, w: 2.0, d: 0.7 }] : []),

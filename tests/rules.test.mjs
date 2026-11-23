@@ -89,11 +89,11 @@ test('aquário nano: aceita 1 peixe pequeno, recusa o 2º e qualquer maior que 1
   const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'); const p = pl.profile;
   p.mao = { uid: 'f1', esp: 'tetra', cm: 5 };
   assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, true);
-  assert.equal(p.aquario.peixes.length, 1);
+  assert.equal(p.vitrine.peixes.length, 1);
   p.mao = { uid: 'f2', esp: 'barrigudo', cm: 4 };
   const r2 = r.action('N', { tipo: 'peixe_aquario' }, T0).res;
   assert.equal(r2.ok, false); assert.match(r2.msg, /\[1\/1\]/);
-  p.aquario.peixes = [];
+  p.vitrine.peixes = [];
   p.mao = { uid: 'f3', esp: 'lambari', cm: 13 };
   assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, false);
   assert.ok(p.mao, 'peixe continua na mão');
@@ -201,10 +201,10 @@ test('mochila: até 5 peixes e no máximo 10 bolsas; sub começa com limite de 5
   const st = stationById('N'); pl.modo = 'terra'; pl.pos = [st.pad[0], 1.6, st.pad[1]];
   const d0 = p.dinheiro;
   assert.equal(r.action('N', { tipo: 'peixe_vender', uid: 'f3' }, T0).res.ok, true); assert.ok(p.dinheiro > d0); assert.equal(p.mochila.length, 3);
-  p.aquario.peixes.push({ uid: 'aq1', esp: 'lambari', cm: 8 });
-  assert.match(r.action('N', { tipo: 'peixe_vender', uid: 'aq1' }, T0).res.msg, /aquário/, 'do aquário não vende direto'); assert.equal(p.aquario.peixes.length, 1);
-  p.mao = null; assert.equal(r.action('N', { tipo: 'aquario_retirar', uid: 'aq1', de: 'aquario' }, T0).res.ok, true);
-  assert.equal(r.action('N', { tipo: 'peixe_vender' }, T0).res.ok, true, 'tirou e vendeu'); assert.equal(p.aquario.peixes.length, 0);
+  p.vitrine.peixes.push({ uid: 'aq1', esp: 'lambari', cm: 8 });
+  assert.match(r.action('N', { tipo: 'peixe_vender', uid: 'aq1' }, T0).res.msg, /aquário/, 'do aquário não vende direto'); assert.equal(p.vitrine.peixes.length, 1);
+  p.mao = null; assert.equal(r.action('N', { tipo: 'aquario_retirar', uid: 'aq1' }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'peixe_vender' }, T0).res.ok, true, 'tirou e vendeu'); assert.equal(p.vitrine.peixes.length, 0);
   p.mao = null;
   p.baloes = 9; p.mao = { uid: 'l', esp: 'lula', cm: 30 };
   assert.equal(r.action('N', { tipo: 'processar_lula' }, T0).res.ok, true); assert.equal(p.baloes, 10);
@@ -406,7 +406,9 @@ test('mais varas, aquários e tanques; dá para pular direto para um aquário/va
   assert.ok(AQUARIOS[1].custo.dinheiro <= 50, 'tem aquário baratinho');
   p.dinheiro = 100000;
   assert.equal(r.action('N', { tipo: 'comprar', cat: 'aquario', nivel: 4 }, T0).res.ok, true); assert.equal(p.aquario.nivel, 4);
-  assert.equal(r.action('N', { tipo: 'comprar', cat: 'aquario', nivel: 2 }, T0).res.ok, false, 'não volta para um menor');
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'aquario', nivel: 2 }, T0).res.ok, true, 'dá para comprar um menor também'); assert.equal(p.vitrine.nivel, 2);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'aquario', nivel: 2 }, T0).res.ok, false, 'não compra o mesmo duas vezes');
+  assert.equal(r.action('N', { tipo: 'vitrine_equipar', tipo2: 'aquario', nivel: 4 }, T0).res.ok, true); assert.equal(p.vitrine.nivel, 4);
   assert.equal(r.action('N', { tipo: 'comprar', cat: 'vara', nivel: 6 }, T0).res.ok, true); assert.equal(p.vara, 6);
   assert.equal(r.action('N', { tipo: 'comprar', cat: 'tanque' }, T0).res.ok, true); assert.equal(p.tanque.nivel, 0);
   assert.equal(r.action('N', { tipo: 'comprar', cat: 'tanque' }, T0).res.ok, true); assert.equal(p.tanque.nivel, 1);
@@ -679,4 +681,24 @@ test('bancada de peixe (S$ 2.000): só peixe na mão de mais de 2 kg; tábua (E)
   assert.equal(res.ok, true, res.msg);
   assert.equal(p.mochila.length, 0);
   assert.equal(p.dinheiro, d0 + v);
+});
+
+test('só um aquário OU tanque na estação: comprar equipa, Equipar troca, peixes passam junto', () => {
+  const r = mkRoom(); r.join(np('n'), 'N', T0); const pl = noSub(r, 'N'); const p = pl.profile;
+  p.dinheiro = 1e6;
+  assert.equal(p.vitrine.tipo, 'aquario'); assert.equal(p.vitrine.nivel, 0);
+  p.mao = { uid: 'a', esp: 'tetra', cm: 5 }; assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'aquario', nivel: 4 }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'tanque' }, T0).res.ok, true);
+  assert.equal(p.vitrine.tipo, 'tanque', 'comprar o tanque equipa ele (o aquário some)'); assert.equal(p.vitrine.peixes.length, 1, 'o peixe veio junto');
+  p.mao = { uid: 't', esp: 'tubarao', cm: 150 }; assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, true, 'tubarão vai no tanque');
+  // volta para o aquário: o tubarão não cabe e vai para a mochila? não (tubarão inteiro não cabe na mochila) → só se couber
+  const res = r.action('N', { tipo: 'vitrine_equipar', tipo2: 'aquario', nivel: 0 }, T0).res;
+  assert.equal(res.ok, true, res.msg); assert.equal(p.vitrine.tipo, 'aquario'); assert.equal(p.vitrine.peixes.length, 1);
+  assert.equal(p.mochila.length, 1, 'o que não coube foi para a mochila');
+  assert.equal(r.action('N', { tipo: 'vitrine_equipar', tipo2: 'tanque', nivel: 3 }, T0).res.ok, false, 'não tem esse tanque');
+  // migração: perfil com aquário e tanque separados vira uma vitrine (o tanque)
+  const velho = migrateProfile({ ...np('w'), vitrine: undefined, aquario: { nivel: 3, peixes: [{ uid: 'x', esp: 'tetra', cm: 4 }] }, tanque: { nivel: 1, peixes: [{ uid: 'y', esp: 'pacu', cm: 60 }] } });
+  assert.equal(velho.vitrine.tipo, 'tanque'); assert.equal(velho.vitrine.nivel, 1); assert.equal(velho.vitrine.peixes.length, 2);
+  assert.deepEqual(velho.tanquesTem, [0, 1]); assert.ok(velho.aquariosTem.includes(3));
 });
