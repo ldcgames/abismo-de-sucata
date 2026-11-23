@@ -95,7 +95,7 @@ export const CASA_TINTA = { x: 13.6, z: 7.4 };
 // bancada de peixe (pertinho da bancada de restauro, na frente da oficina)
 export const BANCADA_PEIXE = { x: -14, z: 2.4 };
 // vaga de estacionamento (garagem): onde o veículo equipado aparece. yaw local: frente para o lago
-export const VAGA_CARRO = { x: -13.2, z: 11.2, yaw: 0 };
+export const VAGA_CARRO = { x: -13.0, z: 11.2, yaw: -Math.PI / 2 }; // de frente para fora da estação (lado -x), não para o lago
 export function estacaoYaw(st) { return Math.atan2(-st.dir[0], -st.dir[1]); }
 // pista da corrida de carro: volta completa em volta do lago pela trilha de terra (atrás das estações)
 export const PISTA_R = LAKE_R + 52;

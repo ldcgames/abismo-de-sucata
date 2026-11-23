@@ -49,7 +49,7 @@ export const Veiculos = {
     for (const d of Object.keys(this.veic)) if (!vistos.has(d)) { this.scene.remove(this.veic[d].m.node); delete this.veic[d]; }
     const eu = s.players?.[this.slot];
     // a sala tirou você do veículo (ex.: o dono trocou de carro)
-    if (eu && !eu.veic && this.me.modo === 'carro' && !this.saindoVeic) this.sairDoVeiculo(true);
+    if (eu && !eu.veic && this.me.modo === 'carro' && !this.saindoVeic && performance.now() - (this.veicEntrouT || 0) > 1500) this.sairDoVeiculo(true);
   },
   interpVeic(e) {
     const t = performance.now() - 110, b = e.buf;
@@ -115,7 +115,7 @@ export const Veiculos = {
     this.me.arma = null; this.me.mirando = false; this.me.mirandoLixo = false; this.me.emote = null; this.roda = null;
     this.me.modo = 'carro'; this.me.vel = [0, 0, 0];
     if (e.info?.ocup) e.info.ocup[lugar] = this.slot; // até o próximo snapshot chegar
-    this.me.veicInfo = { dono, lugar };
+    this.me.veicInfo = { dono, lugar }; this.veicEntrouT = performance.now();
     this.camOffVeic = 0;
     this.audio.blip(220, 0.08, 'square', 0.05);
   },
@@ -373,13 +373,13 @@ export const Veiculos = {
   // ---------------------------------------------------------------- loja de carros (painel)
   painelCarrosHtml() {
     const p = this.perfil, vs = p.veiculos || { tem: ['patinete'], eq: 'patinete' };
-    let h = `<p class="nota">Um veículo equipado por vez: ele aparece na sua <b>vaga de estacionamento</b> (placa GARAGEM, no canto da estação). Se equipar outro, o novo aparece na vaga (o antigo some de onde estiver).<br>
+    let h = `<p class="nota">Um veículo equipado por vez: ele aparece na sua <b>vaga de estacionamento</b> (placa GARAGEM, no canto da estação). Se equipar outro, o novo aparece na vaga (o antigo some de onde estiver). Destrancado, qualquer um pode dirigir o seu veículo; se levarem embora, aperte <b>Trazer para a vaga</b> e ele volta para a garagem.<br>
       <kbd>E</kbd> entra (no seu ou de carona no de um amigo) · <kbd>E</kbd> sai · <kbd>T</kbd> tranca · <kbd>B</kbd> buzina · <kbd>L</kbd> farol. Dentro do veículo não dá para atirar nem pescar.<br>
       Atropelar alguém joga a pessoa longe (como a bazuca). Caiu no lago: o veículo afunda e volta para a vaga; você volta nadando.</p><div class="grade">`;
     for (const k of VEIC_ORDEM) {
       const v = VEICULOS[k], tem = vs.tem.includes(k), eq = vs.eq === k;
       const vel = Math.round(v.vmax * 3.6);
-      const btn = eq ? '<div class="val"><b>✔ Equipado</b></div>' : tem ? `<button data-acao='${JSON.stringify({ tipo: 'veic_equipar', chave: k })}'>Equipar</button>` : `<button data-acao='${JSON.stringify({ tipo: 'comprar', cat: 'veiculo', chave: k })}' ${p.dinheiro < v.preco ? `disabled title="Faltam S$ ${fmt(v.preco - p.dinheiro)}"` : ''}>Comprar</button>`;
+      const btn = eq ? `<div class="val"><b>✔ Equipado</b></div><button data-acao='${JSON.stringify({ tipo: 'veic_equipar', chave: k })}'>🅿️ Trazer para a vaga</button>` : tem ? `<button data-acao='${JSON.stringify({ tipo: 'veic_equipar', chave: k })}'>Equipar</button>` : `<button data-acao='${JSON.stringify({ tipo: 'comprar', cat: 'veiculo', chave: k })}' ${p.dinheiro < v.preco ? `disabled title="Faltam S$ ${fmt(v.preco - p.dinheiro)}"` : ''}>Comprar</button>`;
       h += `<div class="card"><h3>${esc(v.nome)}</h3><div class="val">👥 cabe${v.lugares > 1 ? 'm' : ''} <b>${v.lugares} pessoa${v.lugares > 1 ? 's' : ''}</b> · até ${vel} km/h</div><div class="nv">${esc(v.funcao)}</div><div class="custo">${v.preco ? 'S$ ' + fmt(v.preco) : 'Grátis (já é seu)'}</div>${btn}</div>`;
     }
     return h + '</div>';

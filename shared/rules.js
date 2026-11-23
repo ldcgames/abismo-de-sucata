@@ -763,7 +763,7 @@ const ACOES = {
     const e = precisaEstacao(ctx); if (e) return e;
     p.veiculos ||= { tem: ['patinete'], eq: 'patinete' };
     if (!VEICULOS[a.chave] || !p.veiculos.tem.includes(a.chave)) return fail('Você não tem esse veículo');
-    if (p.veiculos.eq === a.chave) return fail('Esse já está equipado');
+    if (p.veiculos.eq === a.chave) return okR(`${VEICULOS[a.chave].nome} voltou para a sua vaga de estacionamento`); // puxar de novo: some de onde está e aparece na garagem
     p.veiculos.eq = a.chave;
     return okR(`${VEICULOS[a.chave].nome} equipado — ele está na sua vaga de estacionamento`);
   },

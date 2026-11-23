@@ -442,12 +442,13 @@ export class Station {
     }
     // vaga de estacionamento (garagem do veículo): faixas brancas no chão e uma placa
     {
+      // eixo u = frente do carro (aponta para -x, para fora da estação), s = lateral (z)
       const vx = VAGA_CARRO.x, vz = VAGA_CARRO.z;
       g.k = MAT.PINTADO;
-      for (const s2 of [-1, 1]) g.put(box(0.12, 0.012, 5.8), [vx + s2 * 1.55, 1.556, vz], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
-      g.put(box(3.2, 0.012, 0.12), [vx, 1.556, vz - 2.9], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
-      g.put(box(1.3, 0.011, 1.3), [vx, 1.555, vz - 0.6], [0, 0, 0], 1, [0.95, 0.8, 0.15]);
-      g.put(cylinder(0.05, 0.05, 2.2, 8), [vx - 1.9, 2.65, vz - 2.9], [0, 0, 0], 1, METAL);
+      for (const s2 of [-1, 1]) g.put(box(5.8, 0.012, 0.12), [vx, 1.556, vz + s2 * 1.55], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
+      g.put(box(0.12, 0.012, 3.2), [vx + 2.9, 1.556, vz], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
+      g.put(box(1.3, 0.011, 1.3), [vx + 0.6, 1.555, vz], [0, 0, 0], 1, [0.95, 0.8, 0.15]);
+      g.put(cylinder(0.05, 0.05, 2.2, 8), [vx + 2.9, 2.65, vz - 1.9], [0, 0, 0], 1, METAL);
     }
     const sn = new Node('estrutura'); sn.mesh = R.createMesh(g, { rough: 0.85, metal: 0.05, rust: 0.45 });
     this.root.add(sn);
@@ -498,7 +499,7 @@ export class Station {
       const ent4 = textQuad(R, ['CARROS'], 2.4, 0.42, { px: 512, bg: '#1c2a3a', border: '#7fb2ff' });
       ent4.at(hx - 2.36, 4.42, hz).rot(0, -Math.PI / 2, 0); this.root.add(ent4);
       const pv = textQuad(R, ['GARAGEM', 'seu veículo aparece aqui'], 1.3, 0.5, { px: 400, bg: '#20262c', border: '#f2c94c' });
-      pv.at(VAGA_CARRO.x - 1.9, 3.5, VAGA_CARRO.z - 2.9).rot(0, 0, 0); this.root.add(pv);
+      pv.at(VAGA_CARRO.x + 2.9, 3.5, VAGA_CARRO.z - 1.9).rot(0, -Math.PI / 2, 0); this.root.add(pv);
     }
     const ent = textQuad(R, ['BOLSAS DE TINTA'], 2.4, 0.42, { px: 512, bg: '#3a2a1c' });
     ent.at(CASA_TINTA.x - 2.36, 4.42, CASA_TINTA.z).rot(0, -Math.PI / 2, 0); this.root.add(ent);

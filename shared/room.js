@@ -86,7 +86,9 @@ export class Room {
       }
     }
     if (num(s.rot)) pl.rot = s.rot;
-    if (['terra', 'sub', 'nadando', 'guindaste'].includes(s.modo)) { pl.modo = s.modo; if (pl.veic) this.tirarDoVeiculo(slot); }
+    // estados que o navegador mandou antes de saber que entrou no veículo ainda dizem 'terra': nos primeiros 1,5 s eles não tiram ninguém do carro
+    const acabouDeEntrar = pl.veic && now - (pl.veicDesde || 0) < 1500;
+    if (['terra', 'sub', 'nadando', 'guindaste'].includes(s.modo) && !acabouDeEntrar) { pl.modo = s.modo; if (pl.veic) this.tirarDoVeiculo(slot); }
     else if (s.modo === 'carro' && pl.veic) pl.modo = 'carro';
     // quem dirige manda a posição do veículo
     if (pl.veic && pl.veic.lugar === 0 && s.veic && vec(s.veic.pos)) {
@@ -225,7 +227,7 @@ export class Room {
       let lugar = v.ocup.findIndex((o) => o === null);
       // o dono sempre pode assumir o volante se ele estiver vazio; os outros entram onde tiver lugar
       if (lugar < 0) return fail(`Lotado (${spec.lugares}/${spec.lugares} lugares)`);
-      v.ocup[lugar] = slot; pl.veic = { dono, lugar }; pl.modo = 'carro';
+      v.ocup[lugar] = slot; pl.veic = { dono, lugar }; pl.modo = 'carro'; pl.veicDesde = now ?? Date.now();
       return { ...ok(lugar === 0 ? `Você está dirigindo: ${spec.nome}` : `Você entrou de carona (${spec.nome})`, [{ t: 'veic_entrou', dono, slot, lugar }]), lugar };
     }
     if (a.tipo === 'veic_sair') {
