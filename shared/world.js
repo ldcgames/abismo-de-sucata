@@ -192,12 +192,15 @@ export function shaftRadius(seg, y, ang) {
   return R;
 }
 
+// Onde uma parte mais estreita começa embaixo de uma mais larga, o "teto" da estreita sobe um pouco para dentro da
+// larga: sem isso as duas tampas se encostavam num plano e o submarino batia numa parede invisível (-500 m e -1500 m).
+const SEG_SOBRE = SHAFT_SEGS.map((seg, i) => (i > 0 && seg.r0 <= SHAFT_SEGS[i - 1].r1 ? 8 : 0));
 function segSDF(seg, x, y, z) {
   const dx = x - SHAFT_C.x, dz = z - SHAFT_C.z;
   const rr = Math.hypot(dx, dz);
   const ang = Math.atan2(dz, dx);
   const R = shaftRadius(seg, clamp(y, seg.yBot, seg.yTop), ang);
-  return Math.min(R - rr, seg.yTop - y, y - seg.yBot);
+  return Math.min(R - rr, seg.yTop + SEG_SOBRE[SHAFT_SEGS.indexOf(seg)] - y, y - seg.yBot);
 }
 
 // ---------- cavernas laterais (túneis em cápsula) ----------

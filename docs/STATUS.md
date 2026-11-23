@@ -145,3 +145,4 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 - v1.5.2: bunda/bolsos seguem o quadril ao sentar (coxa dobra por baixo), sem fiapos entre perna e boia; boia rígida no quadril; ombro todo com a cor da camisa.
 - v1.5.3: lâmpadas acesas na oficina (2) e nas casinhas de tinta, armas e corrida. TESTE: Garrafa PET valendo S$ 1.000.000 (valor normal = 10, em shared/data.js).
 - v1.6: menu do ESC (Continuar, Configurações: gráfico Ultra/Alto/Médio/Baixo/Mínimo, brilho, som, barulhos, voz dos outros; Ocultar código da sala — modo streamer). Garrafa PET voltou a S$ 10.
+- v1.6.1: removidas as paredes invisíveis da fenda em -500 m e -1500 m (as tampas de duas partes da fenda se encostavam num plano); agora dá para descer até o fundo (-4300 m).
