@@ -211,7 +211,7 @@ export class Character {
     }
     this.phase = 0; this.t = 0;
     // aparência: o pescador com boia de pato (modelo do usuário)
-    try { vestirPescador(this, R); } catch (e) { console.error('pescador', e); }
+    try { vestirPescador(this, R, pal.roupa); } catch (e) { console.error('pescador', e); }
     this.pose = {}; // ângulos suavizados
     this.state = { speed: 0, grounded: true, mode: 'idle', action: null, actionT: 0 };
   }

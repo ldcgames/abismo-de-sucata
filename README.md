@@ -106,6 +106,14 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v1.3: pescador caprichado
+
+- Mais fiel ao modelo: ~97 mil triângulos (antes 37 mil) e a textura original em 4K.
+- Sem partes transparentes: a malha é desenhada dos dois lados (a IA deixa alguns triângulos virados).
+- A camisa fica na **cor que o jogador escolheu**, mantendo as dobras e a estampa do peixe (máscara da camisa + tinta no shader).
+- A boia não gruda mais no braço nem nas pernas: os pedaços que a IA "soldou" (mão na boia, braço na barriga) são separados e cada triângulo fica inteiro do lado certo, sem furos.
+- Ombro com transição mais suave para o peito.
+
 ## Novidades da v1.2: personagem pescador
 
 - O boneco agora é o **pescador com boia de pato** (modelo do usuário feito no Meshy AI), com a textura original.

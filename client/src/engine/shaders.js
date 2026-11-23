@@ -53,7 +53,7 @@ void main(){
 export const STD_FS = /* glsl */`#version 300 es
 ${COMMON}
 in vec3 vW; in vec3 vN; in vec4 vC; in vec3 vL; in vec4 vUv;
-uniform sampler2D uNoise, uBark, uBarkN, uLeaf, uWood, uAlbedo; uniform float uKind, uRust, uTexScale, uHasTex;
+uniform sampler2D uNoise, uBark, uBarkN, uLeaf, uWood, uAlbedo, uMask; uniform float uKind, uRust, uTexScale, uHasTex, uHasMask; uniform vec3 uTint;
 uniform vec3 uColor, uEmissive; uniform float uRough, uMetal, uOpacity, uTime, uExpo, uDouble, uCaust, uGlow, uVE;
 uniform vec3 uCamPos, uSunDir, uSunCol, uSkyAmb, uGndAmb;
 uniform float uUnder; uniform vec3 uWFogCol; uniform float uWFogDen;
@@ -99,7 +99,14 @@ void main(){
   float kind = uKind >= 0. ? uKind : floor(vUv.z + 0.5);
 #endif
   vec3 base = toLin(uColor * vC.rgb);
-  if (uHasTex > 0.5) base = toLin(texture(uAlbedo, vUv.xy).rgb * uColor * vC.rgb);
+  if (uHasTex > 0.5) {
+    vec3 tx = texture(uAlbedo, vUv.xy).rgb;
+    if (uHasMask > 0.5) { // camisa pintada com a cor do jogador, mantendo as dobras e a estampa
+      float m = texture(uMask, vUv.xy).r, l = dot(tx, vec3(0.299, 0.587, 0.114));
+      tx = mix(tx, clamp(uTint * (l / 0.27), 0., 1.), m);
+    }
+    base = toLin(tx * uColor * vC.rgb);
+  }
   vec3 N = normalize(vN);
   if ((uDouble > .5 || kind > 8.5 && kind < 9.5) && !gl_FrontFacing) N = -N;
   vec3 V = normalize(uCamPos - vW);

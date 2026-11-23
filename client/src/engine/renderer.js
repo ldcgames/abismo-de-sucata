@@ -307,7 +307,7 @@ export class Renderer {
     gl.uniform1f(pr.loc('uShadowOn'), this.shadowActive ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
     gl.uniform1i(pr.loc('uShadow'), 0);
-    gl.uniform1i(pr.loc('uAlbedo'), 8);
+    gl.uniform1i(pr.loc('uAlbedo'), 8); gl.uniform1i(pr.loc('uMask'), 9);
     this.bindMatTex(pr);
   }
   bindMatTex(pr) {
@@ -333,13 +333,15 @@ export class Renderer {
     if (!depthOnly) {
       if (mt.tex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, mt.tex); gl.uniform1i(pr.loc('uAlbedo'), 8); gl.uniform1f(pr.loc('uHasTex'), 1); }
       else gl.uniform1f(pr.loc('uHasTex'), 0);
+      if (mt.tex && mt.mask) { gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D, mt.mask); gl.uniform1i(pr.loc('uMask'), 9); gl.uniform3fv(pr.loc('uTint'), mt.tint || [1, 1, 1]); gl.uniform1f(pr.loc('uHasMask'), 1); }
+      else gl.uniform1f(pr.loc('uHasMask'), 0);
     }
     gl.uniform1f(pr.loc('uWind'), mt.wind || 0); gl.uniform1f(pr.loc('uSwim'), mt.swim || 0);
     gl.uniform1f(pr.loc('uKind'), mt.kind ?? -1); gl.uniform1f(pr.loc('uRust'), mt.rust ?? 0.5); gl.uniform1f(pr.loc('uTexScale'), mt.texScale ?? 1);
     if (!depthOnly) {
       gl.uniform3fv(pr.loc('uColor'), mt.color); gl.uniform3fv(pr.loc('uEmissive'), mt.emissive);
       gl.uniform1f(pr.loc('uRough'), mt.rough); gl.uniform1f(pr.loc('uMetal'), mt.metal);
-      gl.uniform1f(pr.loc('uOpacity'), mt.opacity); gl.uniform1f(pr.loc('uDouble'), mt.doubleSide ? 1 : 0);
+      gl.uniform1f(pr.loc('uOpacity'), mt.opacity); gl.uniform1f(pr.loc('uDouble'), mt.doubleSide && !mt.semFlip ? 1 : 0);
       gl.uniform1f(pr.loc('uCaust'), mt.caustics === false ? 0 : 1); gl.uniform1f(pr.loc('uGlow'), mt.glow ?? 1); gl.uniform1f(pr.loc('uVE'), mt.vertexEmissive === 2 ? 2 : mt.vertexEmissive ? 1 : 0);
     }
     if (mt.doubleSide) gl.disable(gl.CULL_FACE); else gl.enable(gl.CULL_FACE);

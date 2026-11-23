@@ -46,12 +46,14 @@ tex=cv2.imread('tex0.jpg'); th,tw=tex.shape[:2]; hsv=cv2.cvtColor(tex,cv2.COLOR_
 uvp=np.zeros((npnt,2)); uvp[pid]=UV
 px=np.clip((uvp[:,0]*tw).astype(int),0,tw-1); py=np.clip((uvp[:,1]*th).astype(int),0,th-1)
 h=hsv[py,px,0].astype(int); s=hsv[py,px,1].astype(int); v=hsv[py,px,2].astype(int)
-amarelo=(h>=19)&(h<=34)&(s>180)&(v>170)
-boia=amarelo&(Pp[:,1]>-0.32)&(Pp[:,1]<0.28)
+amarelo=(h>=17)&(h<=38)&(s>110)&(v>120)
+zonaAnel=(Pp[:,1]>-0.28)&(Pp[:,1]<0.03)
+zonaPato=(Pp[:,1]>=0.03)&(Pp[:,1]<0.3)&(Pp[:,2]>0.12)&(np.abs(Pp[:,0])<0.2)
+boia=amarelo&(zonaAnel|zonaPato)
 # expande a boia por vizinhança (bico laranja, óculos) dentro da região do pato
 from scipy.sparse.csgraph import connected_components
 sub=G.copy(); 
-reg=(Pp[:,1]>-0.32)&(Pp[:,1]<0.3)&(Pp[:,2]>0.0)&(amarelo|((h<16)&(s>205))|(v<70))
+reg=(zonaAnel|zonaPato)&(amarelo|((h<16)&(s>205))|(v<70))
 idx=np.where(reg)[0]; Gs=G[idx][:,idx]; nco,cc=connected_components(Gs,directed=False)
 bcomp=set(cc[np.isin(idx,np.where(boia)[0])])
 boia2=np.zeros(npnt,bool); boia2[idx[np.isin(cc,list(bcomp))]]=True
@@ -80,13 +82,52 @@ v0,v1,v2=Pp[pid[I[:,0]]],Pp[pid[I[:,1]]],Pp[pid[I[:,2]]]
 fn=np.cross(v1-v0,v2-v0)
 for k in range(3): np.add.at(nrm,pid[I[:,k]],fn)
 nrm/=np.linalg.norm(nrm,axis=1,keepdims=True)+1e-12
-# corta os triângulos que grudam a boia nas mãos/braços (malha da IA é uma peça só)
-bra=np.isin(lab,[ORD.index(k) for k in ['shL','elL','hdL','shR','elR','hdR']])
-bv=boia[pid[I]]; av=bra[pid[I]]
-corta=(bv.any(1)&av.any(1))
-# idem pernas x braços e cabeça x braços (dedos encostados)
-I=I[~corta]
-print('triangulos cortados',corta.sum())
-np.savez('rig.npz',P=P,UV=UV,I=I,N=nrm[pid],J=top[pid],W=tw4[pid],lab=lab[pid])
+# triângulos que grudam a boia nas mãos/braços (a malha da IA é uma peça só): em vez de cortar (deixava furos),
+# cada triângulo vai inteiro para o lado da maioria; o vértice do outro lado é duplicado com os pesos desse lado
+# grupos de pele que a IA "soldou" uns nos outros: braço x barriga/quadril, boia x qualquer outra parte
+gidx=lambda ks:[ORD.index(k) for k in ks]
+grupo=np.zeros(npnt,np.int64)  # 0 = tronco/cabeça (normal)
+grupo[np.isin(lab,gidx(['shL','elL','hdL']))]=1
+grupo[np.isin(lab,gidx(['shR','elR','hdR']))]=2
+grupo[np.isin(lab,gidx(['thL','knL','anL']))]=3
+grupo[np.isin(lab,gidx(['thR','knR','anR']))]=4
+grupo[np.isin(lab,gidx(['hips','spine']))]=5
+grupo[boia]=6
+def colado(g1,g2):
+    s_={g1,g2}
+    if 6 in s_ and s_!={6,5} and len(s_)==2: return True          # boia com braço/perna/peito
+    if s_ & {1,2} and s_ & {5,3,4}: return True                    # braço com barriga/quadril/perna
+    if s_=={1,2}: return True
+    return False
+Pv=list(P); UVv=list(UV); Nv=list(nrm[pid]); Jv=list(top[pid]); Wv=list(tw4[pid]); labv=list(lab[pid])
+Iout=I.copy(); nmix=0
+G3=grupo[pid[I]]
+for t in range(len(I)):
+    g=G3[t]
+    if g[0]==g[1]==g[2]: continue
+    if not (colado(g[0],g[1]) or colado(g[1],g[2]) or colado(g[0],g[2])): continue
+    vals,cnt=np.unique(g,return_counts=True); dono=vals[cnt.argmax()]
+    ref=I[t][list(g).index(dono)]
+    for k in range(3):
+        if g[k]!=dono:
+            v=I[t,k]; Pv.append(P[v]); UVv.append(UV[v]); Nv.append(nrm[pid[v]]); Jv.append(top[pid[ref]]); Wv.append(tw4[pid[ref]]); labv.append(lab[pid[ref]]); Iout[t,k]=len(Pv)-1
+    nmix+=1
+print('triangulos misturados resolvidos',nmix)
+P=np.array(Pv); UV=np.array(UVv); I=Iout
+NN=np.array(Nv); JJ=np.array(Jv); WW=np.array(Wv); LL=np.array(labv)
+# máscara da camisa (verde) para pintar com a cor do jogador
+TM=1024
+texs=cv2.resize(tex,(TM,TM),interpolation=cv2.INTER_AREA); hs=cv2.cvtColor(texs,cv2.COLOR_BGR2HSV)
+camisaV=np.isin(LL,[ORD.index(k) for k in ['spine','chest','neck','shL','shR','elL','elR']])&(P[:,1]>-0.1)&(P[:,1]<0.42)
+zona=np.zeros((TM,TM),np.uint8)
+for t in np.where(camisaV[I].sum(1)>=2)[0]:
+    q=np.round(UV[I[t]]*TM*4).astype(np.int32); cv2.fillConvexPoly(zona,q,255,shift=2)
+zona=cv2.dilate(zona,np.ones((5,5),np.uint8))
+verde=((hs[:,:,0]>=28)&(hs[:,:,0]<=75)&(hs[:,:,1]>45)).astype(np.uint8)*255
+verde=cv2.morphologyEx(verde,cv2.MORPH_CLOSE,np.ones((3,3),np.uint8))
+mask=cv2.GaussianBlur(cv2.bitwise_and(zona,verde),(3,3),0)
+cv2.imwrite('mascara.png',mask)
+print('mascara cobertura',(mask>128).mean())
+np.savez('rig.npz',P=P,UV=UV,I=I,N=NN,J=JJ,W=WW,lab=LL)
 json.dump({'J':J,'ORD':ORD,'PAI':PAI},open('esqueleto.json','w'))
 print('labels',np.bincount(lab,minlength=len(ORD)))
