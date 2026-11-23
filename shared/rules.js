@@ -6,7 +6,7 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, RENDA_AQUARIO, PEIXARIA, EQUIP, capPeixes, capSaco, valorItem, nomeItem, valorPeixeItem,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, RENDA_AQUARIO, PEIXARIA, EQUIP, capPeixes, capSaco, VEICULOS, valorItem, nomeItem, valorPeixeItem,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
@@ -45,6 +45,7 @@ function newProfileBase(id, nome = 'Explorador') {
     deposito: [],       // itens guardados na estação
     mao: null,          // peixe na mão {uid, esp, cm}
     equip: { saco: 0, bolsa: 0, traje: 0 }, // saco de lixo, bolsa de peixes, traje de mergulho
+    veiculos: { tem: ['patinete'], eq: 'patinete' }, // garagem: comprados e o equipado
     lixoMao: null,      // lixo catado na mão {uid, tipo}: E guarda no saco · Q joga com o estilingue
     mochila: [],        // até 5 peixes guardados (para arremessar ou vender depois)
     peixaria: null,     // peixe na tábua da bancada de peixe { peixe, cortado }
@@ -125,6 +126,9 @@ export function migrateProfile(p) {
   out.estacao.tinta = true; out.extras.lancador = true;
   // mochila virou lista (até 5 peixes)
   out.equip = { saco: Math.max(0, Math.min(EQUIP.saco.length - 1, p.equip?.saco | 0)), bolsa: Math.max(0, Math.min(EQUIP.bolsa.length - 1, p.equip?.bolsa | 0)), traje: Math.max(0, Math.min(EQUIP.traje.length - 1, p.equip?.traje | 0)) };
+  { const tem = Array.isArray(p.veiculos?.tem) ? p.veiculos.tem.filter((k) => VEICULOS[k]) : [];
+    if (!tem.includes('patinete')) tem.unshift('patinete');
+    out.veiculos = { tem, eq: tem.includes(p.veiculos?.eq) ? p.veiculos.eq : 'patinete' }; }
   out.mochila = Array.isArray(p.mochila) ? p.mochila : p.mochila ? [p.mochila] : [];
   // v0.8: mais varas, aquários e tanques — converte os níveis antigos para os novos
   if ((p.inventVer || 1) < 2) {
@@ -501,6 +505,12 @@ const ACOES = {
       const n = Number.isInteger(a.nivel) ? a.nivel : p.vara + 1;
       const v = VARA[n - 1]; if (!v || n <= p.vara) return fail(n <= p.vara ? 'Você já tem uma vara igual ou melhor' : 'Vara inexistente');
       custo = v.custo; nome = v.nome; aplicar = () => { p.vara = n; };
+    } else if (cat === 'veiculo') {
+      const v = VEICULOS[chave]; if (!v || !v.preco) return fail('Veículo inexistente');
+      p.veiculos ||= { tem: ['patinete'], eq: 'patinete' };
+      if (p.veiculos.tem.includes(chave)) return fail('Você já tem esse veículo: use Equipar');
+      custo = { dinheiro: v.preco, comps: {} }; nome = v.nome;
+      aplicar = () => { p.veiculos.tem.push(chave); p.veiculos.eq = chave; return ' — equipado: ele está na sua vaga de estacionamento'; };
     } else if (cat === 'equip') {
       const lista = EQUIP[chave]; if (!lista) return fail('Item inexistente');
       p.equip ||= { saco: 0, bolsa: 0, traje: 0 };
@@ -748,6 +758,14 @@ const ACOES = {
     p.vitrine.peixes.push(p.mao); p.mao = null;
     const t = vitrineSpec(p.vitrine);
     return okR(`Peixe colocado no ${t.nome} [${p.vitrine.peixes.length}/${t.vagas}]`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+  },
+  veic_equipar(p, a, ctx) {
+    const e = precisaEstacao(ctx); if (e) return e;
+    p.veiculos ||= { tem: ['patinete'], eq: 'patinete' };
+    if (!VEICULOS[a.chave] || !p.veiculos.tem.includes(a.chave)) return fail('Você não tem esse veículo');
+    if (p.veiculos.eq === a.chave) return fail('Esse já está equipado');
+    p.veiculos.eq = a.chave;
+    return okR(`${VEICULOS[a.chave].nome} equipado — ele está na sua vaga de estacionamento`);
   },
   aquario_da_bolsa(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;

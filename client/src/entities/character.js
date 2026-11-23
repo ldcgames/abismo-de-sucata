@@ -310,6 +310,24 @@ export class Character {
         spineP = 0.9 * k; shP = [-1.1 * k, -1.1 * k]; knee = [1.0 * k, 1.0 * k]; thigh = [0.6 * k, 0.6 * k];
       }
     }
+    // dentro de um veículo: sentado no banco (mãos no volante se dirige), montado na moto ou em pé no patinete
+    if (st.veiculo) {
+      const vol = st.volante;
+      hipsYaw = 0; hipsRoll = 0; chestY = 0; spineP = 0;
+      if (st.veiculo === 'banco') {
+        hipsY = this.sentaY ? this.sentaY / this.kQuadril : 0.56; thigh = [1.5, 1.5]; knee = [0.95, 0.95]; ank = [-0.15, -0.15]; spineP = -0.18; // pernas esticadas para a frente (pedais)
+        if (vol) { shP = [-1.05 + (st.virar || 0) * 0.25, -1.05 - (st.virar || 0) * 0.25]; elb = [-0.55, -0.55]; shR = [0.05, 0.05]; }
+        else { shP = [-0.35, -0.35]; elb = [-0.6, -0.6]; shR = [0.2, 0.2]; }
+      } else if (st.veiculo === 'moto') {
+        hipsY = this.sentaY ? this.sentaY / this.kQuadril : 0.56; thigh = [1.05, 1.05]; knee = [1.55, 1.55]; ank = [-0.4, -0.4]; spineP = vol ? 0.35 : 0.15;
+        if (vol) { shP = [-1.25 + (st.virar || 0) * 0.2, -1.25 - (st.virar || 0) * 0.2]; elb = [-0.35, -0.35]; shR = [0.25, 0.25]; }
+        else { shP = [-0.6, -0.6]; elb = [-1.0, -1.0]; shR = [0.45, 0.45]; }
+      } else { // patinete: em pé, um pé na frente, mãos no guidão
+        thigh = [0.15, -0.1]; knee = [0.2, 0.15]; ank = [-0.05, -0.25]; spineP = 0.12;
+        shP = [-0.95 + (st.virar || 0) * 0.2, -0.95 - (st.virar || 0) * 0.2]; elb = [-0.45, -0.45]; shR = [0.18, 0.18];
+      }
+      headP = 0.05;
+    }
     // gestos e danças (scroll do mouse)
     const sentado = !!(st.emote && st.emote.i === 2 && !st.escorrega && !(st.atordoado > 0));
     this.cadeira.visible = sentado;

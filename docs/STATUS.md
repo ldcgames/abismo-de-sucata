@@ -1,5 +1,13 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v1.9: veículos
+- Loja de carros no canto ao lado do tanque, com vaga "GARAGEM" onde o veículo aparece. Casinhas de tinta/armas/corrida foram para o lado; a bancada de cortar peixe ficou perto da mesa de restauro (com colisão).
+- Veículos (do mais lento ao mais rápido): patinete (grátis, 1 lugar, 1,5× a caminhada), moto (S$ 5.000, 2 lugares), carro (S$ 10.000, 4), carro de som (S$ 15.000, 2, voz do motorista 4×), caminhonete (S$ 20.000, 5), superesportivo (S$ 30.000, 2).
+- Um veículo equipado por vez; trocar faz o novo aparecer na garagem. Controles: E entra/sai, W/S/A/D, Espaço freio de mão, T tranca (bip-bip), B buzina, L faróis. Sem armas nem pesca dentro.
+- Colisão com guindaste, submarino, árvores, pedras, estações, pessoas e outros carros (empurram uns aos outros). Não sobe o morro. Atropelar arremessa como a bazuca, sem derrubar.
+- Caiu na água: veículo volta para a garagem e o jogador nada.
+- Corrida de carro na barraca de corridas: uma volta de 360° no lago com 8 pórticos em ordem; cair na água volta no último ponto seguro; vencedor +500, perdedores −500 divididos.
+
 ## Novidades da v1.4: pescador sem peças grudadas, boca falando
 
 - Boia separada pelo volume (toro ajustado aos pontos amarelos): a parte de baixo e as sombras da boia não grudam mais no braço.

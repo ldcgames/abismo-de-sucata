@@ -7,7 +7,9 @@ import { stationById, terrainHeight, noise3, PAD_R, CRADLE_R, LAUNCH_R, DOCK_END
 import { AQUARIOS, TANQUES, CORES_JOGADOR, ESPECIES } from '../../shared/data.js';
 import { makeFishGeo } from '../world/fauna.js';
 import { weaponMesh } from './weapons.js';
-import { BARRACA_ARMAS, BARRACA_CORRIDA, BANCADA_PEIXE } from '../../shared/world.js';
+import { BARRACA_ARMAS, BARRACA_CORRIDA, BANCADA_PEIXE, LOJA_CARROS, CASA_TINTA, VAGA_CARRO } from '../../shared/world.js';
+import { modeloVeiculo } from './veiculos.js';
+import { VEICULOS, VEIC_ORDEM } from '../../shared/data.js';
 import { ARMAS_ORDEM } from '../../shared/data.js';
 
 const CONC0 = [0.42, 0.41, 0.38];
@@ -376,9 +378,9 @@ export class Station {
     g.k = MAT.METAL;
     g.put(cylinder(0.06, 0.05, 7, 8), [12, 5, 14], [0, 0, 0], 1, METAL);
     // casinha da fábrica de bolsas de tinta (aberta para o pátio)
-    casinha(g, 13.6, 2.5, [0.48, 0.34, 0.22], luzesLoc);
+    casinha(g, CASA_TINTA.x, CASA_TINTA.z, [0.48, 0.34, 0.22], luzesLoc);
     {
-      const hx = 13.6, hz = 2.5;
+      const hx = CASA_TINTA.x, hz = CASA_TINTA.z;
       // mesa de trabalho encostada na parede do fundo
       g.k = MAT.MADEIRA; g.put(rbox(0.9, 0.1, 2.6, 0.02), [hx + 1.55, 2.6, hz], [0, 0, 0], 1, [0.55, 0.4, 0.26]);
       g.k = MAT.METAL; for (const z of [-1.1, 1.1]) for (const x of [-0.35, 0.35]) g.put(box(0.07, 0.95, 0.07), [hx + 1.55 + x, 2.1, hz + z], [0, 0, 0], 1, METAL);
@@ -425,6 +427,28 @@ export class Station {
       for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) g.put(box(0.03, 0.2, 0.2), [hx + 2.05, 4.35 + j * 0.2 - 0.2, hz - 0.7 + i * 0.2], [0, 0, 0], 1, (i + j) % 2 ? [0.95, 0.95, 0.95] : [0.08, 0.08, 0.08]);
       g.put(cylinder(0.32, 0.4, 0.9, 16), [hx + 0.2, 2.0, hz], [0, 0, 0], 1, [0.18, 0.2, 0.24]); // pedestal da bola
     }
+    // loja de carros (no canto, ao lado do tanque): pódio giratório com um carro de exposição e balcão
+    {
+      const hx = LOJA_CARROS.x, hz = LOJA_CARROS.z;
+      casinha(g, hx, hz, [0.5, 0.5, 0.52], luzesLoc);
+      g.k = MAT.METAL;
+      g.put(cylinder(1.55, 1.6, 0.12, 32), [hx + 0.55, 1.62, hz], [0, 0, 0], 1, [0.75, 0.76, 0.78]); // pódio
+      g.put(torus(1.58, 0.03, 40, 6), [hx + 0.55, 1.69, hz], [0, 0, 0], 1, [0.95, 0.75, 0.2]);
+      g.put(rbox(0.6, 0.95, 0.5, 0.04), [hx + 1.6, 2.0, hz + 1.5], [0, 0, 0], 1, [0.2, 0.22, 0.25]); // balcão
+      g.put(rbox(0.08, 0.42, 0.62, 0.02), [hx + 1.72, 2.72, hz + 1.5], [0, 0, 0], 1, [0.12, 0.12, 0.13]); // monitor
+      // pneus empilhados e uma bandeira quadriculada
+      for (let k = 0; k < 3; k++) g.put(torus(0.32, 0.13, 18, 8), [hx + 1.55, 1.7 + k * 0.26, hz - 1.45], [0, 0, 0], 1, [0.08, 0.08, 0.09]);
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) g.put(box(0.03, 0.2, 0.2), [hx + 2.05, 4.3 + j * 0.2, hz - 0.5 + i * 0.2], [0, 0, 0], 1, (i + j) % 2 ? [0.95, 0.95, 0.95] : [0.08, 0.08, 0.08]);
+    }
+    // vaga de estacionamento (garagem do veículo): faixas brancas no chão e uma placa
+    {
+      const vx = VAGA_CARRO.x, vz = VAGA_CARRO.z;
+      g.k = MAT.PINTADO;
+      for (const s2 of [-1, 1]) g.put(box(0.12, 0.012, 5.8), [vx + s2 * 1.55, 1.556, vz], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
+      g.put(box(3.2, 0.012, 0.12), [vx, 1.556, vz - 2.9], [0, 0, 0], 1, [0.92, 0.92, 0.9]);
+      g.put(box(1.3, 0.011, 1.3), [vx, 1.555, vz - 0.6], [0, 0, 0], 1, [0.95, 0.8, 0.15]);
+      g.put(cylinder(0.05, 0.05, 2.2, 8), [vx - 1.9, 2.65, vz - 2.9], [0, 0, 0], 1, METAL);
+    }
     const sn = new Node('estrutura'); sn.mesh = R.createMesh(g, { rough: 0.85, metal: 0.05, rust: 0.45 });
     this.root.add(sn);
     // tela do terminal (emissiva)
@@ -435,7 +459,7 @@ export class Station {
     this.sign = null;
     // placa na parede da casinha ensinando a fabricar
     const ens = textQuad(R, ['FÁBRICA DE BOLSAS DE TINTA', '1. Pesque uma LULA (à noite, com a linha funda)', '2. Venha com a lula NA MÃO até esta mesa', '3. Aperte E: 1 lula vira 2 bolsas de tinta', '4. A mochila guarda até 10 bolsas', '5. No submarino, submerso, aperte B para lançar', 'Serve para acertar o submarino de um amigo na água', 'e tampar toda a visão dele até ele voltar à superfície!'], 2.9, 1.7, { px: 1100, bg: '#2a1f30', border: '#c58cff' });
-    ens.at(13.6 + 1.98, 3.62, 2.5).rot(0, -Math.PI / 2, 0); this.root.add(ens);
+    ens.at(CASA_TINTA.x + 1.98, 3.62, CASA_TINTA.z).rot(0, -Math.PI / 2, 0); this.root.add(ens);
     {
       const hx = BARRACA_ARMAS.x, hz = BARRACA_ARMAS.z;
       // armas expostas na parede (todas as que a loja vende)
@@ -459,13 +483,25 @@ export class Station {
       const bg = new Geo(); bg.put(sphere(0.38, 22, 16), [hx + 0.2, 2.82, hz], [0, 0, 0], 1, [0.35, 1, 0.6]);
       const bola = new Node('bola_corrida'); bola.mesh = R.createMesh(bg, { emissive: [0.3, 1.3, 0.6], glow: 1.4, castShadow: false }); this.root.add(bola);
       this.bolaCorrida = bola;
-      const pl = textQuad(R, ['CORRIDA DE SUBMARINO', 'Toque na bola (E) e chame os amigos', '2 corredores: vence ganha S$ 200 · perde paga S$ 200', '3 a 5: vence ganha S$ 250 (dividido entre quem perde)'], 2.3, 0.8, { px: 900, bg: '#12302a', border: '#5fe39a' });
+      const pl = textQuad(R, ['CORRIDAS: SUBMARINO OU CARRO', 'Toque na bola (E), escolha e chame os amigos', 'Submarino: vence ganha S$ 200 (2) ou S$ 250 (3 a 5)', 'Carro: 1 volta no lago · vence ganha S$ 500'], 2.3, 0.8, { px: 900, bg: '#12302a', border: '#5fe39a' });
       pl.at(hx + 0.1, 3.3, hz - 1.72).rot(0, 0, 0); this.root.add(pl);
       const ent3 = textQuad(R, ['CORRIDA'], 2.4, 0.42, { px: 512, bg: '#123a2c', border: '#5fe39a' });
       ent3.at(hx - 2.36, 4.42, hz).rot(0, -Math.PI / 2, 0); this.root.add(ent3);
     }
+    {
+      const hx = LOJA_CARROS.x, hz = LOJA_CARROS.z;
+      const expo = modeloVeiculo(R, 'esportivo', [0.85, 0.12, 0.1]); expo.node.at(hx + 0.55, 1.68, hz).sc(0.62); this.root.add(expo.node); this.carroExpo = expo.node;
+      const linhas = ['LOJA DE CARROS — compre e equipe no balcão (E)'];
+      for (const k of VEIC_ORDEM) { const v = VEICULOS[k]; linhas.push(`${v.nome}: ${v.preco ? 'S$ ' + v.preco.toLocaleString('pt-BR') : 'grátis'} · cabe${v.lugares > 1 ? 'm' : ''} ${v.lugares} pessoa${v.lugares > 1 ? 's' : ''}${v.voz ? ' · voz 4×' : ''}`); }
+      const pl = textQuad(R, linhas, 2.6, 1.25, { px: 1000, bg: '#1c2330', border: '#7fb2ff' });
+      pl.at(hx + 2.0, 3.75, hz).rot(0, -Math.PI / 2, 0); this.root.add(pl);
+      const ent4 = textQuad(R, ['CARROS'], 2.4, 0.42, { px: 512, bg: '#1c2a3a', border: '#7fb2ff' });
+      ent4.at(hx - 2.36, 4.42, hz).rot(0, -Math.PI / 2, 0); this.root.add(ent4);
+      const pv = textQuad(R, ['GARAGEM', 'seu veículo aparece aqui'], 1.3, 0.5, { px: 400, bg: '#20262c', border: '#f2c94c' });
+      pv.at(VAGA_CARRO.x - 1.9, 3.5, VAGA_CARRO.z - 2.9).rot(0, 0, 0); this.root.add(pv);
+    }
     const ent = textQuad(R, ['BOLSAS DE TINTA'], 2.4, 0.42, { px: 512, bg: '#3a2a1c' });
-    ent.at(13.6 - 2.36, 4.42, 2.5).rot(0, -Math.PI / 2, 0); this.root.add(ent);
+    ent.at(CASA_TINTA.x - 2.36, 4.42, CASA_TINTA.z).rot(0, -Math.PI / 2, 0); this.root.add(ent);
     // lâmpadas acesas (bulbo brilhante) + luz pontual usada pelo jogo de dia e de noite
     const lb = new Geo(); for (const l of luzesLoc) lb.put(sphere(0.09, 12, 8), l, [0, 0, 0], 1, [1, 0.92, 0.7]);
     const lbn = new Node('lampadas_internas'); lbn.mesh = R.createMesh(lb, { emissive: [1, 0.85, 0.55], glow: 2.5, castShadow: false }); this.root.add(lbn);
@@ -959,6 +995,7 @@ export class Station {
   }
 
   animateFish(dt, t) {
+    if (this.carroExpo) this.carroExpo.rot(0, t * 0.35, 0);
     if (this.bolaCorrida) this.bolaCorrida.pos[1] = Math.sin(t * 2.2) * 0.07;
     for (const a of [...this.aqFish, ...this.tankFish]) {
       const b = a.box;
@@ -988,9 +1025,10 @@ export class Station {
     ];
     if (est?.peixaria) list.push(P('peixaria', BANCADA_PEIXE.x + 1.7, 1.6, BANCADA_PEIXE.z, 2.4, { txt: 'Bancada de peixe' }));
     if (est?.restauro) list.push(P('restauro', -12, 1.6, -2.5, 2.6, { txt: 'Bancada de restauro' }));
-    list.push(P('tinta', 13.4, 1.6, 2.5, 2.2, { txt: 'Fábrica de bolsas de tinta (leia a placa)' }));
+    list.push(P('tinta', CASA_TINTA.x - 0.2, 1.6, CASA_TINTA.z, 2.2, { txt: 'Fábrica de bolsas de tinta (leia a placa)' }));
+    list.push(P('carros', LOJA_CARROS.x + 0.9, 1.6, LOJA_CARROS.z + 1.4, 2.2, { txt: 'Loja de carros: comprar e equipar veículos' }));
     list.push(P('armas', BARRACA_ARMAS.x + 0.9, 1.6, BARRACA_ARMAS.z - 1.2, 2.0, { txt: 'Computador da loja de armas: comprar armas e balas' }));
-    list.push(P('corrida', BARRACA_CORRIDA.x - 0.6, 1.6, BARRACA_CORRIDA.z, 2.0, { txt: 'Corrida de submarino: chamar amigos' }));
+    list.push(P('corrida', BARRACA_CORRIDA.x - 0.6, 1.6, BARRACA_CORRIDA.z, 2.0, { txt: 'Corrida de carro ou de submarino: chamar amigos' }));
     { const L = vitrineLayout(est?.vitrine || this.estVis?.vitrine); list.push(P('aquario', Math.max(L.x, L.x - L.w / 2 + 1.2), 1.6, VITRINE_FRENTE + 0.9, 2.4, { txt: L.t.nome })); }
     return list;
   }
@@ -1005,7 +1043,9 @@ export class Station {
       { x: 0, z: this.zCradle, w: 2.4, d: 5.4 }, { x: this.xPivot, z: this.zPivot, w: 2.6, d: 2.6 },
       { x: 3.2, z: this.zCradle - 1, w: 0.9, d: 0.6 },
       { x: -14, z: 10, w: 2.6, d: 2.4, auto: 'rec' },
-      { x: 15.75, z: 2.5, w: 0.3, d: 4.0 }, { x: 13.6, z: 0.58, w: 4.4, d: 0.3 }, { x: 13.6, z: 4.42, w: 4.4, d: 0.3 }, { x: 15.15, z: 2.5, w: 0.9, d: 2.6 },
+      { x: CASA_TINTA.x + 2.15, z: CASA_TINTA.z, w: 0.3, d: 4.0 }, { x: CASA_TINTA.x, z: CASA_TINTA.z - 1.92, w: 4.4, d: 0.3 }, { x: CASA_TINTA.x, z: CASA_TINTA.z + 1.92, w: 4.4, d: 0.3 }, { x: CASA_TINTA.x + 1.55, z: CASA_TINTA.z, w: 0.9, d: 2.6 },
+      { x: LOJA_CARROS.x + 2.15, z: LOJA_CARROS.z, w: 0.3, d: 4.0 }, { x: LOJA_CARROS.x, z: LOJA_CARROS.z - 1.92, w: 4.4, d: 0.3 }, { x: LOJA_CARROS.x, z: LOJA_CARROS.z + 1.92, w: 4.4, d: 0.3 },
+      { x: LOJA_CARROS.x + 0.55, z: LOJA_CARROS.z, w: 2.6, d: 2.6 }, { x: LOJA_CARROS.x + 1.6, z: LOJA_CARROS.z + 1.5, w: 0.7, d: 0.6 }, { x: LOJA_CARROS.x + 1.55, z: LOJA_CARROS.z - 1.45, w: 0.9, d: 0.9 },
       { x: BARRACA_ARMAS.x + 2.15, z: BARRACA_ARMAS.z, w: 0.3, d: 4.0 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_ARMAS.x, z: BARRACA_ARMAS.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_ARMAS.x + 1.55, z: BARRACA_ARMAS.z + 0.6, w: 0.9, d: 2.0 }, { x: BARRACA_ARMAS.x + 1.5, z: BARRACA_ARMAS.z - 1.35, w: 0.9, d: 0.9 }, { x: BARRACA_ARMAS.x + 0.45, z: BARRACA_ARMAS.z + 1.45, w: 0.7, d: 0.5 },
       { x: 12, z: 14, w: 0.3, d: 0.3 }, { x: PLACA_X, z: -12.5, w: 4.4, d: 0.3 },

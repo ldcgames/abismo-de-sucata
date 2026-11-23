@@ -153,10 +153,11 @@ check(/Ana/.test(rank) && /Beto/.test(rank) && /S\$/.test(rank), 'ranking top 3 
 // A vai até a barraca da corrida, escolhe o Beto e chama
 const chamou = await A.evaluate(async (sb) => {
   const g = __jogo, st = g.stations[g.slot]; g.net.enviar({ t: 'teste_dinheiro', v: 1000 }); await new Promise((r) => setTimeout(r, 300));
-  for (const wp of [[-1.9, 1.5, 10], [9.5, 1.6, -6], [12.8, 1.6, -7.3]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
+  for (const wp of [[-1.9, 1.5, 10], [9.5, 1.6, -2.4], [12.6, 1.6, -2.4]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
   g.step(3); const prompt = document.getElementById('prompt').textContent;
   g.input.press('KeyE'); g.step(1);
   const painel = g.ui.aberto;
+  document.querySelector('[data-modo-corrida="sub"]')?.click();
   document.querySelector(`[data-escolher="${sb}"]`)?.click();
   const cinza = document.querySelector(`[data-escolher="${sb}"]`)?.className;
   document.querySelector('[data-chamar]')?.click();

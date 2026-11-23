@@ -86,12 +86,19 @@ export function chaoEstatua(x, z) {
   if (d < 4.65) h = deg(4.3, 0.65, 1.05);
   return ESTATUA.y + h * S;
 }
-// barraca de armas: posição local na estação (ao lado da casinha de tinta)
-export const BARRACA_ARMAS = { x: 13.6, z: -2.4 };
-// barraca da corrida de submarino, ao lado da loja de armas (coordenadas locais da estação)
-export const BARRACA_CORRIDA = { x: 13.6, z: -7.3 };
-// bancada de peixe (onde ficava a recicladora) e bancada de restauro, em coordenadas locais da estação
-export const BANCADA_PEIXE = { x: -14, z: 10 };
+// fileira de casinhas no lado direito da estação (coordenadas locais), de trás (perto do tanque) para a frente:
+// loja de carros · corrida · armas · tinta
+export const LOJA_CARROS = { x: 13.6, z: -7.3 };
+export const BARRACA_CORRIDA = { x: 13.6, z: -2.4 };
+export const BARRACA_ARMAS = { x: 13.6, z: 2.5 };
+export const CASA_TINTA = { x: 13.6, z: 7.4 };
+// bancada de peixe (pertinho da bancada de restauro, na frente da oficina)
+export const BANCADA_PEIXE = { x: -14, z: 2.4 };
+// vaga de estacionamento (garagem): onde o veículo equipado aparece. yaw local: frente para o lago
+export const VAGA_CARRO = { x: -13.2, z: 11.2, yaw: 0 };
+export function estacaoYaw(st) { return Math.atan2(-st.dir[0], -st.dir[1]); }
+// pista da corrida de carro: volta completa em volta do lago pela trilha de terra (atrás das estações)
+export const PISTA_R = LAKE_R + 52;
 
 // ---------- terreno ----------
 function stationFlatten(x, z) {

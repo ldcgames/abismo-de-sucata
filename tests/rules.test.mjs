@@ -799,3 +799,68 @@ test('equipamentos: saco 20, bolsas 10/20, trajes 2×/3×; doar peixe para amigo
   assert.equal(r.action('N', { tipo: 'aquario_da_bolsa', uid: 'p3', de: 'mochila' }, T0 + 50).res.ok, true);
   assert.ok(A.profile.vitrine.peixes.some((f) => f.uid === 'p3'));
 });
+
+test('veículos: patinete de começo, comprar/equipar na garagem, entrar/carona/lotado, trancar, atropelar e cair na água', async () => {
+  const { VEICULOS } = await import('../shared/data.js');
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0); r.join(np('c'), 'SE', T0);
+  const A = r.players.get('N'), B = r.players.get('L'), C = r.players.get('SE');
+  assert.equal(r.veiculos.get('N').tipo, 'patinete', 'todo mundo começa com o patinete');
+  assert.equal(r.snapshot(T0).veiculos.N.tipo, 'patinete');
+  const st = STATIONS.find((s) => s.id === 'N'); A.modo = 'terra'; A.pos = [st.pad[0], 1.6, st.pad[1]];
+  A.profile.dinheiro = 40000;
+  const comp = r.action('N', { tipo: 'comprar', cat: 'veiculo', chave: 'carro' }, T0);
+  assert.equal(comp.res.ok, true); assert.equal(A.profile.dinheiro, 30000);
+  assert.ok(comp.events.some((e) => e.t === 'veic_reset' && e.tipo === 'carro'), 'aparece na vaga');
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'veiculo', chave: 'esportivo' }, T0).res.ok, true);
+  assert.equal(r.veiculos.get('N').tipo, 'esportivo', 'comprou = equipou');
+  assert.equal(r.action('N', { tipo: 'veic_equipar', chave: 'carro' }, T0).res.ok, true);
+  const v = r.veiculos.get('N'); assert.equal(v.tipo, 'carro'); assert.equal(v.ocup.length, 4);
+  // entrar: dono dirige, amigos de carona
+  A.pos = [v.pos[0] + 1.5, 1.6, v.pos[2]]; B.modo = 'terra'; B.pos = [v.pos[0] - 1.5, 1.6, v.pos[2]]; C.modo = 'terra'; C.pos = [v.pos[0], 1.6, v.pos[2] + 2];
+  assert.equal(r.action('N', { tipo: 'veic_entrar', dono: 'N' }, T0).res.ok, true); assert.deepEqual(A.veic, { dono: 'N', lugar: 0 });
+  assert.equal(r.action('L', { tipo: 'veic_entrar', dono: 'N' }, T0).res.ok, true); assert.equal(B.veic.lugar, 1);
+  // trancar: C não entra
+  assert.equal(r.action('L', { tipo: 'veic_trancar' }, T0).res.ok, false, 'carona não tranca');
+  const tr = r.action('N', { tipo: 'veic_trancar' }, T0); assert.equal(tr.res.ok, true); assert.ok(tr.events[0].trancado);
+  assert.match(r.action('SE', { tipo: 'veic_entrar', dono: 'N' }, T0).res.msg, /trancado/);
+  r.action('N', { tipo: 'veic_trancar' }, T0);
+  assert.equal(r.action('SE', { tipo: 'veic_entrar', dono: 'N' }, T0).res.ok, true);
+  r.action('SE', { tipo: 'veic_sair' }, T0); assert.equal(C.veic, null); assert.equal(v.ocup[2], null);
+  // dirigindo: estado manda a posição do carro
+  r.setState('N', { pos: [v.pos[0] + 3, 1.6, v.pos[2]], modo: 'carro', veic: { pos: [v.pos[0] + 3, 1.56, v.pos[2]], rot: 0, vel: [12, 0, 0], luz: true } }, T0 + 100);
+  assert.equal(v.luz, true); assert.equal(v.vel[0], 12);
+  // atropela C: voa como na bazuca, sem ficar atordoado
+  C.pos = [v.pos[0] + 2, 1.6, v.pos[2]];
+  const at = r.action('N', { tipo: 'veic_atropelar', alvo: 'SE' }, T0 + 200);
+  assert.equal(at.res.ok, true); const ev = at.events[0]; assert.equal(ev.t, 'atropelado');
+  assert.ok(Math.hypot(ev.empurrao[0], ev.empurrao[2]) > 10, 'joga longe'); assert.equal(C.stunUntil, 0, 'não fica caído');
+  // cai na água: volta para a garagem e todo mundo sai nadando
+  const ag = r.action('N', { tipo: 'veic_agua' }, T0 + 300);
+  assert.equal(ag.res.ok, true); assert.deepEqual(ag.events[0].ejetados.sort(), ['L', 'N']);
+  assert.equal(A.veic, null); assert.equal(A.modo, 'nadando'); assert.deepEqual(r.veiculos.get('N').pos, r.garagem('N').pos);
+  assert.equal(VEICULOS.caminhonete.lugares, 5); assert.equal(VEICULOS.som.lugares, 2); assert.equal(VEICULOS.som.voz, 4);
+  assert.ok(VEICULOS.moto.vmax < VEICULOS.carro.vmax && VEICULOS.carro.vmax < VEICULOS.som.vmax && VEICULOS.som.vmax < VEICULOS.caminhonete.vmax && VEICULOS.caminhonete.vmax < VEICULOS.esportivo.vmax);
+});
+
+test('corrida de carro: volta no lago pelos checkpoints em ordem; vencedor +500, perdedores dividem 500', async () => {
+  const { CORRIDA_CARRO } = await import('../shared/data.js');
+  const { estacaoParaMundo, BARRACA_CORRIDA } = await import('../shared/world.js');
+  const r = mkRoom(); r.join(np('a'), 'N', T0); r.join(np('b'), 'L', T0); r.join(np('c'), 'SE', T0);
+  const A = r.players.get('N'), B = r.players.get('L'), C = r.players.get('SE');
+  for (const p of [A, B, C]) { p.profile.dinheiro = 2000; p.modo = 'terra'; }
+  const h = estacaoParaMundo(STATIONS.find((s) => s.id === 'N'), BARRACA_CORRIDA.x, BARRACA_CORRIDA.z); A.pos = [h[0], 1.6, h[1]];
+  const cv = r.action('N', { tipo: 'corrida_convidar', modo: 'carro', slots: ['L', 'SE'] }, T0);
+  assert.equal(cv.res.ok, true); assert.equal(cv.events[0].modo, 'carro');
+  r.action('L', { tipo: 'corrida_responder', id: cv.events[0].id, aceitar: true }, T0 + 10);
+  const ini = r.action('SE', { tipo: 'corrida_responder', id: cv.events[0].id, aceitar: true }, T0 + 20).events.find((e) => e.t === 'corrida_inicio');
+  assert.ok(ini && ini.modo === 'carro'); assert.equal(ini.checkpoints.length, CORRIDA_CARRO.checkpoints);
+  assert.deepEqual(A.veic, { dono: 'N', lugar: 0 }); assert.deepEqual(r.veiculos.get('L').pos, ini.largada.L);
+  const t = T0 + 20 + CORRIDA_CARRO.largadaMs + 100;
+  // fora de ordem não vale
+  r.veiculos.get('L').pos = ini.checkpoints[2].slice();
+  assert.equal(r.action('L', { tipo: 'corrida_checkpoint', id: ini.id, i: 2 }, t).res.ok, false);
+  let fim = null;
+  ini.checkpoints.forEach((cp, i) => { r.veiculos.get('L').pos = cp.slice(); const res = r.action('L', { tipo: 'corrida_checkpoint', id: ini.id, i }, t + i).res; assert.equal(res.ok, true, 'cp ' + i); fim = res.events.find((e) => e.t === 'corrida_fim') || fim; });
+  assert.ok(fim); assert.equal(fim.vencedor, 'L');
+  assert.equal(B.profile.dinheiro, 2500); assert.equal(A.profile.dinheiro + C.profile.dinheiro, 4000 - 500);
+});

@@ -67,8 +67,9 @@ export class Voz {
       if (!p?.audio || !minhaPos) continue;
       const ip = r.posVoz || r.pos;
       const d = Math.hypot(ip[0] - minhaPos[0], ip[1] - minhaPos[1], ip[2] - minhaPos[2]);
-      const perto = VOZ_ALCANCE * 0.45;
-      const vol = Math.min(1, (d <= perto ? 1 : Math.max(0, 1 - (d - perto) / (VOZ_ALCANCE - perto))) * (this.game?.volumeVozes ?? 1));
+      // quem dirige o carro de som fala com alcance maior (todo mundo escuta)
+      const alc = VOZ_ALCANCE * (r.multVoz || 1), perto = alc * 0.45;
+      const vol = Math.min(1, (d <= perto ? 1 : Math.max(0, 1 - (d - perto) / (alc - perto))) * (this.game?.volumeVozes ?? 1));
       if (Math.abs(p.audio.volume - vol) > 0.01) p.audio.volume = vol;
       p.vol = vol;
     }

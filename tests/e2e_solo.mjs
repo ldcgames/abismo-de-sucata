@@ -168,7 +168,7 @@ check(cata.anim === 'pegar' && cata.naMao && /Guardar/.test(cata.prompt) && /est
 check(cata.s1 === cata.s0 + 1 && !cata.maoDepois, 'E de novo guarda o lixo no saco', JSON.stringify(cata));
 const armas = await ev(async () => {
   const g = __jogo; const st = g.stations[g.slot];
-  for (const wp of [[-1.9, 1.5, 10], [10, 1.6, -6], [14.4, 1.7, -3.6]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
+  for (const wp of [[-1.9, 1.5, 10], [10, 1.6, 1.3], [14.4, 1.7, 1.3]]) { const a = st.toWorld(...wp); for (let k = 0; k < 200; k++) { const d = [a[0] - g.me.pos[0], a[2] - g.me.pos[2]]; const L = Math.hypot(d[0], d[1]); if (L < 0.05) break; const s = Math.min(2.5, L) / L; g.me.pos = [g.me.pos[0] + d[0] * s, a[1], g.me.pos[2] + d[1] * s]; g.me.vel = [0, 0, 0]; g.step(3); await new Promise((r) => setTimeout(r, 10)); } }
   g.perfil.dinheiro = 5000;
   g.step(3); g.input.press('KeyE'); g.step(1);
   const painel = g.ui.aberto;

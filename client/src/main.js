@@ -17,6 +17,8 @@ import { Audio } from './systems/audio.js';
 import { Input } from './systems/input.js';
 import { UI } from './ui/ui.js';
 import { Novidades } from './game/novidades.js';
+import { Veiculos } from './game/veiculos.js';
+import { modeloVeiculo } from './entities/veiculos.js';
 import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listarSalas } from './net/net.js';
 import { Pausa, lerConfig, salvarConfig, presetGrafico, limparUrlSala } from './ui/pausa.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
@@ -86,7 +88,7 @@ async function iniciar(net) {
   $('menu').hidden = true; $('carregando').hidden = false;
   try {
     const g = new Game(net);
-    window.__jogo = g; g._fishNode = fishNode; g._fishCutNode = fishCutNode;
+    window.__jogo = g; g._fishNode = fishNode; g._modeloVeiculo = modeloVeiculo; g._fishCutNode = fishCutNode;
     await g.init();
   } catch (e) {
     console.warn('[menu]', e.message);
@@ -154,6 +156,7 @@ class Game {
     this.net.on('erro', (m) => this.ui.aviso(m, 'ruim'));
     this.net.on('status', (s, ok) => this.ui.aviso(s, ok ? 'ok' : 'ruim'));
     this.initNovidades();
+    this.initVeiculos();
     this.onSnap(r.snap, []);
     $('carregando').hidden = true; $('hud').hidden = false;
     canvas.addEventListener('click', () => { if (!this.ui.aberto) this.input.lock(); this.audio.start(); });
@@ -375,6 +378,7 @@ class Game {
   onSnap(s, proj) {
     this.tempoBase = s.tempo; this.tempoRecebido = performance.now();
     if (this.kr) this.snapNovidades(s);
+    if (this.veic) this.snapVeiculos(s);
     const agora = performance.now();
     const vistos = new Set();
     for (const [slot, pl] of Object.entries(s.players)) {
@@ -428,6 +432,7 @@ class Game {
   onEvents(evs) {
     for (const e of evs) {
       if (this.kr && this.eventoNovidades(e)) continue;
+      if (this.veic && this.eventoVeiculos(e)) continue;
       switch (e.t) {
         case 'item_removido': {
           const n = this.items.get(e.id);
@@ -569,7 +574,8 @@ class Game {
     const stunned = performance.now() < this.me.stunUntil;
     if (this.me.modo === 'terra' || this.me.modo === 'nadando') this.updateWalk(dt, livre && !stunned, stunned);
     else if (this.me.modo === 'entrando') this.cameraTerra(dt);
-    else this.updateSub(dt, livre && !this.corridaTravada());
+    else if (this.me.modo !== 'carro') this.updateSub(dt, livre && !this.corridaTravada());
+    this.updateVeiculos(dt, livre && !stunned);
     // gesto/dança: termina ao andar ou depois de um tempo (sentado fica até mexer)
     if (this.me.emote) {
       this.me.emote.t += dt;
@@ -587,7 +593,10 @@ class Game {
     ch.root.at(this.me.pos[0], this.me.pos[1], this.me.pos[2]).rot(0, this.me.yaw, 0);
     if (this.me.modo !== 'terra' || p.mao || this.me.arma) this.me.mirandoLixo = false;
     this.me.segura = p.mao ? (ESPECIES[p.mao.esp].pesado ? 'tubarao' : this.me.mirando ? 'mira' : 'peixe') : this.me.mirandoLixo ? 'mira' : p.lixoMao ? 'peixe' : this.pesca.estado !== 'off' ? 'vara' : this.me.arma && (this.me.modo === 'terra') ? 'arma' : null;
-    ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, escorrega: !!this.me.escorrega, fala: !!this.voz?.euFalando?.(), miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
+    const vInfo = this.me.modo === 'carro' && this.me.veicInfo ? this.poseNoVeiculo(this.me.veicInfo) : null;
+    if (vInfo) ch.root.at(vInfo.pos[0], vInfo.pos[1], vInfo.pos[2]).rot(0, vInfo.rot, 0);
+    ch.root.sc(vInfo && vInfo.pose === 'banco' ? 0.84 : 1);
+    ch.update(dt, { veiculo: vInfo?.pose || null, volante: !!vInfo?.volante, virar: this.carro?.esterco || 0, speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' || this.me.modo === 'carro' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, escorrega: !!this.me.escorrega, fala: !!this.voz?.euFalando?.(), miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
     this.coice = damp(this.coice || 0, 0, 14, dt);
     this.updateArmaMao(ch, this.me.modo === 'terra' ? this.me.arma : null);
     this.desenharMira((this.me.mirando && !!this.perfil.mao || this.me.mirandoLixo) && this.me.modo === 'terra');
@@ -648,7 +657,7 @@ class Game {
     if (this.sendAcc > 1 / 15) {
       this.sendAcc = 0;
       this.net.sendState({
-        pos: this.me.pos.map((v) => +v.toFixed(3)), rot: +this.me.yaw.toFixed(3), modo: this.me.modo, anim: this.animNome(), arma: this.me.modo === 'terra' ? this.me.arma : null, mic: !!this.voz?.ligado,
+        pos: this.me.pos.map((v) => +v.toFixed(3)), rot: +this.me.yaw.toFixed(3), modo: this.me.modo, anim: this.animNome(), veic: this.estadoVeiculo(), arma: this.me.modo === 'terra' ? this.me.arma : null, mic: !!this.voz?.ligado,
         sub: { pos: this.sub.pos.map((v) => +v.toFixed(3)), rot: +this.sub.yaw.toFixed(3), pitch: +this.sub.pitchVis.toFixed(3), luz: this.sub.luzes, estado: this.crane.estado, braco: this.bracoAnim ? 1 : 0, gancho: this.crane.ganchoY || 0 },
         pescaVis: this.pesca.bobber ? { b: this.pesca.bobber.map((v) => +v.toFixed(2)), e: this.pesca.estado } : null,
       });
@@ -683,9 +692,9 @@ class Game {
     const he = chaoEstatua(x, z); if (he !== null) h = Math.max(h, he);
     return h;
   }
-  collideStations(pos) {
+  collideStations(pos, raio = 0.35) {
     // bloco de mármore da estátua
-    { const R = 2.45 * ESTATUA.escala, dx = pos[0] - ESTATUA.x, dz = pos[2] - ESTATUA.z, d = Math.hypot(dx, dz) || 1; if (d < R) { pos[0] = ESTATUA.x + (dx / d) * R; pos[2] = ESTATUA.z + (dz / d) * R; } }
+    { const R = 2.45 * ESTATUA.escala + (raio - 0.35), dx = pos[0] - ESTATUA.x, dz = pos[2] - ESTATUA.z, d = Math.hypot(dx, dz) || 1; if (d < R) { pos[0] = ESTATUA.x + (dx / d) * R; pos[2] = ESTATUA.z + (dz / d) * R; } }
     for (const s of Object.values(this.stations)) {
       if (!s.ativa) continue;
       const l = s.toLocal(pos);
@@ -694,7 +703,7 @@ class Game {
       for (const b of s.colisores()) {
         if (b.auto === 'rec' && !est?.reciclador) continue;
         if (b.auto === 'tin' && !est?.tinta) continue;
-        const r = 0.35;
+        const r = raio;
         const dx = l[0] - b.x, dz = l[2] - b.z;
         const ox = b.w / 2 + r - Math.abs(dx), oz = b.d / 2 + r - Math.abs(dz);
         if (ox > 0 && oz > 0 && pos[1] < 5.5) {
@@ -759,6 +768,7 @@ class Game {
     else { me.vel[0] *= 0.2; me.vel[2] *= 0.2; }
     this.collideStations(me.pos);
     colidirPedras(me.pos); // pedras do lago e da margem
+    this.colidirComVeiculos(me.pos);
     const g = this.groundAt(me.pos[0], me.pos[2]);
     if (nad) {
       me.pos[1] = damp(me.pos[1], -0.55 + Math.sin(this.t * 2) * 0.05, 5, dt);
@@ -849,6 +859,7 @@ class Game {
       let best = null, bd = 1e9;
       for (const q of pts) { const d = Math.hypot(q.pos[0] - me.pos[0], q.pos[2] - me.pos[2]); if (d < q.r && d < bd) { bd = d; best = q; } }
       if (best?.id === 'berco' && this.crane.estado !== 'berco') best = null;
+      var tVeic = !best ? this.promptVeiculoPerto(livre) : null;
       // estações dos amigos: só olhar (aquário) — ações são sempre na própria estação
       this.pertoPeixaria = best?.id === 'peixaria';
       if (best?.id === 'peixaria') {
@@ -948,6 +959,9 @@ class Game {
       }
       if (livre && me.mirandoLixo && I.mouse.clicked) { me.mirandoLixo = false; this.atirarLixo(); }
       if (this.pesca.estado !== 'off') txt = this.pesca.prompt || txt;
+      if (tVeic) txt = tVeic;
+    } else if (me.modo === 'carro') {
+      txt = this.promptVeiculo();
     } else if (me.modo === 'nadando') {
       const c = !p.mao && this.carcacaPerto();
       if (c) { txt = '<kbd>E</kbd>Pegar o tubarão abatido <span class="nota">(leve até a sua estação e venda por S$ 400)</span>'; if (livre && I.hit('KeyE')) this.acao({ tipo: 'tubarao_pegar', id: c.id }); }
@@ -966,6 +980,7 @@ class Game {
     if (id === 'terminal') this.ui.abrir('terminal');
     else if (id === 'armas') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('armas'); }
     else if (id === 'corrida') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('corrida'); }
+    else if (id === 'carros') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.6 }; this.ui.abrir('carros'); }
     else if (id === 'deposito' || id === 'reciclador' || id === 'restauro') { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.8 }; this.ui.abrir(id); }
     else if (id === 'aquario' || id === 'tanque') {
       if (p.mao) this.acao({ tipo: 'peixe_aquario' });
@@ -1776,11 +1791,14 @@ class Game {
       r.spd = damp(r.spd || 0, spd, 8, dt);
       r.lastPos = ip.pos;
       ch.root.visible = !(r.modo === 'sub' || r.modo === 'guindaste');
-      ch.root.at(ip.pos[0], ip.pos[1], ip.pos[2]).rot(0, ip.rot, 0);
+      const vr = r.veic ? this.poseNoVeiculo(r.veic) : null;
+      if (vr) ch.root.at(vr.pos[0], vr.pos[1], vr.pos[2]).rot(0, vr.rot, 0);
+      else ch.root.at(ip.pos[0], ip.pos[1], ip.pos[2]).rot(0, ip.rot, 0);
+      ch.root.sc(vr && vr.pose === 'banco' ? 0.84 : 1);
       const segura = r.mao ? (ESPECIES[r.mao.esp]?.pesado ? 'tubarao' : r.anim === 'mira' ? 'mira' : 'peixe') : r.pescaVis ? 'vara' : r.arma && r.modo === 'terra' ? 'arma' : null;
       const em = r.anim === 'escorrega' ? [0, 2] : /^emote(\d)$/.exec(r.anim || '');
       if (em) { if (!r.emote || r.emote.i !== +em[1]) r.emote = { i: +em[1], t: 0 }; r.emote.t += dt; } else r.emote = null;
-      ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote, escorrega: r.anim === 'escorrega', fala: !!this.falandoAgora?.has(slot) });
+      ch.update(dt, { veiculo: vr?.pose || null, volante: !!vr?.volante, speed: r.modo === 'terra' && !vr ? r.spd : 0, grounded: true, mode: vr ? 'terra' : r.modo, segura: vr ? null : segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote, escorrega: r.anim === 'escorrega', fala: !!this.falandoAgora?.has(slot) });
       this.updateHeld(ch, r.mao, slot);
       this.updateLixoMao(ch, r.modo === 'terra' ? r.lixo : null);
       this.updateArmaMao(ch, r.modo === 'terra' ? r.arma : null);
@@ -1919,6 +1937,7 @@ class Game {
 }
 
 Object.assign(Game.prototype, Novidades);
+Object.assign(Game.prototype, Veiculos);
 
 function frame() { return new Promise((r) => requestAnimationFrame(() => r())); }
 

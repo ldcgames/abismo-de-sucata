@@ -1,11 +1,12 @@
 // v0.9: Kraken do abismo, corrida de submarino, estilingue de lixo, chat de voz e ranking.
 // Métodos misturados na classe Game (main.js) com Object.assign(Game.prototype, Novidades).
 import { Node } from '../engine/renderer.js';
-import { Geo, cylinder, torus, sphere } from '../engine/geometry.js';
+import { Geo, cylinder, torus, sphere, box } from '../engine/geometry.js';
 import { Kraken } from '../entities/kraken.js';
 import { itemNode } from '../entities/items.js';
 import { Voz } from '../systems/voz.js';
-import { ARMAS, ESPECIES, CORRIDA, KRAKEN, LIXO, SUCATA, TUBARAO, textoPremioCorrida, divisaoCorrida } from '../../shared/data.js';
+import { ARMAS, ESPECIES, CORRIDA, KRAKEN, LIXO, SUCATA, TUBARAO, textoPremioCorrida, divisaoCorrida, CORRIDA_CARRO, textoPremioCorridaCarro, divisaoCorridaCarro, VEICULOS } from '../../shared/data.js';
+const VEIC_VOZ = Object.fromEntries(Object.entries(VEICULOS).map(([k, v]) => [k, v.voz || 1]));
 import { stationById, tubaraoPos } from '../../shared/world.js';
 import { fishNode } from '../entities/station.js';
 import { lerp } from '../engine/math.js';
@@ -101,8 +102,9 @@ export const Novidades = {
       case 'corrida_ponto':
         if (this.corrida?.id === e.id) {
           this.corrida.pegos[e.slot] = e.n;
-          if (e.slot === this.slot) { this.corrida.meus.add(e.i); this.audio.blip(880 + e.n * 120, 0.12, 'square', 0.06, 200); this.ui.aviso(`Palito ${e.n}/${CORRIDA.checkpoints}!`, 'ok', 1200); }
-          else this.ui.aviso(`${this.corrida.nomes[e.slot] || 'Alguém'} pegou ${e.n}/${CORRIDA.checkpoints}`, 'info', 1500);
+          { const N = this.corrida.modo === 'carro' ? CORRIDA_CARRO.checkpoints : CORRIDA.checkpoints, nm = this.corrida.modo === 'carro' ? 'Arco' : 'Palito';
+          if (e.slot === this.slot) { this.corrida.meus.add(e.i); this.audio.blip(880 + e.n * 120, 0.12, 'square', 0.06, 200); this.ui.aviso(`${nm} ${e.n}/${N}!`, 'ok', 1200); }
+          else this.ui.aviso(`${this.corrida.nomes[e.slot] || 'Alguém'} passou ${e.n}/${N}`, 'info', 1500); }
         }
         return true;
       case 'corrida_fim': this.onCorridaFim(e); return true;
@@ -144,6 +146,7 @@ export const Novidades = {
     if (livre && I.hit('KeyM')) this.alternarVoz();
     const minha = this.me.modo === 'sub' || this.me.modo === 'guindaste' ? this.sub.pos : this.me.pos;
     for (const r of Object.values(this.remotos)) r.posVoz = r.modo === 'sub' || r.modo === 'guindaste' ? r.sub.pos : r.char.root.pos;
+    for (const r of Object.values(this.remotos)) { const v = r.veic && r.veic.lugar === 0 ? this.veic?.[r.veic.dono] : null; r.multVoz = v && VEIC_VOZ[v.tipo] ? VEIC_VOZ[v.tipo] : 1; }
     this.voz.atualizar(this.remotos, minha);
     if (performance.now() > this.vozMsgAte) $('vozAviso').hidden = true;
     const fal = this.voz.falando().map((s) => this.remotos[s]?.nome).filter(Boolean);
@@ -244,7 +247,9 @@ export const Novidades = {
     if (!e.convidados.includes(this.slot)) { this.ui.aviso(`${e.nome} chamou ${e.convidados.length} amigo(s) para uma corrida de submarino`, 'info'); return; }
     const n = e.convidados.length + 1;
     this.convite = { id: e.id, ate: performance.now() + e.ms };
-    $('conviteTexto').innerHTML = `<b>${esc(e.nome)}</b> chamou você para uma <b>corrida de submarino</b>!<br><span class="premio">${esc(textoPremioCorrida(n))}</span><br><small>Se nem todos aceitarem, o prêmio muda conforme quantos correrem (2 corredores: ganha/perde S$ ${CORRIDA.premio2}).</small>`;
+    $('conviteTexto').innerHTML = e.modo === 'carro'
+      ? `<b>${esc(e.nome)}</b> chamou você para uma <b>corrida de carro</b> (1 volta em volta do lago, com o seu veículo equipado)!<br><span class="premio">${esc(textoPremioCorridaCarro(n))}</span><br><small>Se nem todos aceitarem, o prêmio muda conforme quantos correrem.</small>`
+      : `<b>${esc(e.nome)}</b> chamou você para uma <b>corrida de submarino</b>!<br><span class="premio">${esc(textoPremioCorrida(n))}</span><br><small>Se nem todos aceitarem, o prêmio muda conforme quantos correrem (2 corredores: ganha/perde S$ ${CORRIDA.premio2}).</small>`;
     $('corridaConvite').hidden = false;
     this.audio.blip(660, 0.1, 'square', 0.06, 300); setTimeout(() => this.audio.blip(990, 0.12, 'square', 0.06), 140);
   },
@@ -260,11 +265,12 @@ export const Novidades = {
   },
   async chamarCorrida() {
     const slots = [...this.corridaSel].filter((s) => this.remotos[s]);
-    const r = await this.acao({ tipo: 'corrida_convidar', slots });
+    const r = await this.acao({ tipo: 'corrida_convidar', slots, modo: this.corridaModo || 'carro' });
     if (r.ok) { this.ui.fechar(); this.corridaSel.clear(); }
   },
   onCorridaInicio(e) {
-    if (!e.participantes.includes(this.slot)) { this.ui.aviso(`Corrida começando: ${e.participantes.map((s) => e.nomes[s]).join(' × ')}`, 'info', 4000); return; }
+    if (!e.participantes.includes(this.slot)) { this.ui.aviso(`Corrida ${e.modo === 'carro' ? 'de carro' : 'de submarino'} começando: ${e.participantes.map((s) => e.nomes[s]).join(' × ')}`, 'info', 4000); return; }
+    if (e.modo === 'carro') return this.onCorridaCarroInicio(e);
     // guarda onde eu estava para voltar no fim
     const cr = this.crane, sc = this.sub;
     this.antesCorrida = { modo: this.me.modo, pos: this.me.pos.slice(), yaw: this.me.yaw, crane: cr.estado, subPos: sc.pos.slice(), subYaw: sc.yaw };
@@ -278,6 +284,36 @@ export const Novidades = {
     this.corrida = { id: e.id, participantes: e.participantes, nomes: e.nomes, checkpoints: e.checkpoints, meus: new Set(), pegos: {}, largaEm: performance.now() + e.largaMs, fimEm: performance.now() + e.largaMs + e.limiteMs, enviando: new Set() };
     this.criarPalitos(e.checkpoints);
     this.ui.aviso(`🏁 Corrida! Pegue os ${CORRIDA.checkpoints} palitos brilhantes sobre a água — ${esc(textoPremioCorrida(e.participantes.length))}`, 'ok', 6000);
+  },
+  onCorridaCarroInicio(e) {
+    if (this.pesca.estado !== 'off') this.cancelarPesca?.();
+    this.me.arma = null; this.me.mirando = false; this.me.mirandoLixo = false; this.me.emote = null; this.roda = null; this.ui.fechar();
+    // a sala já pôs o seu veículo na largada com você no volante
+    const L = e.largada[this.slot];
+    this.me.modo = 'carro'; this.me.veicInfo = { dono: this.slot, lugar: 0 }; this.me.pos = L.slice();
+    const v = this.veic[this.slot];
+    if (v) { v.buf = []; v.pose = { pos: L.slice(), rot: e.yaw }; if (v.info) v.info.ocup = v.info.ocup.map((o, i) => (i === 0 ? this.slot : null)); }
+    this.carro = { dono: this.slot, tipo: v?.tipo || 'patinete', pos: L.slice(), rot: e.yaw, vx: 0, vz: 0, luz: false, esterco: 0 };
+    this.me.camYaw = e.yaw; this.camYawVeic = e.yaw;
+    this.corrida = { id: e.id, modo: 'carro', participantes: e.participantes, nomes: e.nomes, checkpoints: e.checkpoints, meus: new Set(), pegos: {}, largaEm: performance.now() + e.largaMs, fimEm: performance.now() + e.largaMs + e.limiteMs, enviando: new Set() };
+    this.criarArcos(e.checkpoints);
+    this.ui.aviso(`🏁 Corrida de carro! Uma volta inteira no lago passando pelos ${CORRIDA_CARRO.checkpoints} arcos em ordem (o último é a chegada) — ${esc(textoPremioCorridaCarro(e.participantes.length))}`, 'ok', 7000);
+  },
+  // arcos dos checkpoints na trilha (o próximo pisca; o último é a chegada quadriculada)
+  criarArcos(cps) {
+    this.removerPalitos();
+    this.palitos = cps.map((c, i) => {
+      const g = new Geo(), ult = i === cps.length - 1;
+      const ang = Math.atan2(c[2], c[0]), tg = [-Math.sin(ang), Math.cos(ang)], rad = [Math.cos(ang), Math.sin(ang)];
+      for (const s2 of [-1, 1]) g.put(cylinder(0.18, 0.18, 5.4, 10), [rad[0] * s2 * 6.5, 2.7, rad[1] * s2 * 6.5], [0, 0, 0], 1, ult ? [0.95, 0.95, 0.95] : [0.3, 0.9, 1]);
+      const n = new Node('arco' + i);
+      // faixa de cima (atravessa a pista)
+      const fx = new Geo();
+      for (let k = 0; k < 14; k++) { const t = -6.5 + k * 1.0; fx.put(box(1.0, 0.7, 0.12), [rad[0] * (t + 0.5), 5.2, rad[1] * (t + 0.5)], [0, Math.atan2(rad[0], rad[1]), 0], 1, ult ? (k % 2 ? [0.05, 0.05, 0.05] : [0.98, 0.98, 0.98]) : [0.35, 0.95, 1]); }
+      g.add(fx);
+      n.mesh = this.R.createMesh(g, { emissive: ult ? [0.4, 0.4, 0.4] : [0.3, 1.2, 1.6], glow: 1, castShadow: false });
+      n.at(c[0], c[1], c[2]); this.fxRoot.add(n); n.tg = tg; return n;
+    });
   },
   criarPalitos(cps) {
     this.removerPalitos();
@@ -302,6 +338,7 @@ export const Novidades = {
       const txt = falta > 0 ? String(Math.ceil(falta / 1000)) : 'VAI!';
       if (cont.textContent !== txt) { cont.textContent = txt; this.audio.blip(falta > 0 ? 520 : 1040, 0.15, 'square', 0.07); }
     } else cont.hidden = true;
+    if (C.modo === 'carro') return this.updateCorridaCarro(dt, C, falta, hud);
     // palitos: giram e somem quando você pega
     (this.palitos || []).forEach((n, i) => {
       n.visible = !C.meus.has(i);
@@ -319,11 +356,30 @@ export const Novidades = {
     const h = `<div class="tit">🏁 CORRIDA DE SUBMARINO <span>${falta > 0 ? 'largada…' : mmss(C.fimEm - agora)}</span></div>${linhas}<small>${esc(textoPremioCorrida(C.participantes.length))}</small>`;
     if (hud._h !== h) { hud.innerHTML = h; hud._h = h; }
   },
+  updateCorridaCarro(dt, C, falta, hud) {
+    const agora = performance.now(), prox = C.meus.size;
+    (this.palitos || []).forEach((n, i) => {
+      n.visible = !C.meus.has(i) && i <= prox + 2;
+      n.sc(i === prox ? 1 + Math.sin(this.t * 6) * 0.04 : 1);
+      if (i !== prox || falta > 0 || this.me.modo !== 'carro' || !this.carro || C.enviando.has(i)) return;
+      const c = C.checkpoints[i];
+      if (Math.hypot(this.carro.pos[0] - c[0], this.carro.pos[2] - c[2]) < CORRIDA_CARRO.raioCheck) {
+        C.enviando.add(i);
+        this.acao({ tipo: 'corrida_checkpoint', id: C.id, i }).finally(() => C.enviando.delete(i));
+      }
+    });
+    hud.hidden = false;
+    const N = CORRIDA_CARRO.checkpoints;
+    const linhas = C.participantes.map((s) => `<div class="${s === this.slot ? 'eu' : ''}">${esc(C.nomes[s])}: <b>${s === this.slot ? C.meus.size : C.pegos[s] || 0}/${N}</b></div>`).join('');
+    const h = `<div class="tit">🏁 CORRIDA DE CARRO <span>${falta > 0 ? 'largada…' : mmss(C.fimEm - agora)}</span></div>${linhas}<small>Próximo arco: ${Math.min(prox + 1, N)}/${N}${prox === N - 1 ? ' (CHEGADA)' : ''} · ${esc(textoPremioCorridaCarro(C.participantes.length))}</small>`;
+    if (hud._h !== h) { hud.innerHTML = h; hud._h = h; }
+  },
   // controles travados durante a contagem da largada
   corridaTravada() { return !!this.corrida && performance.now() < this.corrida.largaEm; },
   onCorridaFim(e) {
     const eu = this.corrida?.id === e.id;
-    if (!eu) { if (e.vencedor) this.ui.aviso(`🏁 ${e.nome} venceu a corrida de submarino!`, 'info', 4000); return; }
+    if (!eu) { if (e.vencedor) this.ui.aviso(`🏁 ${e.nome} venceu a corrida ${e.modo === 'carro' ? 'de carro' : 'de submarino'}!`, 'info', 4000); return; }
+    const eraCarro = this.corrida?.modo === 'carro';
     this.corrida = null; this.removerPalitos();
     const g = e.ganhos?.[this.slot];
     let titulo, sub;
@@ -332,6 +388,7 @@ export const Novidades = {
     else { titulo = `${esc(e.nome)} venceu`; sub = `Você perdeu S$ ${fmt(-(g || 0))}`; this.audio.blip(300, 0.4, 'sawtooth', 0.08, -150); }
     const el = $('corridaResultado'); el.innerHTML = `<div class="t">${titulo}</div><div class="s">${sub}</div>`; el.hidden = false;
     clearTimeout(this.resTimer); this.resTimer = setTimeout(() => { el.hidden = true; }, 4500);
+    if (eraCarro) return; // na corrida de carro você continua no seu veículo, onde terminou
     // volta todo mundo para onde estava
     const A = this.antesCorrida; this.antesCorrida = null;
     if (!A) return;
@@ -353,13 +410,18 @@ export const Novidades = {
   painelCorridaHtml() {
     const lista = Object.entries(this.remotos).filter(([, r]) => r.conectado);
     const n = 1 + [...this.corridaSel].filter((s) => this.remotos[s]).length;
-    let h = `<p class="nota">Escolha quem vai correr com você e clique em <b>Chamar para corrida</b>. Cada um recebe um convite e aceita com <kbd>Y</kbd> (ou recusa com <kbd>N</kbd>). Quem aceitar vai para dentro do submarino, lado a lado no lago. Ganha quem passar primeiro pelos <b>${CORRIDA.checkpoints} palitos brilhantes</b> sobre a água (eles só aparecem para quem está correndo). No fim, todos voltam para onde estavam.</p>`;
-    h += `<div class="premioCorrida"><b>Prêmio:</b> ${esc(textoPremioCorrida(Math.max(2, n)))}<br><small>2 corredores: quem vence ganha S$ ${CORRIDA.premio2} e quem perde paga S$ ${CORRIDA.premio2}. De 3 a 5: quem vence ganha S$ ${CORRIDA.premioN}, divididos entre os que perderam (5 corredores: S$ ${divisaoCorrida(5).perda[0]} de cada um). Precisa ter pelo menos S$ ${CORRIDA.minDinheiro} para correr.</small></div>`;
+    const modo = this.corridaModo || 'carro';
+    let h = `<div class="convite"><button class="${modo === 'carro' ? 'verde' : 'cinza'}" data-modo-corrida="carro">🚗 Corrida de carro</button><button class="${modo === 'sub' ? 'verde' : 'cinza'}" data-modo-corrida="sub">🚤 Corrida de submarino</button></div>`;
+    if (modo === 'carro') {
+      h += `<p class="nota">Escolha quem vai correr e clique em <b>Chamar para corrida</b>. Cada um aceita com <kbd>Y</kbd> (ou recusa com <kbd>N</kbd>). Todo mundo vai para a largada <b>atrás da sua estação</b>, cada um no próprio veículo equipado. É <b>uma volta inteira em volta do lago</b> pela trilha, passando pelos ${CORRIDA_CARRO.checkpoints} arcos em ordem: o último é a chegada, no mesmo lugar da largada. Dá para bater e jogar o outro para fora! Caiu no lago: volta para onde caiu.</p>`;
+      h += `<div class="premioCorrida"><b>Prêmio:</b> ${esc(textoPremioCorridaCarro(Math.max(2, n)))}<br><small>Quem vence ganha S$ ${CORRIDA_CARRO.premio}; quem perde paga S$ ${CORRIDA_CARRO.premio} (se for mais de um, divide: 5 corredores = S$ ${divisaoCorridaCarro(5).perda[0]} de cada). Precisa ter pelo menos S$ ${CORRIDA_CARRO.minDinheiro}.</small></div>`;
+    } else h += `<p class="nota">Escolha quem vai correr com você e clique em <b>Chamar para corrida</b>. Cada um recebe um convite e aceita com <kbd>Y</kbd> (ou recusa com <kbd>N</kbd>). Quem aceitar vai para dentro do submarino, lado a lado no lago. Ganha quem passar primeiro pelos <b>${CORRIDA.checkpoints} palitos brilhantes</b> sobre a água (eles só aparecem para quem está correndo). No fim, todos voltam para onde estavam.</p>`;
+    if (modo !== 'carro') h += `<div class="premioCorrida"><b>Prêmio:</b> ${esc(textoPremioCorrida(Math.max(2, n)))}<br><small>2 corredores: quem vence ganha S$ ${CORRIDA.premio2} e quem perde paga S$ ${CORRIDA.premio2}. De 3 a 5: quem vence ganha S$ ${CORRIDA.premioN}, divididos entre os que perderam (5 corredores: S$ ${divisaoCorrida(5).perda[0]} de cada um). Precisa ter pelo menos S$ ${CORRIDA.minDinheiro} para correr.</small></div>`;
     if (!lista.length) return h + '<p class="nota">Não tem mais ninguém na sala agora. Chame os amigos com o código da sala (Tab).</p>';
     h += '<div class="lista">';
     for (const [s, r] of lista) {
       const sel = this.corridaSel.has(s);
-      h += `<div class="item"><div>🚤 ${esc(r.nome)} <span class="nota">${esc(stationById(s).nome)} · S$ ${fmt(r.dinheiro || 0)}</span></div><div class="acoes"><button class="${sel ? 'cinza' : 'verde'}" data-escolher="${s}">${sel ? 'Escolhido ✓' : 'Escolher'}</button></div></div>`;
+      h += `<div class="item"><div>${modo === 'carro' ? '🚗' : '🚤'} ${esc(r.nome)} <span class="nota">${esc(stationById(s).nome)} · S$ ${fmt(r.dinheiro || 0)}</span></div><div class="acoes"><button class="${sel ? 'cinza' : 'verde'}" data-escolher="${s}">${sel ? 'Escolhido ✓' : 'Escolher'}</button></div></div>`;
     }
     h += '</div>';
     h += `<div class="convite"><button class="grande" data-chamar ${n < 2 ? 'disabled' : ''}>🏁 Chamar para corrida (${n - 1} amigo${n - 1 === 1 ? '' : 's'})</button></div>`;

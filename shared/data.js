@@ -221,6 +221,32 @@ export const capPeixes = (p) => (EQUIP.bolsa[p?.equip?.bolsa | 0] || EQUIP.bolsa
 export const capSaco = (p) => (EQUIP.saco[p?.equip?.saco | 0] || EQUIP.saco[0]).cap;
 export const multNado = (p) => (EQUIP.traje[p?.equip?.traje | 0] || EQUIP.traje[0]).mult;
 export const DOACAO = { alcance: 3.5, expiraMs: 20e3 };
+// ---------------- VEÍCULOS (loja de carros na estação) ----------------
+// vmax em m/s (andando 3,3 · correndo 6,2). lugares: quantos cabem (o primeiro é o motorista).
+// comp/larg/alt: tamanho (colisão e modelo). voz: multiplica o alcance da voz de quem está dirigindo.
+export const VEICULOS = {
+  patinete:    { nome: 'Patinete', preco: 0, lugares: 1, vmax: 4.95, acel: 5, giro: 3.4, comp: 1.1, larg: 0.5, alt: 1.1, funcao: 'Todo mundo começa com ele. 1,5× mais rápido que andando.' },
+  moto:        { nome: 'Moto', preco: 5000, lugares: 2, vmax: 13, acel: 7, giro: 2.6, comp: 2.1, larg: 0.8, alt: 1.2, funcao: 'Só para andar. Cabem 2 pessoas.' },
+  carro:       { nome: 'Carro', preco: 10000, lugares: 4, vmax: 16, acel: 7, giro: 2.0, comp: 4.2, larg: 1.8, alt: 1.45, funcao: 'Só para andar. Cabem 4 pessoas.' },
+  som:         { nome: 'Carro de som', preco: 15000, lugares: 2, vmax: 18, acel: 7, giro: 1.9, comp: 4.6, larg: 1.85, alt: 1.6, voz: 4, funcao: 'Picape com caixas de som: quem dirige fala com alcance 4× maior (todo mundo escuta). Cabem 2 pessoas.' },
+  caminhonete: { nome: 'Caminhonete', preco: 20000, lugares: 5, vmax: 20, acel: 7.5, giro: 1.8, comp: 5.3, larg: 2.0, alt: 1.9, funcao: 'Só para andar. Cabem 5 pessoas.' },
+  esportivo:   { nome: 'Superesportivo', preco: 30000, lugares: 2, vmax: 32, acel: 12, giro: 2.1, comp: 4.5, larg: 2.0, alt: 1.15, funcao: 'O mais rápido de todos. Cabem 2 pessoas.' },
+};
+export const VEIC_ORDEM = ['patinete', 'moto', 'carro', 'som', 'caminhonete', 'esportivo'];
+// corrida de carro: uma volta em volta do lago passando pelos checkpoints. Quem vence ganha 500; os outros dividem 500.
+export const CORRIDA_CARRO = { checkpoints: 8, premio: 500, largadaMs: 5000, limiteMs: 6 * 60e3, raioCheck: 9, minDinheiro: 500 };
+export function divisaoCorridaCarro(n) {
+  if (n < 2) return { premio: 0, perda: [] };
+  const base = Math.floor(CORRIDA_CARRO.premio / (n - 1)), perda = Array(n - 1).fill(base);
+  for (let i = 0; i < CORRIDA_CARRO.premio - base * (n - 1); i++) perda[i]++;
+  return { premio: CORRIDA_CARRO.premio, perda };
+}
+export function textoPremioCorridaCarro(n) {
+  if (n < 2) return 'Escolha pelo menos 1 amigo.';
+  if (n === 2) return `Quem vencer ganha S$ ${CORRIDA_CARRO.premio}. Quem perder paga S$ ${CORRIDA_CARRO.premio}.`;
+  const d = divisaoCorridaCarro(n);
+  return `${n} corredores: quem vencer ganha S$ ${CORRIDA_CARRO.premio}, pagos pelos ${n - 1} que perderem (cerca de S$ ${d.perda[d.perda.length - 1]} cada).`;
+}
 
 // ---------------- ESTAÇÃO (BASE) ----------------
 export const ESTACAO = {

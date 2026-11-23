@@ -157,8 +157,12 @@ export class UI {
       $('painelTitulo').textContent = 'Loja de armas';
       abas.innerHTML = '';
       html = this.lojaArmas(p);
+    } else if (this.aberto === 'carros') {
+      $('painelTitulo').textContent = '🚗 Loja de carros';
+      abas.innerHTML = '';
+      html = this.g.painelCarrosHtml();
     } else if (this.aberto === 'corrida') {
-      $('painelTitulo').textContent = '🏁 Corrida de submarino';
+      $('painelTitulo').textContent = '🏁 Corridas';
       abas.innerHTML = '';
       html = this.g.painelCorridaHtml();
     } else if (this.aberto === 'sala') {
@@ -180,6 +184,7 @@ export class UI {
     corpo.querySelectorAll('[data-sair]').forEach((b) => (b.onclick = () => this.g.sairParaMenu()));
     corpo.querySelectorAll('[data-escolher]').forEach((b) => (b.onclick = () => { const s = b.dataset.escolher, sel = this.g.corridaSel; if (sel.has(s)) sel.delete(s); else sel.add(s); this.render(); }));
     corpo.querySelectorAll('[data-chamar]').forEach((b) => (b.onclick = async () => { b.disabled = true; await this.g.chamarCorrida(); if (this.aberto) this.render(); }));
+    corpo.querySelectorAll('[data-modo-corrida]').forEach((b) => (b.onclick = () => { this.g.corridaModo = b.dataset.modoCorrida; this.render(); }));
     corpo.querySelectorAll('[data-copiar]').forEach((b) => (b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copiar).then(() => this.aviso('Copiado!', 'ok')).catch(() => this.aviso('Copie manualmente o texto acima', 'info')); }));
   }
   btn(label, a, disabled = false, title = '') { return `<button data-acao='${esc(JSON.stringify(a))}' ${disabled ? 'disabled' : ''} title="${esc(title)}">${label}</button>`; }
