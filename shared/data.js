@@ -45,6 +45,12 @@ export const SUCATA = {
   sonda_ok:        { nome: 'Sonda recuperada', kg: 40, L: 45, rar: 'raro', valor: 2240, restaurado: true },
   reliquia_viva:   { nome: 'Relíquia desperta', kg: 15, L: 15, rar: 'lendário', valor: 12600, restaurado: true },
 };
+// restaurar (de graça) e cortar peixe (de graça) dobram o valor de venda
+export const RESTAURO_MULT = 2;
+export const PEIXARIA = { minKg: 2, mult: 2 };
+export function valorItem(it) { const t = SUCATA[it.tipo]; return (t?.valor || 0) * (it.rest ? RESTAURO_MULT : 1); }
+export function nomeItem(it) { return SUCATA[it.tipo].nome + (it.rest ? ' (restaurado)' : ''); }
+export function valorPeixeItem(f) { return valorPeixe(f.esp, f.cm) * (f.cortado ? PEIXARIA.mult : 1); }
 export const RESTAURO = {
   radio_ok: { dinheiro: 20, comps: { eletronica: 1 }, s: 3 },
   ferramentas_ok: { dinheiro: 25, comps: { metal: 1 }, s: 3 },
@@ -200,8 +206,9 @@ export const MOCHILA = { peixes: 5, bolsas: 10 };
 
 // ---------------- ESTAÇÃO (BASE) ----------------
 export const ESTACAO = {
-  reciclador: { nome: 'Recicladora', custo: { dinheiro: 200, comps: {} }, desc: 'Transforma sucata em componentes.' },
-  restauro:   { nome: 'Bancada de restauro', custo: { dinheiro: 600, comps: {} }, desc: 'Restaura sucata em itens valiosos.' },
+  reciclador: { nome: 'Recicladora', custo: { dinheiro: 200, comps: {} }, desc: 'Transforma sucata em componentes.', oculto: true }, // saiu da loja (componentes não são mais usados)
+  restauro:   { nome: 'Bancada de restauro', custo: { dinheiro: 1000, comps: {} }, desc: 'Restaura de graça qualquer item (lixo, sucata do fundo) direto do submarino: o item restaurado vende pelo dobro.' },
+  peixaria:   { nome: 'Bancada de peixe', custo: { dinheiro: 2000, comps: {} }, desc: 'Coloque um peixe de mais de 2 kg na tábua (E), corte (I) e pegue (I): o peixe cortado vende pelo dobro.' },
   iluminacao: { nome: 'Iluminação da estação', custo: { dinheiro: 150, comps: {} }, desc: 'Postes e luzes no cais.' },
   carregador: { nome: 'Carregador rápido', custo: { dinheiro: 800, comps: {} }, desc: 'Recarrega a bateria 3× mais rápido no cais.' },
   decoracao:  { nome: 'Decoração (bandeiras e plantas)', custo: { dinheiro: 120, comps: {} }, desc: 'Deixa a estação com a sua cara.' },

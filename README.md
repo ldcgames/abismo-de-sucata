@@ -106,6 +106,12 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.5
+
+- **Recicladora saiu da loja** (componentes não são mais necessários; o HUD só mostra componentes se você ainda tiver algum).
+- **Bancada de restauro — S$ 1.000**, agora com colisão. Restaurar é **grátis** e funciona com **qualquer item** (lixo, metal, sucata do lago) direto do submarino, da mochila de sucata ou do depósito. Item restaurado vende pelo **dobro**.
+- **Bancada de peixe — S$ 2.000**, no lugar da antiga recicladora, com colisão. Com um peixe de **mais de 2 kg na mão**: **E** coloca na tábua, **I** corta (animação com faca), **I** pega o peixe cortado. Peixe cortado vende pelo **dobro**. Usar é grátis. Peixe cortado não entra no aquário.
+
 ## Novidades da v0.9.4
 
 - **Peixe do aquário não é mais vendido sem querer:** a aba "Vender" do computador só mostra o peixe da mão e da mochila. Para vender um peixe do aquário ou do tanque, tire primeiro (aba Aquário → **Pegar na mão**) e depois venda.

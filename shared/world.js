@@ -90,6 +90,8 @@ export function chaoEstatua(x, z) {
 export const BARRACA_ARMAS = { x: 13.6, z: -2.4 };
 // barraca da corrida de submarino, ao lado da loja de armas (coordenadas locais da estação)
 export const BARRACA_CORRIDA = { x: 13.6, z: -7.3 };
+// bancada de peixe (onde ficava a recicladora) e bancada de restauro, em coordenadas locais da estação
+export const BANCADA_PEIXE = { x: -14, z: 10 };
 
 // ---------- terreno ----------
 function stationFlatten(x, z) {

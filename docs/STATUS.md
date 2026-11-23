@@ -1,5 +1,11 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v0.9.5
+
+- **Recicladora saiu da loja** (componentes não são mais necessários; o HUD só mostra componentes se você ainda tiver algum).
+- **Bancada de restauro — S$ 1.000**, agora com colisão. Restaurar é **grátis** e funciona com **qualquer item** (lixo, metal, sucata do lago) direto do submarino, da mochila de sucata ou do depósito. Item restaurado vende pelo **dobro**.
+- **Bancada de peixe — S$ 2.000**, no lugar da antiga recicladora, com colisão. Com um peixe de **mais de 2 kg na mão**: **E** coloca na tábua, **I** corta (animação com faca), **I** pega o peixe cortado. Peixe cortado vende pelo **dobro**. Usar é grátis. Peixe cortado não entra no aquário.
+
 ## Novidades da v0.9.4
 `peixe_vender` recusa peixe do aquário/tanque (tem que `aquario_retirar` antes); aba Vender e lista do aquário sem botão Vender para aquário/tanque; caixa térmica fora da interface (só aparece se ainda tiver peixe antigo); painel da mão ganhou botão Mochila. Testes: npm test 35/35 · e2e_solo 54/54.
 

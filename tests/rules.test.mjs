@@ -627,3 +627,48 @@ test('estilingue tira 1 de vida do Kraken/tubarão; decorações saem e voltam s
   assert.ok(!pl.profile.estacao.decoOff.banco); assert.equal(pl.profile.dinheiro, d, 'não cobra de novo');
   assert.equal(r.action('N', { tipo: 'deco_alternar', chave: 'carregador' }, T0).res.ok, false, 'carregador não é decoração');
 });
+
+test('bancada de restauro (S$ 1.000): restaura de graça qualquer item direto do sub/saco e vende pelo dobro; recicladora saiu da loja', async () => {
+  const { ESTACAO } = await import('../shared/data.js');
+  assert.equal(ESTACAO.restauro.custo.dinheiro, 1000); assert.equal(ESTACAO.peixaria.custo.dinheiro, 2000);
+  const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'), p = pl.profile; const st = STATIONS.find((s) => s.id === 'N');
+  pl.modo = 'terra'; pl.pos = [st.pad[0], 1.6, st.pad[1]]; p.dinheiro = 1500;
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'reciclador' }, T0).res.ok, false, 'recicladora não se compra mais');
+  p.carga.push({ uid: 'lt', tipo: 'lata' }, { uid: 'pn', tipo: 'pneu' }); p.saco.push({ uid: 'pet', tipo: 'garrafa_pet' });
+  assert.match(r.action('N', { tipo: 'restaurar', uid: 'lt', de: 'carga' }, T0).res.msg, /Bancada de restauro/);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'restauro' }, T0).res.ok, true);
+  const d0 = p.dinheiro; p.comps = { metal: 0, cobre: 0, borracha: 0, eletronica: 0, vidro: 0, cristal: 0 };
+  for (const [uid, de] of [['lt', 'carga'], ['pn', 'carga'], ['pet', 'saco']]) assert.equal(r.action('N', { tipo: 'restaurar', uid, de }, T0).res.ok, true, uid);
+  assert.equal(p.dinheiro, d0, 'restaurar é de graça');
+  assert.equal(r.action('N', { tipo: 'restaurar', uid: 'lt', de: 'carga' }, T0).res.ok, false, 'não restaura duas vezes');
+  r.action('N', { tipo: 'vender', uid: 'lt', de: 'carga' }, T0);
+  assert.equal(p.dinheiro, d0 + SUCATA.lata.valor * 2, 'vende pelo dobro');
+  r.action('N', { tipo: 'vender_saco' }, T0);
+  assert.equal(p.dinheiro, d0 + SUCATA.lata.valor * 2 + SUCATA.garrafa_pet.valor * 2);
+});
+
+test('bancada de peixe (S$ 2.000): só peixe na mão de mais de 2 kg; tábua (E), cortar (I), pegar (I) e vende pelo dobro', async () => {
+  const { BANCADA_PEIXE, estacaoParaMundo } = await import('../shared/world.js');
+  const r = mkRoom(); r.join(np('a'), 'N', T0); const pl = r.players.get('N'), p = pl.profile; const st = STATIONS.find((s) => s.id === 'N');
+  pl.modo = 'terra'; p.dinheiro = 3000;
+  const b = estacaoParaMundo(st, BANCADA_PEIXE.x, BANCADA_PEIXE.z); pl.pos = [b[0] + 2, 1.6, b[1]];
+  assert.match(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.msg, /Bancada de peixe/);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'peixaria' }, T0).res.ok, true);
+  assert.equal(p.dinheiro, 1000);
+  p.mochila.push({ uid: 'm', esp: 'tucunare', cm: 70 });
+  assert.match(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.msg, /na mão/, 'na mochila não vale');
+  p.mao = { uid: 'pq', esp: 'lambari', cm: 12 };
+  assert.match(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.msg, /pequeno/, 'menos de 2 kg não corta');
+  p.mao = null; r.action('N', { tipo: 'mochila_tirar', uid: 'm' }, T0);
+  assert.equal(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.ok, true); assert.equal(p.mao, null);
+  assert.equal(r.action('N', { tipo: 'peixaria_pegar' }, T0).res.ok, false, 'precisa cortar antes');
+  assert.equal(r.action('N', { tipo: 'peixaria_cortar' }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'peixaria_pegar' }, T0).res.ok, true);
+  assert.equal(p.mao.cortado, true);
+  assert.equal(r.action('N', { tipo: 'peixe_aquario' }, T0).res.ok, false, 'cortado não vai para o aquário');
+  pl.pos = [st.pad[0], 1.6, st.pad[1]];
+  const { valorPeixe } = await import('../shared/data.js');
+  const d0 = p.dinheiro, v = valorPeixe('tucunare', 70);
+  assert.equal(r.action('N', { tipo: 'peixe_vender' }, T0).res.ok, true);
+  assert.equal(p.dinheiro, d0 + v * 2);
+});

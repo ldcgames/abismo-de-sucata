@@ -6,11 +6,11 @@
 import {
   SUCATA, RESTAURO, ESPECIES, SUB_UP, VARA, PESADO, AQUARIOS, TANQUES, CAIXA_TERMICA, ESTACAO, DEPOSITO,
   EXTRAS, CONTRATOS, TROLL, PERFIL_VERSAO, massaPeixe, valorPeixe, ENERGIA, MOCHILA,
-  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO,
+  ARMAS, ARMAS_ORDEM, MUNICAO_MAX, ESTATUA_PECAS, LIXO, MISSOES, SUB_ORDEM, SUCATA_RESPAWN_S, KRAKEN, TUBARAO, PEIXARIA, valorItem, nomeItem, valorPeixeItem,
 } from './data.js';
 import {
   STATIONS, stationById, terrainHeight, navSDF, SHAFT_C, SHAFT_SEGS, shaftRadius, CAVES, WRECKS,
-  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS, krakenPos, tubaraoPos,
+  makeRng, LAKE_R, SLIDE_R, hourOfDay, isNight, ESTATUA, BARRACA_ARMAS, krakenPos, tubaraoPos, BANCADA_PEIXE, estacaoParaMundo,
 } from './world.js';
 
 // ------------------------------------------------------------------ util
@@ -46,6 +46,7 @@ function newProfileBase(id, nome = 'Explorador') {
     mao: null,          // peixe na mão {uid, esp, cm}
     lixoMao: null,      // lixo catado na mão {uid, tipo}: E guarda no saco · Q joga com o estilingue
     mochila: [],        // até 5 peixes guardados (para arremessar ou vender depois)
+    peixaria: null,     // peixe na tábua da bancada de peixe { peixe, cortado }
     inventVer: 2,
     caixaTermica: [],   // peixes guardados temporariamente
     aquario: { nivel: 0, peixes: [] },
@@ -128,6 +129,7 @@ export function migrateProfile(p) {
     out.inventVer = 2;
   }
   out.saco = Array.isArray(p.saco) ? p.saco : [];
+  out.peixaria = p.peixaria && p.peixaria.peixe && ESPECIES[p.peixaria.peixe.esp] ? p.peixaria : null;
   out.lixoMao = p.lixoMao && typeof p.lixoMao === 'object' && SUCATA[p.lixoMao.tipo]?.terra ? p.lixoMao : null;
   out.armas = p.armas && typeof p.armas === 'object' ? p.armas : {};
   out.municao = p.municao && typeof p.municao === 'object' ? p.municao : {};
@@ -413,10 +415,12 @@ export function cabeNoAquario(p, peixe, destino = 'aquario') {
     if (p.aquario.peixes.length >= a.vagas) return `${a.nome} lotado [${p.aquario.peixes.length}/${a.vagas}]`;
     if (peixe.cm > a.maxCm) return `${ESPECIES[peixe.esp].nome} de ${peixe.cm} cm não cabe: máximo ${a.maxCm} cm no ${a.nome}`;
     if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
+    if (peixe.cortado) return 'Peixe cortado é para vender';
     if (ESPECIES[peixe.esp].pesado) return 'Tubarões só no tanque de peixes';
     return null;
   }
   if (ESPECIES[peixe.esp].cacado) return 'O tubarão abatido é para vender no computador';
+  if (peixe.cortado) return 'Peixe cortado é para vender';
   if (p.tanque.nivel < 0) return 'Você ainda não tem tanque de peixes';
   const t = TANQUES[p.tanque.nivel];
   if (p.tanque.peixes.length >= t.vagas) return `${t.nome} lotado [${p.tanque.peixes.length}/${t.vagas}]`;
@@ -453,6 +457,13 @@ export function applyAction(p, a, ctx) {
 }
 
 const precisaEstacao = (ctx) => (estaNaEstacao(ctx.player) ? null : fail('Você precisa estar na sua estação'));
+function pertoPeixaria(p, ctx) {
+  if (!p.estacao.peixaria) return fail('Compre a Bancada de peixe no computador (aba Estação)');
+  const st = stationById(ctx.player.slot); if (!st) return fail('Estação inválida');
+  const b = estacaoParaMundo(st, BANCADA_PEIXE.x, BANCADA_PEIXE.z);
+  if (ctx.player.modo !== 'terra' || Math.hypot(ctx.player.pos[0] - b[0], ctx.player.pos[2] - b[1]) > 4) return fail('Vá até a bancada de peixe da sua estação');
+  return null;
+}
 
 const ACOES = {
   // ---------- compras ----------
@@ -488,7 +499,7 @@ const ACOES = {
         const prox = DEPOSITO[p.estacao.deposito + 1]; if (!prox) return fail('Depósito no máximo');
         custo = prox.custo; nome = `Depósito (${prox.vagas} vagas)`; aplicar = () => { p.estacao.deposito += 1; };
       } else {
-        const it = ESTACAO[chave]; if (!it) return fail('Item inexistente');
+        const it = ESTACAO[chave]; if (!it || it.oculto) return fail('Item inexistente');
         if (p.estacao[chave]) return fail('Já construído');
         custo = it.custo; nome = it.nome; aplicar = () => { p.estacao[chave] = true; };
       }
@@ -551,12 +562,12 @@ const ACOES = {
     const lista = a.de === 'deposito' ? p.deposito : a.de === 'saco' ? p.saco : p.carga;
     const i = lista.findIndex((x) => x.uid === a.uid);
     if (i < 0) return fail('Item não encontrado');
-    const t = SUCATA[lista[i].tipo];
+    const it = lista[i], t = SUCATA[it.tipo];
     if (t.estatua) return fail('Peças da estátua não se vendem: coloque na estátua');
     lista.splice(i, 1);
-    const v = comMult(p, t.valor);
+    const v = comMult(p, valorItem(it));
     p.dinheiro += v; p.xp += 1;
-    return okR(`Vendido: ${t.nome} por S$ ${v}` + (multDinheiro(p) > 1 ? ` (×${multDinheiro(p)})` : ''));
+    return okR(`Vendido: ${nomeItem(it)} por S$ ${v}` + (multDinheiro(p) > 1 ? ` (×${multDinheiro(p)})` : ''));
   },
   reciclar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
@@ -570,19 +581,44 @@ const ACOES = {
     receber(p, { comps: t.recicla });
     return okR(`Reciclado: ${t.nome} → ` + Object.entries(t.recicla).map(([k, n]) => `${n} ${k}`).join(', '));
   },
+  // restauro: de graça, qualquer item (lixo, sucata do fundo) direto do submarino, do depósito ou do saco. Vende pelo dobro.
   restaurar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
-    if (!p.estacao.restauro) return fail('Construa a Bancada de restauro');
-    const lista = a.de === 'deposito' ? p.deposito : p.carga;
+    if (!p.estacao.restauro) return fail('Compre a Bancada de restauro no computador (aba Estação)');
+    const lista = a.de === 'deposito' ? p.deposito : a.de === 'saco' ? p.saco : p.carga;
     const i = lista.findIndex((x) => x.uid === a.uid);
     if (i < 0) return fail('Item não encontrado');
-    const t = SUCATA[lista[i].tipo];
-    if (!t.restaura) return fail('Este item não pode ser restaurado');
-    const custo = RESTAURO[t.restaura];
-    if (!podePagar(p, custo)) return fail('Faltam: ' + faltando(p, custo).join(', '));
-    pagar(p, custo);
-    lista[i] = { uid: uid(ctx.rnd), tipo: t.restaura };
-    return okR(`Restaurado: ${SUCATA[t.restaura].nome} (vale S$ ${SUCATA[t.restaura].valor})`, [{ t: 'bancada', slot: ctx.player.slot, maquina: 'restauro' }]);
+    const it = lista[i], t = SUCATA[it.tipo];
+    if (t.estatua) return fail('Peças da estátua vão para a estátua');
+    if (it.coop) return fail('A âncora gigante não cabe na bancada');
+    if (it.rest || t.restaurado) return fail('Esse item já está restaurado');
+    lista[i] = { ...it, rest: true };
+    return okR(`Restaurado: ${t.nome} — agora vende por S$ ${comMult(p, valorItem(lista[i]))}`, [{ t: 'bancada', slot: ctx.player.slot, maquina: 'restauro' }]);
+  },
+  // bancada de peixe: peixe de mais de 2 kg na mão → tábua (E) → cortar (I) → pegar (I). Cortado vende pelo dobro.
+  peixaria_colocar(p, a, ctx) {
+    const e = pertoPeixaria(p, ctx); if (e) return e;
+    if (p.peixaria) return fail('Já tem um peixe na tábua');
+    if (!p.mao) return fail('Traga o peixe na mão (tire da mochila com Z)');
+    if (p.mao.cortado) return fail('Esse peixe já está cortado: venda no computador');
+    const kg = massaPeixe(p.mao.esp, p.mao.cm);
+    if (kg <= PEIXARIA.minKg) return fail(`Peixe pequeno demais para cortar: ${kg.toFixed(1)} kg (precisa ter mais de ${PEIXARIA.minKg} kg)`);
+    p.peixaria = { peixe: p.mao, cortado: false }; p.mao = null;
+    return okR(`${ESPECIES[p.peixaria.peixe.esp].nome} na tábua — aperte I para cortar`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
+  },
+  peixaria_cortar(p, a, ctx) {
+    const e = pertoPeixaria(p, ctx); if (e) return e;
+    if (!p.peixaria) return fail('Coloque um peixe na tábua primeiro');
+    if (p.peixaria.cortado) return fail('Já está cortado — aperte I para pegar');
+    p.peixaria.cortado = true;
+    return okR('Peixe cortado! Aperte I para pegar', [{ t: 'visual_estacao', slot: ctx.player.slot }, { t: 'bancada', slot: ctx.player.slot, maquina: 'peixaria' }]);
+  },
+  peixaria_pegar(p, a, ctx) {
+    const e = pertoPeixaria(p, ctx); if (e) return e;
+    if (!p.peixaria?.cortado) return fail(p.peixaria ? 'Corte o peixe primeiro (I)' : 'Não tem peixe na tábua');
+    if (p.mao) return fail('Suas mãos estão ocupadas');
+    p.mao = { ...p.peixaria.peixe, cortado: true }; p.peixaria = null;
+    return okR(`Peixe cortado na mão — venda no computador por S$ ${comMult(p, valorPeixeItem(p.mao))}`, [{ t: 'visual_estacao', slot: ctx.player.slot }]);
   },
   guardar(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
@@ -694,7 +730,7 @@ const ACOES = {
       if (!p.mao) return fail('Nenhum peixe na mão');
       f = p.mao; p.mao = null; de = 'mao';
     }
-    const v = comMult(p, valorPeixe(f.esp, f.cm));
+    const v = comMult(p, valorPeixeItem(f));
     p.dinheiro += v;
     return okR(`Vendido: ${ESPECIES[f.esp].nome} por S$ ${v}`, de === 'aquario' || de === 'tanque' ? [{ t: 'visual_estacao', slot: ctx.player.slot }] : [], { de });
   },
@@ -849,7 +885,7 @@ const ACOES = {
   vender_saco(p, a, ctx) {
     const e = precisaEstacao(ctx); if (e) return e;
     if (!p.saco.length) return fail('O saco está vazio');
-    let tot = 0; for (const x of p.saco) tot += SUCATA[x.tipo].valor;
+    let tot = 0; for (const x of p.saco) tot += valorItem(x);
     const v = comMult(p, tot), n = p.saco.length;
     p.saco = []; p.dinheiro += v;
     return okR(`Vendeu ${n} reciclável(is) por S$ ${v}` + (multDinheiro(p) > 1 ? ` (×${multDinheiro(p)})` : ''));

@@ -20,7 +20,7 @@ import { Novidades } from './game/novidades.js';
 import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listarSalas } from './net/net.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
 import { terrainHeight, navSDF, STATIONS, stationById, PLAY_R, SLIDE_R, LAKE_R, depthZone, isNight, hourOfDay, SHAFT_C, CAVES, ESTATUA, chaoEstatua, colidirPedras } from '../shared/world.js';
-import { ESPECIES, SUCATA, CORES_JOGADOR, TROLL, ENERGIA, ARMAS, ARMAS_ORDEM, ESTATUA_PECAS, LIXO, MOCHILA } from '../shared/data.js';
+import { ESPECIES, SUCATA, CORES_JOGADOR, TROLL, ENERGIA, ARMAS, ARMAS_ORDEM, ESTATUA_PECAS, LIXO, MOCHILA, PEIXARIA, massaPeixe } from '../shared/data.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -230,6 +230,13 @@ class Game {
     if (tipo === 'tinta') { this.me.acao = { tipo: 'bancada', t: 0, dur: 1.4 }; return this.acao({ tipo: 'processar_lula' }); }
     if (tipo === 'soltar') return this.soltarPeixe();
     if (tipo === 'arremessar') return this.arremessar();
+  }
+  // bancada de peixe: animação de cortar (2 s, com o som da faca) e depois o servidor marca como cortado
+  cortarPeixe() {
+    this.cortando = true;
+    this.me.acao = { tipo: 'bancada', t: 0, dur: 2.0 };
+    for (let k = 0; k < 6; k++) setTimeout(() => { this.audio.blip(180 + Math.random() * 60, 0.05, 'square', 0.07, -80); this.audio.noise?.(0.05, 2400, 0.05, 1); }, 150 + k * 300);
+    setTimeout(async () => { await this.acao({ tipo: 'peixaria_cortar' }); this.cortando = false; }, 1900);
   }
   async soltarPeixe() {
     const f = this.perfil.mao; if (!f) return;
@@ -503,7 +510,7 @@ class Game {
     this.anims ||= [];
     // painéis/atalhos
     if (!this.ui.aberto) {
-      if (I.hit('KeyI')) this.ui.abrir('inventario');
+      if (I.hit('KeyI') && !(this.pertoPeixaria && p.peixaria)) this.ui.abrir('inventario'); // perto da tábua com peixe, I corta/pega
       if (I.hit('KeyJ')) this.ui.abrir('mapa');
       if (I.hit('Tab')) this.ui.abrir('sala');
     } else if (I.hit('KeyI') || I.hit('Tab') || I.hit('KeyJ')) this.ui.fechar();
@@ -560,8 +567,8 @@ class Game {
       // a base só existe quando tem alguém nela (as outras vagas ficam livres, sem construção)
       st.ativa = s.id === this.slot || !!this.remotos[s.id];
       let est = null, cor = 0, nome = '';
-      if (s.id === this.slot) { est = { ...p.estacao, aquario: p.aquario, tanque: p.tanque, depositoN: p.deposito.length }; cor = p.cor; nome = p.nome; }
-      else if (this.remotos[s.id]) { const r = this.remotos[s.id]; est = { ...r.estacao, depositoN: r.estacao.cargaN || 0 }; cor = r.cor; nome = r.nome; }
+      if (s.id === this.slot) { est = { ...p.estacao, aquario: p.aquario, tanque: p.tanque, depositoN: p.deposito.length, peixariaEst: p.peixaria || null }; cor = p.cor; nome = p.nome; }
+      else if (this.remotos[s.id]) { const r = this.remotos[s.id]; est = { ...r.estacao, depositoN: r.estacao.cargaN || 0, peixariaEst: r.peixaria || null }; cor = r.cor; nome = r.nome; }
       st.updateVisual(est, cor, nome);
       st.animateFish(dt, this.t);
     }
@@ -803,7 +810,19 @@ class Game {
       for (const q of pts) { const d = Math.hypot(q.pos[0] - me.pos[0], q.pos[2] - me.pos[2]); if (d < q.r && d < bd) { bd = d; best = q; } }
       if (best?.id === 'berco' && this.crane.estado !== 'berco') best = null;
       // estações dos amigos: só olhar (aquário) — ações são sempre na própria estação
-      if (best) {
+      this.pertoPeixaria = best?.id === 'peixaria';
+      if (best?.id === 'peixaria') {
+        const pe = p.peixaria;
+        if (pe?.cortado) { txt = `<kbd>I</kbd>Pegar o peixe cortado <span class="nota">(vende pelo dobro no computador)</span>`; if (livre && I.hit('KeyI')) this.acao({ tipo: 'peixaria_pegar' }); }
+        else if (pe) {
+          txt = this.cortando ? '🔪 Cortando…' : `<kbd>I</kbd>Cortar ${ESPECIES[pe.peixe.esp].nome}`;
+          if (livre && I.hit('KeyI') && !this.cortando) this.cortarPeixe();
+        } else if (p.mao && !p.mao.cortado) {
+          const kg = massaPeixe(p.mao.esp, p.mao.cm);
+          txt = kg > PEIXARIA.minKg ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} na tábua <span class="nota">(${kg.toFixed(1)} kg)</span>` : `Peixe pequeno demais para cortar (${kg.toFixed(1)} kg) — precisa ter mais de ${PEIXARIA.minKg} kg`;
+          if (livre && I.hit('KeyE') && kg > PEIXARIA.minKg) { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.7 }; this.acao({ tipo: 'peixaria_colocar' }); }
+        } else txt = p.mao?.cortado ? 'Peixe já cortado: venda no computador da estação' : `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b> (da mochila: <kbd>Z</kbd>)`;
+      } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
         if (best.id === 'aquario' && p.mao) txt = `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no aquário`;
         if (best.id === 'tinta') txt = p.mao && ESPECIES[p.mao.esp].tinta ? `<kbd>E</kbd>Fabricar bolsas com a lula (+2) · você tem ${p.baloes}/10` : `Fábrica de bolsas: traga uma LULA na mão · bolsas ${p.baloes}/10`;

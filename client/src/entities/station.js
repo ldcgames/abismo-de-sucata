@@ -7,7 +7,7 @@ import { stationById, terrainHeight, noise3, PAD_R, CRADLE_R, LAUNCH_R, DOCK_END
 import { AQUARIOS, TANQUES, CORES_JOGADOR, ESPECIES } from '../../shared/data.js';
 import { makeFishGeo } from '../world/fauna.js';
 import { weaponMesh } from './weapons.js';
-import { BARRACA_ARMAS, BARRACA_CORRIDA } from '../../shared/world.js';
+import { BARRACA_ARMAS, BARRACA_CORRIDA, BANCADA_PEIXE } from '../../shared/world.js';
 import { ARMAS_ORDEM } from '../../shared/data.js';
 
 const CONC0 = [0.42, 0.41, 0.38];
@@ -367,10 +367,18 @@ export class Station {
     const pal = CORES_JOGADOR[cor % CORES_JOGADOR.length];
     // bandeira
     g.put(box(2.2, 1.3, 0.04), [13.15, 7.6, 14], [0, 0, 0], 1, pal.roupa);
-    if (est?.reciclador) {
-      g.put(rbox(2.4, 2.2, 2.2, 0.12), [-14, 2.65, 10], [0, 0, 0], 1, [0.3, 0.45, 0.3]);
-      g.put(lathe([[0.7, 0], [1.3, 1.0], [1.35, 1.05]], 4), [-14, 3.75, 10], [0, Math.PI / 4, 0], 1, [0.35, 0.5, 0.35]);
-      g.put(rbox(2.6, 0.15, 0.9, 0.04), [-11.8, 2.2, 10], [0, 0, -0.25], 1, [0.15, 0.15, 0.15]);
+    // bancada de peixe (onde ficava a recicladora): mesa de inox, tábua de corte, faca e balde de gelo
+    if (est?.peixaria) {
+      const bx = BANCADA_PEIXE.x, bz = BANCADA_PEIXE.z;
+      g.put(rbox(1.1, 0.08, 2.6, 0.02), [bx, 2.45, bz], [0, 0, 0], 1, [0.78, 0.8, 0.82]); // tampo de inox
+      for (const sx of [-0.45, 0.45]) for (const sz of [-1.15, 1.15]) g.put(cylinder(0.05, 0.05, 0.9, 8), [bx + sx, 1.98, bz + sz], [0, 0, 0], 1, METAL);
+      g.put(rbox(1.0, 0.05, 2.4, 0.02), [bx, 1.75, bz], [0, 0, 0], 1, [0.6, 0.62, 0.65]); // prateleira
+      g.put(rbox(0.75, 0.06, 1.7, 0.03), [bx + 0.05, 2.52, bz], [0, 0, 0], 1, [0.85, 0.68, 0.45]); // tábua
+      g.put(box(0.03, 0.02, 0.3), [bx - 0.35, 2.56, bz + 1.05], [0, 0.3, 0], 1, [0.85, 0.87, 0.9]); // lâmina
+      g.put(box(0.05, 0.04, 0.14), [bx - 0.4, 2.56, bz + 1.27], [0, 0.3, 0], 1, [0.12, 0.1, 0.08]); // cabo
+      g.put(cylinder(0.28, 0.22, 0.45, 14), [bx - 0.1, 1.83, bz - 1.75], [0, 0, 0], 1, [0.25, 0.45, 0.75]); // balde
+      g.put(sphere(0.25, 10, 6), [bx - 0.1, 2.02, bz - 1.75], [0, 0, 0], [1, 0.35, 1], [0.9, 0.95, 1]); // gelo
+      g.put(rbox(0.06, 0.9, 1.6, 0.02), [bx - 0.6, 3.0, bz], [0, 0, 0], 1, [0.78, 0.8, 0.82]); // espelho de inox atrás
     }
     if (est?.restauro) {
       g.put(rbox(2.2, 0.1, 1.0, 0.03), [-13, 2.45, -2.5], [0, Math.PI / 2, 0], 1, [0.5, 0.38, 0.25]);
@@ -459,6 +467,20 @@ export class Station {
       const lg = new Geo(); for (const p of this.lights) { const l = this.toLocal(p); lg.put(sphere(0.18, 10, 6), [l[0], 5.15, l[2]], [0, 0, 0], 1, [1, 0.9, 0.6]); }
       const ln = new Node('lampadas'); ln.mesh = R.createMesh(lg, { emissive: [1, 0.85, 0.5], glow: 2, castShadow: false }); this.dyn.add(ln);
       this.lampNode = ln;
+    }
+    if (est?.peixaria && est.peixariaEst?.peixe) {
+      const f = est.peixariaEst.peixe, bx = BANCADA_PEIXE.x + 0.05, bz = BANCADA_PEIXE.z;
+      const cm = Math.min(f.cm, 150);
+      if (!est.peixariaEst.cortado) {
+        const n = fishNode(R, f.esp, cm); n.at(bx, 2.62, bz).rot(0, 0, Math.PI / 2); this.dyn.add(n);
+      } else {
+        // cortado: cabeça, rabo e três filés rosados
+        const fg = new Geo(), L = cm / 100;
+        fg.put(sphere(0.12 * L + 0.05, 10, 8), [bx, 2.62, bz - L * 0.42], [0, 0, 0], [1, 0.8, 1.2], ESPECIES[f.esp].cor);
+        fg.put(box(0.06, 0.2 * L + 0.06, 0.18 * L + 0.05), [bx, 2.62, bz + L * 0.45], [0, 0, 0], 1, ESPECIES[f.esp].cor);
+        for (let k = 0; k < 3; k++) fg.put(rbox(0.18 * L + 0.12, 0.05, 0.16 * L + 0.08, 0.02), [bx + (k - 1) * 0.04, 2.58, bz - L * 0.18 + k * (0.2 * L + 0.05)], [0, 0, 0], 1, [0.97, 0.58, 0.5]);
+        const fn = new Node('peixe_cortado'); fn.mesh = R.createMesh(fg, { rough: 0.5 }); this.dyn.add(fn);
+      }
     }
     if (est?.luzinhas) {
       const lg = new Geo(), cores = [[1, 0.3, 0.3], [1, 0.85, 0.3], [0.3, 1, 0.45], [0.35, 0.6, 1], [1, 0.45, 0.9]];
@@ -652,7 +674,7 @@ export class Station {
       P('deposito', -7.5, 1.6, -2.5, 2.8, { txt: 'Depósito' }),
       P('berco', 2.4, 1.6, this.zCradle, 3.4, { txt: 'Entrar no submarino' }),
     ];
-    if (est?.reciclador) list.push(P('reciclador', -12, 1.6, 10, 2.8, { txt: 'Recicladora' }));
+    if (est?.peixaria) list.push(P('peixaria', BANCADA_PEIXE.x + 1.7, 1.6, BANCADA_PEIXE.z, 2.4, { txt: 'Bancada de peixe' }));
     if (est?.restauro) list.push(P('restauro', -12, 1.6, -2.5, 2.6, { txt: 'Bancada de restauro' }));
     list.push(P('tinta', 13.4, 1.6, 2.5, 2.2, { txt: 'Fábrica de bolsas de tinta (leia a placa)' }));
     list.push(P('armas', BARRACA_ARMAS.x + 0.9, 1.6, BARRACA_ARMAS.z - 1.2, 2.0, { txt: 'Computador da loja de armas: comprar armas e balas' }));
@@ -678,6 +700,8 @@ export class Station {
       { x: BARRACA_CORRIDA.x + 2.15, z: BARRACA_CORRIDA.z, w: 0.3, d: 4.0 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z - 1.92, w: 4.4, d: 0.3 }, { x: BARRACA_CORRIDA.x, z: BARRACA_CORRIDA.z + 1.92, w: 4.4, d: 0.3 },
       { x: BARRACA_CORRIDA.x + 0.2, z: BARRACA_CORRIDA.z, w: 0.85, d: 0.85 },
       ...(est?.banco ? [{ x: -8, z: 13, w: 2.0, d: 0.7 }] : []),
+      ...(est?.restauro ? [{ x: -13, z: -2.5, w: 1.1, d: 2.3 }] : []),
+      ...(est?.peixaria ? [{ x: BANCADA_PEIXE.x, z: BANCADA_PEIXE.z, w: 1.2, d: 2.7 }, { x: BANCADA_PEIXE.x - 0.1, z: BANCADA_PEIXE.z - 1.75, w: 0.6, d: 0.6 }] : []),
       ...(est?.guardasol ? [{ x: -13.5, z: 4.5, w: 0.3, d: 0.3 }, { x: -12.4, z: 4.6, w: 0.7, d: 1.0 }] : []),
       ...(est?.churrasqueira ? [{ x: -10, z: 2.6, w: 1.25, d: 0.8 }] : []),
       ...(est?.rede ? [{ x: 4.5, z: -5, w: 0.3, d: 0.3 }, { x: 8.3, z: -5, w: 0.3, d: 0.3 }] : []),

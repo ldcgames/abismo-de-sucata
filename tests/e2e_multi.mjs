@@ -48,7 +48,7 @@ await A.evaluate(() => __jogo.ui.fechar());
 const pescar = async (P) => {
   await P.evaluate(() => { const g = __jogo; const st = g.stations[g.slot]; g.me.vel = [0, 0, 0]; g.me.camYaw = st.yaw; g.me.camPitch = 0; g.step(2); if (g.pesca.estado === 'off') { g.input.press('KeyF'); g.step(1); } g.input.mouse.down = true; g.input.mouse.clicked = true; g.step(1); g.input.mouse.down = true; g.step(12); g.input.mouse.down = false; g.step(25); });
   for (let i = 0; i < 160; i++) { const e = await P.evaluate(() => { __jogo.step(1); return __jogo.pesca.estado; }); if (e === 'mordida') break; if (e === 'pronto' && i > 30) return 'nada'; await sleep(100); }
-  if (await P.evaluate(() => __jogo.pesca.estado) !== 'mordida') return 'sem';
+  { const est = await P.evaluate(() => __jogo.pesca.estado + '|' + __jogo.prompt?.textContent); if (!est.startsWith('mordida')) return 'sem:' + est; }
   await P.evaluate(() => { __jogo.input.mouse.clicked = true; __jogo.step(1); });
   for (let i = 0; i < 2000; i++) { const e = await P.evaluate(() => { const g = __jogo, Pp = g.pesca; if (Pp.estado !== 'brigando') return Pp.estado; g.input.mouse.down = Pp.tensao < 70; g.step(1); return Pp.estado; }); if (e !== 'brigando') break; if (i % 20 === 0) await sleep(30); }
   await P.evaluate(() => { __jogo.input.mouse.down = false; });

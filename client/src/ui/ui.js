@@ -2,7 +2,7 @@
 // Todo botão envia uma AÇÃO para o servidor (ou servidor local); nada muda saldo/inventário só na tela.
 import {
   SUB_UP, SUB_ORDEM, VARA, PESADO, AQUARIOS, TANQUES, ESTACAO, DEPOSITO, EXTRAS, CONTRATOS, SUCATA, RESTAURO, ESPECIES,
-  COMPONENTES, CORES_JOGADOR, valorPeixe, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
+  COMPONENTES, CORES_JOGADOR, valorPeixe, valorPeixeItem, valorItem, nomeItem, PEIXARIA, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
 } from '../../shared/data.js';
 import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, depositoVagas, multDinheiro } from '../../shared/rules.js';
 import { STATIONS } from '../../shared/world.js';
@@ -34,7 +34,8 @@ export class UI {
     const mult = multDinheiro(p);
     const extra = `<div>🗑️ Saco: <b>${p.saco.length}/${LIXO.saco}</b> · 🗿 Estátua <b>${p.estatua.colocadas.length}/${ESTATUA_PECAS.length}</b> · multiplicador <b class="${mult > 1 ? 'mult' : ''}">×${mult}</b></div>`;
     const mis = (p.missoes?.ativas || []).map((m) => `<div class="missao">🎯 ${esc(m.txt)} <b>${m.tipo === 'fundo' ? `${m.feito}/${m.n} m` : `${m.feito}/${m.n}`}</b> <span class="premio">S$ ${fmt(m.premio)}</span></div>`).join('');
-    const html = `<div class="din">S$ ${fmt(p.dinheiro)}</div><div class="comps">${comps}</div>${moc}${extra}<div class="missoes">${mis}</div>`;
+    // componentes (metal, cobre...) não são mais usados: só aparecem se o jogador ainda tiver algum guardado
+    const html = `<div class="din">S$ ${fmt(p.dinheiro)}</div>${Object.values(p.comps).some((n) => n > 0) ? `<div class="comps">${comps}</div>` : ""}${moc}${extra}<div class="missoes">${mis}</div>`;
     if ($('topoEsq')._h !== html) { $('topoEsq').innerHTML = html; $('topoEsq')._h = html; }
     const h = Math.floor(info.hora), m = Math.floor((info.hora % 1) * 60);
     const dir = `<div>${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${info.noite ? '🌙' : '☀️'}</div><div>${esc(info.zona)}</div>${info.ranking ? `<div class="ranking">${info.ranking}</div>` : ''}<div class="nota">${esc(info.rede)}</div>${info.fps ? `<div class="nota">${info.fps} FPS</div>` : ''}`;
@@ -98,11 +99,11 @@ export class UI {
     if (el._k === k) return;
     el._k = k; el.hidden = false;
     if (e.cacado) {
-      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixe(f.esp, f.cm)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="soltar">Largar (X)</button></div>`;
+      el.innerHTML = `<div>🦈 <b>${esc(e.nome)}</b> · vale S$ ${valorPeixeItem(f)}</div><div class="bt"><button data-a="vender" ${!naEstacao ? 'disabled' : ''} title="${naEstacao ? '' : 'Vá até o computador da sua estação'}">Vender</button><button data-a="soltar">Largar (X)</button></div>`;
       el.querySelectorAll('button').forEach((b) => (b.onclick = () => this.g.acaoMao(b.dataset.a)));
       return;
     }
-    el.innerHTML = `<div>🐟 <b>${esc(e.nome)}</b> — ${f.cm} cm · vale S$ ${valorPeixe(f.esp, f.cm)}</div>
+    el.innerHTML = `<div>🐟 <b>${esc(e.nome)}${f.cortado ? ' (cortado)' : ''}</b> — ${f.cm} cm · vale S$ ${valorPeixeItem(f)}</div>
       <div class="bt">
         <button data-a="aquario" ${!naEstacao || motivo ? 'disabled' : ''} title="${esc(motivo || (naEstacao ? '' : 'Vá até sua estação'))}">Aquário</button>
         ${p.tanque.nivel >= 0 ? `<button data-a="tanque" ${!naEstacao || motivoT ? 'disabled' : ''} title="${esc(motivoT || '')}">Tanque</button>` : ''}
@@ -220,6 +221,7 @@ export class UI {
   aba_estacao(p) {
     let h = '<div class="grade">';
     for (const [k, it] of Object.entries(ESTACAO)) {
+      if (it.oculto) continue;
       const falta = faltando(p, it.custo);
       const deco = it.deco || k === 'decoracao', off = !!p.estacao.decoOff?.[k];
       const tem = p.estacao[k] ? (deco ? `<div class="val"><b>${off ? 'Guardada (fora da estação)' : 'Equipada'}</b></div>${this.btn(off ? 'Equipar' : 'Desequipar', { tipo: 'deco_alternar', chave: k })}` : '<div class="val"><b>Construído</b></div>') : this.btn(deco ? 'Comprar e equipar' : 'Construir', { tipo: 'comprar', cat: 'estacao', chave: k }, falta.length > 0, falta.join(', '));
@@ -260,15 +262,15 @@ export class UI {
     const pegar = (f) => onde === 'mochila' ? { tipo: 'mochila_tirar', uid: f.uid } : onde === 'caixa' ? { tipo: 'caixa_mao', uid: f.uid } : { tipo: 'aquario_retirar', uid: f.uid, de: onde };
     const m = multDinheiro(p);
     let h = '<div class="lista">';
-    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(f.esp, f.cm) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
+    for (const f of lista) h += `<div class="item"><div>🐟 ${esc(ESPECIES[f.esp].nome)}${f.cortado ? ' (cortado)' : ''} — ${f.cm} cm</div><div class="acoes">${this.btn('Pegar na mão', pegar(f), !!p.mao, p.mao ? 'Suas mãos estão ocupadas' : '')}${onde === 'mochila' || onde === 'caixa' ? this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(f) * m))}`, { tipo: 'peixe_vender', uid: f.uid }) : ''}</div></div>`;
     return h + '</div>';
   }
   sacoVenda(p) {
     if (!p.saco.length) return '<p class="nota">🗑️ Saco de recicláveis vazio — cate garrafas PET e latinhas na margem (E).</p>';
     let tot = 0; const cont = {};
-    for (const x of p.saco) { tot += SUCATA[x.tipo].valor; cont[x.tipo] = (cont[x.tipo] || 0) + 1; }
+    for (const x of p.saco) { tot += valorItem(x); const k = nomeItem(x); cont[k] = (cont[k] || 0) + 1; }
     const m = multDinheiro(p);
-    return `<h3>Saco de recicláveis (${p.saco.length}/${LIXO.saco})</h3><div class="convite">${Object.entries(cont).map(([t, n]) => `${n}× ${esc(SUCATA[t].nome)}`).join(' · ')} ${this.btn(`Vender tudo — S$ ${fmt(Math.round(tot * m))}${m > 1 ? ` (×${m})` : ''}`, { tipo: 'vender_saco' })}</div>`;
+    return `<h3>Saco de recicláveis (${p.saco.length}/${LIXO.saco})</h3><div class="convite">${Object.entries(cont).map(([t, n]) => `${n}× ${esc(t)}`).join(' · ')} ${this.btn(`Vender tudo — S$ ${fmt(Math.round(tot * m))}${m > 1 ? ` (×${m})` : ''}`, { tipo: 'vender_saco' })}</div>`;
   }
   aba_vender(p) {
     // tudo o que dá para vender num lugar só: peixes (mão, mochila, aquário, tanque), lixo catado e a carga do submarino
@@ -284,7 +286,7 @@ export class UI {
     const m = multDinheiro(p);
     if (p.mao) {
       const e = ESPECIES[p.mao.esp];
-      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixe(p.mao.esp, p.mao.cm) * m))}`, { tipo: 'peixe_vender' })}${e.pesado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
+      h += `<h3>Peixe na mão</h3><div class="lista"><div class="item"><div>🐟 ${esc(e.nome)}${p.mao.cortado ? ' (cortado)' : ''} — ${p.mao.cm} cm</div><div class="acoes">${this.btn(`Vender S$ ${fmt(Math.round(valorPeixeItem(p.mao) * m))}`, { tipo: 'peixe_vender' })}${e.pesado ? '' : this.btn(`Guardar na mochila (${p.mochila.length}/${MOCHILA.peixes})`, { tipo: 'mochila_guardar' }, p.mochila.length >= MOCHILA.peixes, 'Mochila cheia')}${e.tinta && p.estacao.tinta ? this.btn('Extrair tinta (+2 bolsas)', { tipo: 'processar_lula' }) : ''}</div></div></div>`;
     }
     // aquário e tanque não aparecem aqui: para vender, tire o peixe de lá antes (aba Aquário → Pegar na mão)
     for (const [onde, tit] of [['mochila', `Mochila (${p.mochila.length}/${MOCHILA.peixes})`], ['caixa', 'Caixa térmica (peixes antigos)']]) {
@@ -295,7 +297,6 @@ export class UI {
   }
   linhaItem(it, de, p, modo = 'tudo') {
     const t = SUCATA[it.tipo];
-    const rest = t.restaura ? RESTAURO[t.restaura] : null;
     const bts = [];
     if (t.estatua) {
       const pc = ESTATUA_PECAS.find((x) => x.id === t.estatua);
@@ -304,20 +305,22 @@ export class UI {
       if (de === 'carga' && modo === 'tudo') bts.push(this.btn('Guardar no depósito', { tipo: 'guardar', uid: it.uid }));
       return `<div class="item"><div><b class="rar-lendário">🗿 ${esc(t.nome)}</b> <span class="nota">${t.kg} kg · ${nota}</span></div><div class="acoes">${bts.join('')}</div></div>`;
     }
-    const vm = Math.round(t.valor * multDinheiro(p));
+    const m = multDinheiro(p), vm = Math.round(valorItem(it) * m);
+    const podeRest = !it.rest && !t.restaurado && !it.coop;
     if (modo === 'tudo' || modo === 'deposito') bts.push(this.btn(`Vender S$ ${vm}`, { tipo: 'vender', uid: it.uid, de }));
-    if (t.recicla && (modo === 'tudo' || modo === 'reciclador' || modo === 'deposito')) bts.push(this.btn('Reciclar → ' + Object.entries(t.recicla).map(([k, n]) => `${n} ${k}`).join(', '), { tipo: 'reciclar', uid: it.uid, de }, !p.estacao.reciclador, 'Construa a Recicladora'));
-    if (rest && (modo === 'tudo' || modo === 'restauro' || modo === 'deposito')) bts.push(this.btn(`Restaurar (${custoTxt(rest)}) → S$ ${SUCATA[t.restaura].valor}`, { tipo: 'restaurar', uid: it.uid, de }, !p.estacao.restauro || faltando(p, rest).length > 0, !p.estacao.restauro ? 'Construa a bancada de restauro' : faltando(p, rest).join(', ')));
+    if (modo === 'restauro' && podeRest) bts.push(this.btn(`Restaurar (grátis) → vende por S$ ${Math.round(valorItem({ ...it, rest: true }) * m)}`, { tipo: 'restaurar', uid: it.uid, de }));
+    if (modo === 'restauro' && !podeRest) bts.push('<span class="nota">✨ já restaurado</span>');
     if (de === 'carga' && modo === 'tudo') bts.push(this.btn('Guardar', { tipo: 'guardar', uid: it.uid }));
     if (de === 'deposito' && modo === 'deposito') bts.push(this.btn('Levar ao sub', { tipo: 'retirar', uid: it.uid }));
-    return `<div class="item"><div><b class="rar-${t.rar}">${esc(t.nome)}</b> <span class="nota">${t.kg} kg · ${t.L} L · ${t.rar}</span></div><div class="acoes">${bts.join('')}</div></div>`;
+    return `<div class="item"><div><b class="rar-${t.rar}">${it.rest ? '✨ ' : ''}${esc(nomeItem(it))}</b> <span class="nota">${t.kg} kg · ${t.L} L · ${t.rar}</span></div><div class="acoes">${bts.join('')}</div></div>`;
   }
   listaSucata(p, modo) {
-    const filtro = (it) => (modo === 'reciclador' ? !!SUCATA[it.tipo].recicla : modo === 'restauro' ? !!SUCATA[it.tipo].restaura : true);
+    const filtro = (it) => (modo === 'restauro' ? !SUCATA[it.tipo].estatua && !it.coop : true);
     let h = '';
-    if (modo === 'reciclador' && !p.estacao.reciclador) return '<p class="nota">Construa a Recicladora no terminal (aba Estação).</p>';
-    if (modo === 'restauro' && !p.estacao.restauro) return '<p class="nota">Construa a Bancada de restauro no terminal (aba Estação).</p>';
+    if (modo === 'restauro' && !p.estacao.restauro) return '<p class="nota">Compre a Bancada de restauro no computador (aba Estação).</p>';
+    if (modo === 'restauro') h += `<p class="nota">Restaurar é <b>de graça</b> e funciona com qualquer item: lixo da margem, latas, pneus, peças do fundo… direto do submarino, do depósito ou do saco. O item restaurado vende pelo <b>dobro</b> no computador.</p>`;
     h += `<h3>No submarino (${p.carga.length})</h3><div class="lista">${p.carga.filter(filtro).map((it) => this.linhaItem(it, 'carga', p, modo === 'deposito' ? 'tudo' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
+    if (modo === 'restauro') h += `<h3>No saco de lixo (${p.saco.length}/${LIXO.saco})</h3><div class="lista">${p.saco.map((it) => this.linhaItem(it, 'saco', p, modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     h += `<h3>No depósito (${p.deposito.length}/${depositoVagas(p)})</h3><div class="lista">${p.deposito.filter(filtro).map((it) => this.linhaItem(it, 'deposito', p, modo === 'deposito' ? 'deposito' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     return h;
   }
