@@ -1,11 +1,14 @@
 import numpy as np, sys
 d=np.load('bruto.npz'); P=d['P'].astype(np.float64); UV=d['UV'].astype(np.float64); I=d['I'].astype(np.int64)
-cell=float(sys.argv[1]) if len(sys.argv)>1 else 0.012
+cell=float(sys.argv[1]) if len(sys.argv)>1 and not sys.argv[1].startswith('-') else 0.012
 UB=40
 mn=P.min(0)
 ci=np.floor((P-mn)/cell).astype(np.int64)
 dims=ci.max(0)+1
 cid=(ci[:,0]*dims[1]+ci[:,1])*dims[2]+ci[:,2]
+import os
+GO=np.load('grupos_orig.npy') if os.path.exists('grupos_orig.npy') and '--grupos' in sys.argv else np.zeros(len(P),np.int64)
+cid=cid*4+GO   # células não misturam peças diferentes (braço, boia, corpo)
 ucell, cinv=np.unique(cid, return_inverse=True)
 nc=len(ucell)
 # quadrics por célula
@@ -25,7 +28,8 @@ M=QA+np.eye(3)[None]*eps[:,:,None]
 rhs=-Qb+eps*mean
 pos=np.linalg.solve(M,rhs[:,:,None])[:,:,0]
 # não deixa sair da célula (+ meia célula)
-lo=mn+(np.stack([ucell//(dims[1]*dims[2]), (ucell//dims[2])%dims[1], ucell%dims[2]],1))*cell
+uc_=ucell//4
+lo=mn+(np.stack([uc_//(dims[1]*dims[2]), (uc_//dims[2])%dims[1], uc_%dims[2]],1))*cell
 pos=np.clip(pos,lo-cell*0.5,lo+cell*1.5)
 # subclusters por UV
 ub=np.floor(UV*UB).astype(np.int64)
@@ -43,4 +47,5 @@ Ts=np.sort(T,1); _,ui=np.unique(Ts,axis=0,return_index=True); T=T[np.sort(ui)]
 used=np.unique(T); remap=-np.ones(nv,np.int64); remap[used]=np.arange(len(used))
 Pk=pos[kc[used]]; UVk=uvk[used]; T=remap[T]
 print('celulas',nc,'vertices',len(used),'triangulos',len(T))
-np.savez('dec.npz',P=Pk.astype(np.float32),UV=UVk.astype(np.float32),I=T.astype(np.int32))
+gcell=ucell%4
+np.savez('dec.npz',P=Pk.astype(np.float32),UV=UVk.astype(np.float32),I=T.astype(np.int32),G=gcell[kc[used]])

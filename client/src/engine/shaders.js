@@ -103,7 +103,8 @@ void main(){
     vec3 tx = texture(uAlbedo, vUv.xy).rgb;
     if (uHasMask > 0.5) { // camisa pintada com a cor do jogador, mantendo as dobras e a estampa
       float m = texture(uMask, vUv.xy).r, l = dot(tx, vec3(0.299, 0.587, 0.114));
-      tx = mix(tx, clamp(uTint * (l / 0.27), 0., 1.), m);
+      float f = l / 0.27; f = f > 1. ? 1. + (f - 1.) * 0.2 : f; f = min(f, 1.15); // pontinhos claros do tecido não estouram em branco
+      tx = mix(tx, clamp(uTint * f, 0., 1.), m);
     }
     base = toLin(tx * uColor * vC.rgb);
   }

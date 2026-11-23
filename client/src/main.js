@@ -1111,7 +1111,8 @@ class Game {
     if (!k) return;
     const n = weaponNode(this.R, k);
     n.rot(Math.PI / 2, 0, 0); // cano na direção do braço estendido
-    if (k === 'bazuca') n.at(0, 0.28, 0.2); // a bazuca fica apoiada mais perto do ombro
+    if (ch.escalaArma) n.sc(ch.escalaArma); // mãos grandes do pescador: arma proporcional
+    if (k === 'bazuca') n.at(0, 0.28 * (ch.escalaArma || 1), 0.2); // a bazuca fica apoiada mais perto do ombro
     ch.handR.add(n); ch._arma = n;
   }
 

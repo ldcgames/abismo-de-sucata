@@ -60,11 +60,11 @@ export function vestirPescador(ch, R, corCamisa = null) {
   for (const no of [ch.hips, ch.chest, ch.head, ...ch.arms.flatMap((a) => [a.sh, a.el, a.hd]), ...ch.legs.flatMap((l) => [l.th, l.kn, l.an])]) no.mesh = null;
   ch.xEyes.visible = false; ch.xEyes.mesh = null;
   ch.stars.at(0, 0.42, 0);
-  ch.cadeira.sc([1.65, 0.48, 1.25]); ch.cadeira.at(0, 0, -0.12);
+  ch.cadeira.sc([1.65, 0.55, 1.25]); ch.cadeira.at(0, 0, -0.1);
   // mandíbula: abre e fecha a boca quando a pessoa fala no chat de voz
   ch.jaw = new Node('mandibula'); set(ch.jaw, sub('jaw', 'head')); ch.head.add(ch.jaw);
   // ajustes de animação para o corpo dele (pernas curtas, barrigão e boia)
-  ch.kPasso = 0.56; ch.bracoAbre = 0.2; ch.kBraco = 0.6; ch.gordinho = true; ch.sentaY = 0.4;
+  ch.kPasso = 0.56; ch.bracoAbre = 0.07; ch.kBraco = 0.5; ch.gordinho = true; ch.sentaY = 0.35; ch.escalaArma = 1.85;
   ch.kQuadril = J.hips[1] / 0.92;
   // malha com pele
   const geo = decodificar();

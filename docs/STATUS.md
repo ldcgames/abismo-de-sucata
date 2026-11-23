@@ -135,3 +135,9 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 3. Login simples (código de recuperação) para levar o perfil online a outro aparelho.
 4. Animação de esqueleto mais rica (mãos segurando o volante, saída do sub pela escotilha).
 5. Simulação de movimento no servidor, se o jogo for aberto ao público.
+
+## v1.5 — pescador refeito
+- Malha do pescador reduzida de novo a partir do modelo original (colapso de arestas com quádricas, `tools/pescador/qem.cpp`): superfície fechada, sem lascas nem pedaços do pato grudando.
+- Braço, boia e corpo separados de verdade; buracos fechados; braço só obedece ossos do braço.
+- Partes que ficavam escondidas (debaixo do braço, contato com a boia) foram repintadas na textura com a cor vizinha.
+- Armas maiores na mão (escala 1,85); cobertura do quiosque em 4 postes; camisa tingida sem pontinhos estourados.

@@ -284,12 +284,20 @@ export class Station {
       for (let i = 0; i < 12; i++) for (let j = 0; j < 4; j++) kg.put(rbox(0.055, 0.02, 0.05, 0.008), [-0.33 + i * 0.06, 1.19 - j * 0.017, 0.18 + j * 0.06], [0.28, 0, 0], 1, j === 3 && i > 2 && i < 9 ? [0.85, 0.85, 0.85] : [0.88, 0.89, 0.9]);
       kg.put(rbox(0.16, 0.03, 0.1, 0.01), [0.42, 1.19, 0.3], [0.28, 0, 0], 1, [0.1, 0.1, 0.1]); // leitor de cartão
       kg.put(box(0.1, 0.005, 0.02), [0.42, 1.21, 0.29], [0.28, 0, 0], 1, [0.2, 0.8, 0.3]);
-      kg.put(box(0.12, 0.45, 0.1), [0, 1.42, -0.12], [0, 0, 0], 1, AZE); // haste
-      kg.put(rbox(1.02, 0.74, 0.14, 0.04), [0, 1.9, -0.05], [-0.22, 0, 0], 1, [0.12, 0.13, 0.15]); // monitor
-      kg.put(rbox(0.6, 0.25, 0.1, 0.03), [0, 1.85, -0.16], [-0.22, 0, 0], 1, [0.1, 0.11, 0.12]); // traseira
-      for (const s of [-1, 1]) kg.put(cylinder(0.03, 0.03, 1.2, 8), [s * 0.6, 1.85, -0.38], [0, 0, 0], 1, [0.4, 0.42, 0.45]); // postes da cobertura
-      kg.put(rbox(1.5, 0.05, 0.9, 0.02), [0, 2.48, -0.02], [-0.12, 0, 0], 1, [0.85, 0.55, 0.1]); // cobertura
-      kg.put(box(1.5, 0.12, 0.03), [0, 2.42, 0.42], [0, 0, 0], 1, [0.85, 0.55, 0.1]);
+      // monitor preso num braço: coluna saindo do gabinete, suporte VESA encostado na traseira do monitor
+      const MP = [0, 1.92, -0.06], MI = -0.22; // centro e inclinação do monitor
+      kg.put(rbox(0.16, 0.6, 0.12, 0.03), [0, 1.42, -0.2], [0, 0, 0], 1, AZE);                       // coluna
+      kg.put(rbox(0.2, 0.2, 0.16, 0.03), [0, 1.78, -0.17], [MI, 0, 0], 1, AZE);                       // junta
+      kg.put(rbox(1.02, 0.74, 0.14, 0.04), MP, [MI, 0, 0], 1, [0.12, 0.13, 0.15]);                    // monitor
+      kg.put(rbox(0.5, 0.34, 0.08, 0.03), [0, MP[1] - Math.sin(-MI) * 0.0 - 0.02, MP[2] - 0.1], [MI, 0, 0], 1, [0.1, 0.11, 0.12]); // traseira
+      // cobertura apoiada em 4 postes (um em cada canto da base), teto reto encaixado no topo dos postes
+      for (const s of [-1, 1]) for (const z of [-0.36, 0.36]) {
+        kg.put(cylinder(0.035, 0.035, 2.4, 8), [s * 0.62, 1.32, z], [0, 0, 0], 1, [0.4, 0.42, 0.45]);
+        kg.put(cylinder(0.07, 0.07, 0.03, 10), [s * 0.62, 0.135, z], [0, 0, 0], 1, [0.3, 0.3, 0.32]);
+      }
+      for (const z of [-0.36, 0.36]) kg.put(box(1.3, 0.06, 0.06), [0, 2.49, z], [0, 0, 0], 1, [0.4, 0.42, 0.45]); // travessas no topo
+      kg.put(rbox(1.5, 0.05, 0.95, 0.02), [0, 2.545, 0], [0, 0, 0], 1, [0.85, 0.55, 0.1]); // teto
+      kg.put(box(1.5, 0.12, 0.03), [0, 2.5, 0.475], [0, 0, 0], 1, [0.85, 0.55, 0.1]); // aba da frente
       g.k = MAT.PINTADO; g.put(kg, [-4, 1.55, 9], [0, 0.4, 0]);
     }
     // caixa d'água/postes
@@ -354,7 +362,7 @@ export class Station {
     const sn = new Node('estrutura'); sn.mesh = R.createMesh(g, { rough: 0.85, metal: 0.05, rust: 0.45 });
     this.root.add(sn);
     // tela do terminal (emissiva)
-    const tg0 = new Geo(); tg0.put(box(0.88, 0.58, 0.01), [0, 1.9, 0.025], [-0.22, 0, 0], 1, [0.2, 0.8, 0.9]);
+    const tg0 = new Geo(); tg0.put(box(0.88, 0.58, 0.01), [0, 1.92 + Math.sin(0.22) * 0.075, -0.06 + Math.cos(0.22) * 0.075], [-0.22, 0, 0], 1, [0.2, 0.8, 0.9]);
     const tg = new Geo(); tg.put(tg0, [-4, 1.55, 9], [0, 0.4, 0]);
     const tn = new Node('tela_terminal'); tn.mesh = R.createMesh(tg, { emissive: [0.25, 0.75, 0.9], glow: 1.4, castShadow: false }); this.root.add(tn);
     // placa da estação
