@@ -209,7 +209,7 @@ export const MOCHILA = { peixes: 5, bolsas: 10 };
 export const ESTACAO = {
   reciclador: { nome: 'Recicladora', custo: { dinheiro: 200, comps: {} }, desc: 'Transforma sucata em componentes.', oculto: true }, // saiu da loja (componentes não são mais usados)
   restauro:   { nome: 'Bancada de restauro', custo: { dinheiro: 1000, comps: {} }, desc: 'Restaura de graça qualquer item (lixo, sucata do fundo) direto do submarino: o item restaurado vende pelo dobro.' },
-  peixaria:   { nome: 'Bancada de peixe', custo: { dinheiro: 2000, comps: {} }, desc: 'Coloque um peixe de mais de 2 kg na tábua (E), corte (I) e pegue (I): o peixe cortado vende pelo dobro.' },
+  peixaria:   { nome: 'Bancada de peixe', custo: { dinheiro: 2000, comps: {} }, desc: 'Qualquer peixe: coloque na tábua (E), corte (I) e pegue (I), ou corte todos os da mochila de uma vez (E, 10 s). O peixe cortado vende pelo dobro.' },
   iluminacao: { nome: 'Iluminação da estação', custo: { dinheiro: 150, comps: {} }, desc: 'Postes e luzes no cais.' },
   carregador: { nome: 'Carregador rápido', custo: { dinheiro: 800, comps: {} }, desc: 'Recarrega a bateria 3× mais rápido no cais.' },
   decoracao:  { nome: 'Decoração (bandeiras e plantas)', custo: { dinheiro: 120, comps: {} }, desc: 'Deixa a estação com a sua cara.' },
