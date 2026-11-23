@@ -373,7 +373,7 @@ export const Veiculos = {
   // ---------------------------------------------------------------- loja de carros (painel)
   painelCarrosHtml() {
     const p = this.perfil, vs = p.veiculos || { tem: ['patinete'], eq: 'patinete' };
-    let h = `<p class="nota">Um veículo equipado por vez: ele aparece na sua <b>vaga de estacionamento</b> (ao lado da bancada de peixe). Se equipar outro, o novo aparece na vaga (o antigo some de onde estiver).<br>
+    let h = `<p class="nota">Um veículo equipado por vez: ele aparece na sua <b>vaga de estacionamento</b> (placa GARAGEM, no canto da estação). Se equipar outro, o novo aparece na vaga (o antigo some de onde estiver).<br>
       <kbd>E</kbd> entra (no seu ou de carona no de um amigo) · <kbd>E</kbd> sai · <kbd>T</kbd> tranca · <kbd>B</kbd> buzina · <kbd>L</kbd> farol. Dentro do veículo não dá para atirar nem pescar.<br>
       Atropelar alguém joga a pessoa longe (como a bazuca). Caiu no lago: o veículo afunda e volta para a vaga; você volta nadando.</p><div class="grade">`;
     for (const k of VEIC_ORDEM) {
