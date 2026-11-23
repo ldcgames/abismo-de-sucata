@@ -11,6 +11,69 @@ import { BARRACA_ARMAS, BARRACA_CORRIDA, BANCADA_PEIXE } from '../../shared/worl
 import { ARMAS_ORDEM } from '../../shared/data.js';
 
 const CONC0 = [0.42, 0.41, 0.38];
+// ---------------- enfeites de aquário (cada um aparece uma vez só, para não poluir) ----------------
+// u = escala (≈ tamanho de um enfeite), y = altura do fundo
+const DECO = {
+  castelo(g, x, y, z, u) {
+    const ped = [0.78, 0.72, 0.62], esc = [0.5, 0.45, 0.4];
+    g.put(rbox(u * 0.9, u * 0.55, u * 0.6, u * 0.04), [x, y + u * 0.275, z], [0, 0, 0], 1, ped);
+    for (const s2 of [-1, 1]) {
+      g.put(cylinder(u * 0.17, u * 0.19, u * 0.95, 10), [x + s2 * u * 0.42, y + u * 0.475, z], [0, 0, 0], 1, ped);
+      g.put(lathe([[u * 0.21, 0], [0, u * 0.3]], 10), [x + s2 * u * 0.42, y + u * 0.95, z], [0, 0, 0], 1, [0.7, 0.3, 0.25]);
+    }
+    g.put(rbox(u * 0.24, u * 0.3, u * 0.05, u * 0.1), [x, y + u * 0.15, z + u * 0.3], [0, 0, 0], 1, [0.12, 0.1, 0.1]); // portão
+    for (let k = -1; k <= 1; k++) g.put(box(u * 0.13, u * 0.12, u * 0.12), [x + k * u * 0.27, y + u * 0.61, z + u * 0.24], [0, 0, 0], 1, esc);
+  },
+  bau(g, x, y, z, u, rot = 0.4) {
+    const mad = [0.45, 0.28, 0.14], ouro = [0.95, 0.75, 0.2];
+    g.put(rbox(u * 0.7, u * 0.38, u * 0.45, u * 0.03), [x, y + u * 0.19, z], [0, rot, 0], 1, mad);
+    g.put(cylinder(u * 0.225, u * 0.225, u * 0.7, 12), [x, y + u * 0.42, z], [Math.PI / 2, rot, Math.PI / 2], [1, 1, 0.6], mad.map((c) => c * 0.85));
+    for (const s2 of [-1, 1]) g.put(box(u * 0.05, u * 0.62, u * 0.47), [x + Math.cos(rot) * s2 * u * 0.25, y + u * 0.3, z - Math.sin(rot) * s2 * u * 0.25], [0, rot, 0], 1, ouro);
+    for (let k = 0; k < 5; k++) g.put(cylinder(u * 0.06, u * 0.06, u * 0.015, 10), [x + (k - 2) * u * 0.13, y + u * 0.01, z + u * 0.35 + (k % 2) * u * 0.06], [0.1 * k, 0, 0.2], 1, ouro); // moedas
+  },
+  ancora(g, x, y, z, u) {
+    const fe = [0.32, 0.3, 0.28];
+    g.put(cylinder(u * 0.05, u * 0.05, u * 1.1, 8), [x, y + u * 0.45, z], [0, 0, 0.5], 1, fe);
+    g.put(torus(u * 0.12, u * 0.035, 12, 6), [x - u * 0.27, y + u * 0.95, z], [Math.PI / 2, 0, 0], 1, fe);
+    g.add(tube([[-u * 0.45, u * 0.3, 0], [-u * 0.35, 0, 0], [0, -u * 0.12, 0], [u * 0.35, 0, 0], [u * 0.45, u * 0.3, 0]], u * 0.05, 6), m4.compose(m4.create(), [x + u * 0.25, y + u * 0.08, z], quat.fromEuler(quat.create(), 0, 0, 0.5), [1, 1, 1]), [...fe, 1]);
+  },
+  capacete(g, x, y, z, u) { // capacete de escafandro
+    const lat = [0.78, 0.55, 0.22];
+    g.put(sphere(u * 0.42, 14, 10), [x, y + u * 0.42, z], [0, 0, 0], 1, lat);
+    g.put(cylinder(u * 0.45, u * 0.48, u * 0.12, 14), [x, y + u * 0.06, z], [0, 0, 0], 1, lat.map((c) => c * 0.8));
+    for (const [dx, dz] of [[0, 1], [0.85, 0.5], [-0.85, 0.5]]) {
+      g.put(cylinder(u * 0.15, u * 0.15, u * 0.06, 12), [x + dx * u * 0.37, y + u * 0.45, z + dz * u * 0.37], [Math.PI / 2, Math.atan2(dx, dz), 0], 1, [0.2, 0.35, 0.4]);
+      g.put(torus(u * 0.15, u * 0.025, 12, 5), [x + dx * u * 0.4, y + u * 0.45, z + dz * u * 0.4], [Math.PI / 2, Math.atan2(dx, dz), 0], 1, lat);
+    }
+  },
+  estrela(g, x, y, z, u, cor = [0.95, 0.45, 0.25]) {
+    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; g.put(capsule(u * 0.06, u * 0.2, 6, 4), [x + Math.cos(a) * u * 0.13, y + u * 0.03, z + Math.sin(a) * u * 0.13], [Math.PI / 2, 0, -a + Math.PI / 2], [1, 1, 0.5], cor); }
+    g.put(sphere(u * 0.09, 8, 6), [x, y + u * 0.04, z], [0, 0, 0], [1, 0.5, 1], cor);
+  },
+  concha(g, x, y, z, u) { // concha aberta com pérola
+    g.put(sphere(u * 0.25, 12, 8), [x, y + u * 0.05, z], [0, 0, 0], [1, 0.3, 0.85], [0.92, 0.82, 0.78]);
+    g.put(sphere(u * 0.25, 12, 8), [x, y + u * 0.22, z - u * 0.12], [-0.9, 0, 0], [1, 0.3, 0.85], [0.95, 0.75, 0.75]);
+    g.put(sphere(u * 0.07, 10, 8), [x, y + u * 0.12, z + u * 0.03], [0, 0, 0], 1, [0.98, 0.97, 0.95]);
+  },
+  anfora(g, x, y, z, u) { // vaso antigo tombado
+    const barro = [0.72, 0.42, 0.26];
+    g.put(lathe([[0, 0], [u * 0.12, u * 0.02], [u * 0.22, u * 0.25], [u * 0.2, u * 0.5], [u * 0.08, u * 0.68], [u * 0.08, u * 0.8], [u * 0.11, u * 0.82]], 12), [x, y + u * 0.2, z], [0, 0.6, Math.PI / 2 - 0.15], 1, barro);
+    for (const s2 of [-1, 1]) g.add(tube([[0, u * 0.62, s2 * u * 0.08], [0, u * 0.6, s2 * u * 0.2], [0, u * 0.45, s2 * u * 0.2]], u * 0.025, 4), m4.compose(m4.create(), [x, y + u * 0.2, z], quat.fromEuler(quat.create(), 0, 0.6, Math.PI / 2 - 0.15), [1, 1, 1]), [...barro, 1]);
+  },
+  arco(g, x, y, z, u) { // arco de pedra
+    const pd = [0.5, 0.48, 0.45];
+    g.add(tube([[-u * 0.45, 0, 0], [-u * 0.4, u * 0.45, 0], [0, u * 0.65, 0], [u * 0.4, u * 0.45, 0], [u * 0.45, 0, 0]], u * 0.11, 8), m4.compose(m4.create(), [x, y, z], [0, 0, 0, 1], [1, 1, 1]), [...pd, 1]);
+  },
+  anemona(g, x, y, z, u, cor = [0.98, 0.5, 0.7]) {
+    g.put(cylinder(u * 0.12, u * 0.15, u * 0.18, 10), [x, y + u * 0.09, z], [0, 0, 0], 1, cor.map((c) => c * 0.7));
+    for (let k = 0; k < 10; k++) { const a = k * 0.628; g.add(tube([[0, 0, 0], [Math.cos(a) * u * 0.08, u * 0.12, Math.sin(a) * u * 0.08], [Math.cos(a) * u * 0.16, u * 0.2, Math.sin(a) * u * 0.16]], u * 0.022, 4), m4.compose(m4.create(), [x, y + u * 0.17, z], [0, 0, 0, 1], [1, 1, 1]), [...cor, 1]); }
+  },
+  bolhas(g, x, y, z, u, h) { // pedra porosa soltando bolhas
+    g.put(cylinder(u * 0.1, u * 0.12, u * 0.08, 10), [x, y + u * 0.04, z], [0, 0, 0], 1, [0.35, 0.35, 0.38]);
+    for (let k = 1; k < 7; k++) g.put(sphere(u * (0.025 + k * 0.006), 6, 4), [x + Math.sin(k * 2.1) * u * 0.05, y + (k / 7) * h, z + Math.cos(k * 1.7) * u * 0.05], [0, 0, 0], 1, [0.85, 0.95, 1]);
+  },
+};
+
 const WOOD = [0.45, 0.32, 0.2], WOOD_DK = [0.3, 0.21, 0.13], CONC = [0.42, 0.41, 0.38], METAL = [0.42, 0.43, 0.45], YEL = [0.9, 0.7, 0.15];
 
 export function textQuad(R, lines, w = 4, h = 1.4, opts = {}) {
@@ -704,10 +767,16 @@ export class Station {
       g.put(cylinder(0.22, 0.25, 0.04, 16), [x, 1.57, z], [0, 0, 0], 1, [0.3, 0.22, 0.16]);
       g.put(cylinder(r * 0.55, r * 0.5, 0.05, 16), [x, baseY + 0.03, z], [0, 0, 0], 1, [0.85, 0.6, 0.45]); // pedrinhas coloridas
       g.add(tube([[0, 0, 0], [0.02, 0.12, 0], [-0.01, 0.22, 0.01]], 0.012, 4), m4.compose(m4.create(), [x + 0.06, baseY + 0.05, z], [0, 0, 0, 1], [1, 1, 1]), [0.25, 0.65, 0.3, 1]);
-      g.put(icosphere(0.04, 1), [x - 0.07, baseY + 0.07, z + 0.03], [0, 1, 0], 1, [0.45, 0.42, 0.4]);
+      DECO.concha(g, x - 0.08, baseY + 0.05, z + 0.04, 0.16);
+      DECO.estrela(g, x + 0.02, baseY + 0.055, z + 0.1, 0.18, [0.98, 0.6, 0.25]);
+      // luminária de pinça na borda do aquário-bola
+      g.put(cylinder(0.012, 0.012, 0.28, 6), [x + r * 0.5, baseY + r * 1.95, z], [0, 0, 0.5], 1, [0.2, 0.2, 0.22]);
+      const lu = new Geo(); lu.put(cylinder(0.06, 0.08, 0.05, 12), [x + r * 0.35, baseY + r * 2.1, z], [0, 0, 0], 1, [1, 0.97, 0.88]);
+      const lun = new Node('aquario_luz'); lun.mesh = R.createMesh(lu, { emissive: [1, 0.95, 0.85], castShadow: false }); this.dyn.add(lun);
+      this.luzVitrine = { pos: this.toWorld(x, baseY + r * 1.3, z), range: 2.2, col: [1.0, 1.0, 0.92] };
       const base = new Node('aquario_base'); base.mesh = R.createMesh(g, { rough: 0.7 }); this.dyn.add(base);
       const wg = new Geo(); wg.put(sphere(r * 0.94, 20, 14), [x, baseY + r * 0.83, z], [0, 0, 0], [1, 0.82, 1], [0.35, 0.65, 0.78]);
-      const wn = new Node('aquario_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.22, rough: 0.1, castShadow: false }); this.dyn.add(wn);
+      const wn = new Node('aquario_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.2, rough: 0.1, castShadow: false, emissive: [0.06, 0.14, 0.16] }); this.dyn.add(wn);
       const gg = new Geo(); gg.put(sphere(r, 22, 16), [x, baseY + r, z], [0, 0, 0], 1, [0.85, 0.95, 1]);
       gg.put(torus(r * 0.55, 0.015, 20, 6), [x, baseY + r * 1.83, z], [0, 0, 0], 1, [0.85, 0.95, 1]);
       const gn = new Node('aquario_vidro'); gn.mesh = R.createMesh(gg, { opacity: 0.14, rough: 0.02, castShadow: false, doubleSide: true }); this.dyn.add(gn);
@@ -724,21 +793,40 @@ export class Station {
       g.put(rbox(w + 0.06, 0.05, d + 0.06, 0.01), [x, baseY + 0.02, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]);
       g.put(rbox(w + 0.06, 0.06, d + 0.06, 0.01), [x, baseY + h + 0.03, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]);
       // fundo: areia clara (corais), substrato escuro (plantado) ou cascalho
-      const areia = est === 'corais' ? [0.93, 0.88, 0.75] : est === 'plantado' ? [0.28, 0.22, 0.17] : [0.82, 0.74, 0.55];
-      g.put(rbox(w - 0.02, est === 'plantado' ? 0.1 : 0.06, d - 0.02, 0.01), [x, baseY + 0.07, z], [0, 0, 0], 1, areia);
+      const areia = est === 'corais' ? [0.6, 0.55, 0.46] : est === 'plantado' ? [0.28, 0.22, 0.17] : [0.82, 0.74, 0.55];
+      g.put(rbox(w - 0.02, est === 'plantado' ? 0.1 : 0.06, d - 0.02, 0.01), [x, baseY + 0.07, z], [0, 0, 0], 1, est === 'simples' ? [0.5, 0.43, 0.32] : areia);
       const nPl = est === 'plantado' ? 8 + aq.nivel * 2 : est === 'corais' ? 2 : 2 + aq.nivel;
       for (let k = 0; k < nPl; k++) {
         const px = x - w / 2 + 0.1 + ((k * 0.37) % 1) * (w - 0.2), pz = z - d / 2 + 0.08 + ((k * 0.61) % 1) * (d * (est === 'plantado' ? 0.75 : 0.4));
         const alt = h * (est === 'plantado' ? 0.45 + ((k * 0.29) % 1) * 0.4 : 0.6);
         g.add(tube([[0, 0, 0], [0.03, alt * 0.5, 0.01], [-0.02, alt, 0]], 0.012 + w * 0.006, 4), m4.compose(m4.create(), [px, baseY + 0.08, pz], [0, 0, 0, 1], [1, 1, 1]), [...verdes[k % 4], 1]);
         if (est === 'plantado' && k % 3 === 0) g.put(sphere(0.05 + w * 0.03, 8, 6), [px + 0.04, baseY + 0.12, pz + 0.03], [0, 0, 0], [1.4, 0.5, 1], verdes[(k + 1) % 4]); // tapete de musgo
-        if (est !== 'corais') g.put(icosphere(0.04 + w * 0.04, 1), [px + 0.08, baseY + 0.1, pz + 0.05], [0, k, 0], 1, [0.45, 0.42, 0.4]);
+        if (est !== 'corais' && k % 3 === 1) { const rr = icosphere(0.04 + w * 0.04, 1); noisy(rr, 0.012, 4, k); g.put(rr, [px + 0.08, baseY + 0.1, pz + 0.05], [0, k, 0], [1.2, 0.7, 1], [[0.45, 0.42, 0.4], [0.55, 0.5, 0.42], [0.38, 0.4, 0.42]][k % 3]); }
+      }
+      // enfeites (um de cada, espalhados no fundo e nos cantos — sem repetir)
+      const u = Math.min(h * 0.45, 0.12 + w * 0.16), fy = baseY + 0.1, atras = z - d * 0.22, frente = z + d * 0.2;
+      if (est === 'simples') {
+        (aq.nivel % 2 ? DECO.capacete : DECO.castelo)(g, x + w * 0.24, fy, atras, u);
+        DECO.concha(g, x - w * 0.3, fy, frente, u * 0.5);
+        if (aq.nivel >= 2) DECO.bolhas(g, x - w * 0.38, fy, atras, u * 0.6, h * 0.75);
+        if (aq.nivel >= 3) DECO.estrela(g, x + w * 0.02, fy, frente, u * 0.55);
+      } else if (est === 'plantado') {
+        DECO.arco(g, x + w * 0.22, fy, atras + d * 0.05, u * 0.9);
+        DECO.anfora(g, x + w * 0.3, fy, frente, u * 0.55);
+        DECO.bolhas(g, x - w * 0.42, fy, atras, u * 0.5, h * 0.8);
+        if (aq.nivel >= 6) DECO.bau(g, x - w * 0.05, fy, frente, u * 0.55);
+      } else if (est === 'corais') {
+        DECO.bau(g, x + w * 0.28, fy, frente, u * 0.6, -0.5);
+        DECO.anemona(g, x - w * 0.3, fy, frente, u * 0.7);
+        DECO.estrela(g, x + w * 0.02, fy, frente + d * 0.08, u * 0.55, [0.95, 0.3, 0.35]);
+        DECO.concha(g, x - w * 0.05, fy, atras, u * 0.5);
+        if (aq.nivel >= 7) { DECO.ancora(g, x - w * 0.36, fy, atras, u * 0.9); DECO.capacete(g, x + w * 0.38, fy, atras, u * 0.7); DECO.anemona(g, x + w * 0.12, fy, atras, u * 0.6, [0.5, 0.9, 0.7]); }
       }
       if (est === 'plantado') // tronco de madeira
         g.add(tube([[0, 0, 0], [w * 0.2, h * 0.25, 0.02], [w * 0.35, h * 0.4, -0.03]], 0.02 + w * 0.012, 6), m4.compose(m4.create(), [x - w * 0.2, baseY + 0.1, z], [0, 0, 0, 1], [1, 1, 1]), [0.4, 0.28, 0.17, 1]);
       if (est === 'corais') {
         // rochas vivas e corais coloridos
-        for (let k = 0; k < 4 + aq.nivel; k++) {
+        for (let k = 0; k < 3 + Math.floor(aq.nivel / 2); k++) {
           const px = x - w / 2 + 0.15 + ((k * 0.41) % 1) * (w - 0.3), pz = z - d / 2 + 0.1 + ((k * 0.57) % 1) * (d * 0.55);
           const rr = icosphere(0.06 + w * 0.05, 1); noisy(rr, 0.02, 4, k);
           g.put(rr, [px, baseY + 0.1, pz], [0, k, 0], [1.2, 0.8, 1], [0.6, 0.55, 0.5]);
@@ -747,13 +835,16 @@ export class Station {
           else g.put(sphere(0.04 + w * 0.025, 10, 8), [px + 0.05, baseY + 0.15 + w * 0.04, pz], [0, 0, 0], [1, 0.7, 1], c);
         }
       }
-      // luminária
-      if (aq.nivel >= 2) g.put(rbox(w * 0.8, 0.04, 0.12, 0.01), [x, baseY + h + 0.08, z], [0, 0, 0], 1, est === 'corais' ? [0.7, 0.8, 1] : [0.95, 0.95, 0.9]);
+      // luminária na tampa (todos os aquários): barra acesa + luz de verdade dentro da água
+      g.put(rbox(w * 0.86, 0.05, Math.min(0.2, d * 0.5), 0.01), [x, baseY + h + 0.085, z], [0, 0, 0], 1, [0.15, 0.15, 0.16]);
+      { const lu = new Geo(); lu.put(box(w * 0.78, 0.012, Math.min(0.14, d * 0.4)), [x, baseY + h + 0.058, z], [0, 0, 0], 1, [1, 1, 1]);
+        const lun = new Node('aquario_luz'); lun.mesh = R.createMesh(lu, { emissive: est === 'corais' ? [0.75, 0.85, 1] : [1, 0.97, 0.88], castShadow: false }); this.dyn.add(lun); }
+      this.luzVitrine = { pos: this.toWorld(x, baseY + h * 0.8, z + d * 0.25), range: Math.max(2, w * 1.4), col: est === 'corais' ? [0.75, 0.95, 1.2] : [1.0, 0.97, 0.85] };
       const base = new Node('aquario_base'); base.mesh = R.createMesh(g, { rough: 0.7 }); this.dyn.add(base);
       // água (volume) e vidro
       const corAgua = est === 'corais' ? [0.3, 0.6, 0.9] : est === 'plantado' ? [0.4, 0.68, 0.6] : [0.35, 0.65, 0.75];
       const wg = new Geo(); wg.put(box(w - 0.02, h * 0.92, d - 0.02), [x, baseY + h * 0.46 + 0.02, z], [0, 0, 0], 1, corAgua);
-      const wn = new Node('aquario_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.22, rough: 0.1, castShadow: false, emissive: aq.nivel >= 2 ? (est === 'corais' ? [0.04, 0.1, 0.22] : [0.05, 0.12, 0.1]) : [0, 0, 0] }); this.dyn.add(wn);
+      const wn = new Node('aquario_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.2, rough: 0.1, castShadow: false, emissive: est === 'corais' ? [0.06, 0.13, 0.26] : est === 'plantado' ? [0.07, 0.15, 0.12] : [0.06, 0.14, 0.16] }); this.dyn.add(wn);
       const gg = new Geo(); gg.put(box(w, h, d), [x, baseY + h / 2, z], [0, 0, 0], 1, [0.85, 0.95, 1]);
       const gn = new Node('aquario_vidro'); gn.mesh = R.createMesh(gg, { opacity: 0.12, rough: 0.02, castShadow: false, doubleSide: true }); this.dyn.add(gn);
       // etiqueta de capacidade
@@ -789,7 +880,22 @@ export class Station {
     g.put(rbox(w + wall * 2, 0.5, wall, 0.05), [x, 1.8 + 0.25, z + d / 2 + wall / 2], [0, 0, 0], 1, CONC);
     for (let k = 0; k <= 3; k++) g.put(box(0.12, h - 0.8, 0.12), [x - w / 2 + (k * w) / 3, 1.8 + h / 2, z + d / 2 + 0.05], [0, 0, 0], 1, METAL);
     g.put(rbox(w, 0.2, d, 0.02), [x, 1.9, z], [0, 0, 0], 1, [0.6, 0.55, 0.42]);
-    for (let k = 0; k < 6; k++) { const r = icosphere(0.3 + (k % 3) * 0.2, 1); noisy(r, 0.08, 3, k); g.put(r, [x - w / 2 + 0.6 + k * (w - 1.2) / 5, 2.1, z - d / 2 + 0.6 + (k % 2) * 0.8], [0, k, 0], 1, [0.4, 0.38, 0.36]); }
+    for (let k = 0; k < 3; k++) { const r = icosphere(0.35 + (k % 3) * 0.2, 1); noisy(r, 0.1, 3, k); g.put(r, [x - w / 2 + 0.7 + k * (w - 1.4) / 2, 2.1, z - d / 2 + 0.6 + (k % 2) * 0.5], [0, k, 0], [1.3, 0.8, 1], [[0.4, 0.38, 0.36], [0.5, 0.46, 0.4], [0.36, 0.38, 0.4]][k]); }
+    // enfeites grandes (um de cada)
+    { const u = Math.min(1.1, h * 0.3), fy = 2.0;
+      DECO.ancora(g, x - w * 0.28, fy, z - d * 0.2, u * 1.2);
+      DECO.bau(g, x + w * 0.28, fy, z + d * 0.12, u * 0.8, -0.4);
+      DECO.anfora(g, x + w * 0.05, fy, z - d * 0.25, u * 0.7);
+      if (est !== 'abissal') { DECO.arco(g, x - w * 0.02, fy, z - d * 0.3, u * 1.1); DECO.estrela(g, x - w * 0.12, fy, z + d * 0.2, u * 0.6); }
+      else { DECO.capacete(g, x - w * 0.05, fy, z + d * 0.15, u * 0.9); DECO.anemona(g, x + w * 0.38, fy, z - d * 0.25, u, [0.5, 0.95, 0.85]); DECO.anemona(g, x - w * 0.42, fy, z + d * 0.1, u * 0.8, [0.98, 0.5, 0.7]); }
+      // plantas altas nos cantos de trás
+      for (const s2 of [-1, 1]) for (let b = 0; b < 4; b++) g.add(tube([[0, 0, 0], [Math.sin(b * 1.7) * 0.15, h * 0.25, Math.cos(b * 1.3) * 0.1], [Math.sin(b * 2.3) * 0.3, h * (0.4 + b * 0.06), 0]], 0.05, 4), m4.compose(m4.create(), [x + s2 * (w / 2 - 0.45) + b * 0.12 * s2 * -1, fy + 0.1, z - d / 2 + 0.4 + (b % 2) * 0.2], [0, 0, 0, 1], [1, 1, 1]), [...[[0.2, 0.6, 0.25], [0.3, 0.72, 0.2], [0.12, 0.45, 0.2]][b % 3], 1]); }
+    // luminárias penduradas na borda de cima (todas as versões) + luz de verdade dentro
+    { const lg2 = new Geo();
+      for (let k = 0; k < 3; k++) { const lx = x - w / 3 + k * (w / 3); g.put(rbox(0.9, 0.12, 0.5, 0.03), [lx, 1.8 + h + 0.25, z], [0, 0, 0], 1, METAL); lg2.put(box(0.8, 0.02, 0.4), [lx, 1.8 + h + 0.18, z], [0, 0, 0], 1, [1, 1, 1]); }
+      g.put(box(w, 0.08, 0.08), [x, 1.8 + h + 0.34, z], [0, 0, 0], 1, METAL);
+      const ln2 = new Node('tanque_luz_cima'); ln2.mesh = R.createMesh(lg2, { emissive: est === 'abissal' ? [0.6, 0.85, 1] : [1, 0.96, 0.85], castShadow: false }); this.dyn.add(ln2);
+      this.luzVitrine = { pos: this.toWorld(x, 1.8 + h * 0.7, z + d * 0.3), range: Math.max(w, d) * 1.1 + 2, col: est === 'abissal' ? [1.4, 2.0, 2.6] : [2.2, 2.1, 1.9] }; }
     if (est === 'abissal') {
       // faixas de luz azul no topo e na base da janela + corais grandes
       const lg = new Geo();
@@ -800,7 +906,7 @@ export class Station {
     }
     const tn = new Node('tanque'); tn.mesh = R.createMesh(g, { rough: 0.9, kind: MAT.CONCRETO }); this.dyn.add(tn);
     const wg = new Geo(); wg.put(box(w - 0.05, h - 0.5, d - 0.05), [x, 1.8 + (h - 0.5) / 2 + 0.1, z], [0, 0, 0], 1, est === 'abissal' ? [0.1, 0.3, 0.6] : [0.2, 0.45, 0.55]);
-    const wn = new Node('tanque_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.3, rough: 0.1, castShadow: false, emissive: est === 'abissal' ? [0.02, 0.08, 0.2] : [0, 0, 0] }); this.dyn.add(wn);
+    const wn = new Node('tanque_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.26, rough: 0.1, castShadow: false, emissive: est === 'abissal' ? [0.04, 0.12, 0.28] : [0.06, 0.14, 0.16] }); this.dyn.add(wn);
     const lab = textQuad(R, [`${t.nome} [${tq.peixes.length}/${t.vagas}]`, `até ${t.maxCm} cm`], 2.6, 0.7, { px: 384 });
     lab.at(x, 1.8 + 0.25, z + d / 2 + wall + 0.02); this.dyn.add(lab);
     const bx = { x, y: 2.3, z, w: w - 0.8, h: h - 1.4, d: d - 0.8 };
@@ -826,9 +932,22 @@ export class Station {
     // escadinha
     for (let k = 0; k < 4; k++) g.put(box(0.5, 0.05, 0.25), [x + w / 2 - 0.6, 1.8 + k * (h / 4), z + d / 2 + 0.35 - k * 0.0], [0, 0, 0], 1, METAL);
     for (const s of [-1, 1]) g.put(box(0.05, h + 0.2, 0.05), [x + w / 2 - 0.6 + s * 0.27, 1.68 + h / 2 + 0.1, z + d / 2 + 0.35], [0, 0, 0], 1, METAL);
+    // fundo: areia, duas pedras, planta e uma âncora velha
+    g.put(box(w - 0.12, 0.06, d - 0.12), [x, 1.71, z], [0, 0, 0], 1, [0.8, 0.72, 0.55]);
+    for (let k = 0; k < 2; k++) { const r = icosphere(0.25 + k * 0.1, 1); noisy(r, 0.06, 3, k + 7); g.put(r, [x - w * 0.3 + k * w * 0.55, 1.8, z - d * 0.25], [0, k, 0], [1.3, 0.7, 1], [0.45, 0.43, 0.4]); }
+    DECO.ancora(g, x + w * 0.12, 1.74, z - d * 0.15, 0.8);
+    DECO.estrela(g, x - w * 0.2, 1.74, z + d * 0.2, 0.5);
+    for (let b = 0; b < 4; b++) g.add(tube([[0, 0, 0], [Math.sin(b) * 0.1, h * 0.25, 0.05], [Math.sin(b * 2) * 0.2, h * (0.4 + b * 0.05), 0]], 0.04, 4), m4.compose(m4.create(), [x - w / 2 + 0.4 + b * 0.1, 1.75, z - d / 2 + 0.35], [0, 0, 0, 1], [1, 1, 1]), [0.25, 0.62, 0.25, 1]);
+    // refletor num poste, apontado para dentro da água
+    g.put(cylinder(0.04, 0.04, h + 1.2, 8), [x - w / 2 - 0.15, 1.68 + (h + 1.2) / 2, z - d / 2 - 0.15], [0, 0, 0], 1, METAL);
+    g.put(cylinder(0.03, 0.03, 0.36, 6), [x - w / 2 - 0.03, 1.68 + h + 1.18, z - d / 2 - 0.03], [0, -0.78, Math.PI / 2], 1, METAL); // braço do poste até a cabeça
+    g.put(cylinder(0.14, 0.2, 0.25, 12), [x - w / 2 + 0.05, 1.68 + h + 1.1, z - d / 2 + 0.05], [0.7, -0.78, 0], 1, [0.15, 0.15, 0.16]);
+    { const lg2 = new Geo(); lg2.put(cylinder(0.17, 0.17, 0.02, 12), [x - w / 2 + 0.1, 1.68 + h + 1.02, z - d / 2 + 0.1], [0.7, -0.78, 0], 1, [1, 1, 1]);
+      const ln2 = new Node('tanque_luz_cima'); ln2.mesh = R.createMesh(lg2, { emissive: [1, 0.96, 0.85], castShadow: false }); this.dyn.add(ln2); }
+    this.luzVitrine = { pos: this.toWorld(x, 1.7 + h * 0.8, z), range: Math.max(w, d) + 2, col: [2.2, 2.1, 1.9] };
     const tn = new Node('tanque'); tn.mesh = R.createMesh(g, { rough: 0.6 }); this.dyn.add(tn);
-    const wg = new Geo(); wg.put(box(w - 0.1, h - 0.25, d - 0.1), [x, 1.7 + (h - 0.25) / 2, z], [0, 0, 0], 1, [0.25, 0.5, 0.6]);
-    const wn = new Node('tanque_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.45, rough: 0.1, castShadow: false }); this.dyn.add(wn);
+    const wg = new Geo(); wg.put(box(w - 0.1, h - 0.25, d - 0.1), [x, 1.7 + (h - 0.25) / 2, z], [0, 0, 0], 1, [0.3, 0.58, 0.66]);
+    const wn = new Node('tanque_agua'); wn.mesh = R.createMesh(wg, { opacity: 0.34, rough: 0.1, castShadow: false, emissive: [0.06, 0.15, 0.18] }); this.dyn.add(wn);
     const lab = textQuad(R, [`${t.nome} [${tq.peixes.length}/${t.vagas}]`, `até ${t.maxCm} cm`], 2.2, 0.6, { px: 384 });
     lab.at(x - 0.6, 1.68 + h * 0.5, z + d / 2 + 0.05); this.dyn.add(lab);
     const bx = { x, y: 1.9, z, w: w - 0.6, h: h - 0.6, d: d - 0.6 };

@@ -1814,9 +1814,14 @@ class Game {
     const pts = [];
     // lâmpadas internas (oficina e casinhas): sempre acesas, as mais perto da câmera primeiro
     const internas = [];
-    for (const s of Object.values(this.stations)) if (s.ativa && s.luzesInternas) for (const l of s.luzesInternas) { const d = Math.hypot(l[0] - this.cam.pos[0], l[2] - this.cam.pos[2]); if (d < 40) internas.push([d, l]); }
+    for (const s of Object.values(this.stations)) {
+      if (!s.ativa) continue;
+      for (const l of s.luzesInternas || []) { const d = Math.hypot(l[0] - this.cam.pos[0], l[2] - this.cam.pos[2]); if (d < 40) internas.push([d, { pos: l, col: [2.6, 2.1, 1.5], range: 7.5 }]); }
+      // luz do aquário/tanque equipado
+      if (s.luzVitrine) { const l = s.luzVitrine.pos, d = Math.hypot(l[0] - this.cam.pos[0], l[2] - this.cam.pos[2]); if (d < 45) internas.push([d - 6, s.luzVitrine]); }
+    }
     internas.sort((a, b) => a[0] - b[0]);
-    for (const [, l] of internas.slice(0, 5)) pts.push({ pos: l, col: [2.6, 2.1, 1.5], range: 7.5 });
+    for (const [, L] of internas.slice(0, 6)) pts.push(L);
     for (const s of Object.values(this.stations)) if (s.ativa && s.lights && env.day < 0.6) for (const l of s.lights) if (pts.length < 8 && Math.hypot(l[0] - this.cam.pos[0], l[2] - this.cam.pos[2]) < 90) pts.push({ pos: l, col: [3.2, 2.5, 1.6], range: 14 });
     // luz interna da cabine (painel) deixa o próprio sub legível no escuro
     if (this.sub.pos[1] < -8) pts.push({ pos: [this.sub.pos[0], this.sub.pos[1] + 1.8, this.sub.pos[2]], col: [0.35, 0.42, 0.48], range: 7 });
