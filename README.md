@@ -106,6 +106,13 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v1.1 (modelagem natural)
+
+- **Boneco refeito** com formas orgânicas (seções elípticas suavizadas em vez de esferas e cápsulas): proporções de gente de verdade (cabeça ~1/7,5 da altura), rosto com nariz, maçãs, queixo e boca esculpidos na própria cabeça, olhos com pálpebra, orelhas, cabelo curto com fios, boné na cor do jogador, jaqueta de trabalho aberta com camiseta, bolsos e gola, mochila de lona, calça jeans com cinto e bolso cargo, botas de couro com cadarço e sola com cravos, mãos de pele com dedos de verdade. Tons de pele mais naturais.
+- **Peixes remodelados**: corpo com dorso arqueado e barriga mais reta, proporções por espécie (pacu e tambaqui altos, pirarucu alongado…), escamas, linha lateral, tampa da guelra, nadadeiras com membrana e raios (caudal bifurcada, dorsal, anal, peitorais, pélvicas), olhos com íris, boca; tubarão com cauda heterocerca, dorsal alta e fendas; bagre com barbilhões e nadadeira adiposa; enguia com nadadeira contínua.
+- **Casinhas** (tinta, armas, corrida) com lambri de tábuas sobrepostas, cantoneiras, mão-francesa, caibros aparentes, telhado de uma água com telha ondulada, testeira, calha e luminária.
+- **Cais**: tábuas com tons variados, longarinas por baixo, pregos, cunhos de amarração com corda e escadinha até a água. Bandeira de pano ondulando.
+
 ## Novidades da v1.0 (modelagem)
 
 - **Sentar** agora abre uma cadeira de praia dobrável (alumínio + lona listrada na cor do jogador). Dá para **pescar sentado**: sente, depois aperte F.

@@ -2,6 +2,7 @@
 // criaturas de profundidade (peixes-lanterna, águas-vivas, peixe-diabo) e tubarões noturnos.
 import { Geo, lathe, sphere, cylinder, tube, capsule, torus, icosphere } from '../engine/geometry.js';
 import { Node } from '../engine/renderer.js';
+import { loft, suavizar } from '../engine/organico.js';
 import { m4, quat } from '../engine/math.js';
 import { ESPECIES } from '../../shared/data.js';
 import { navSDF, navGrad, terrainHeight, LAKE_R, SHAFT_C, makeRng, isNight } from '../../shared/world.js';
@@ -40,55 +41,75 @@ export function makeFishGeo(esp, detail = 1) {
     g.flip(); g.recomputeNormals();
     return g;
   }
-  const L = 1;
-  let prof;
-  if (e.forma === 'enguia') prof = [[0, -0.5], [0.03, -0.45], [0.04, -0.2], [0.045, 0.1], [0.04, 0.38], [0.025, 0.47], [0, 0.5]];
-  else if (e.forma === 'tubarao') prof = [[0, -0.5], [0.03, -0.38], [0.07, -0.15], [0.1, 0.05], [0.095, 0.22], [0.07, 0.38], [0.03, 0.47], [0, 0.5]];
-  else if (e.forma === 'bagre') prof = [[0, -0.5], [0.03, -0.4], [0.08, -0.15], [0.1, 0.1], [0.1, 0.3], [0.07, 0.44], [0, 0.5]];
-  else prof = [[0, -0.5], [0.03, -0.42], [0.09, -0.2], [0.12, 0.05], [0.11, 0.25], [0.07, 0.42], [0, 0.5]];
-  const body = lathe(prof, seg);
-  // eixo do lathe = Y → gira para Z; achata lateralmente
-  const flatX = e.forma === 'bagre' ? 1.1 : e.forma === 'tubarao' ? 0.9 : e.forma === 'enguia' ? 0.8 : 0.55;
-  const tall = e.forma === 'peixe' ? 1.35 : 1.0;
-  g.put(body, [0, 0, 0], [Math.PI / 2, 0, 0], [flatX, 1, tall], col);
-  // cauda
-  const tail = new Geo();
-  const tH = e.forma === 'tubarao' ? 0.22 : e.forma === 'enguia' ? 0.05 : 0.16;
-  tail.p.push(0, 0, -0.42, 0, tH, -0.62, 0, 0.02, -0.55, 0, -tH * (e.forma === 'tubarao' ? 0.6 : 1), -0.62);
-  tail.n.push(1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0);
-  for (let k = 0; k < 4; k++) tail.c.push(...back, 0);
-  tail.i.push(0, 1, 2, 0, 2, 3);
-  g.add(tail); g.add(mirrorX(tail));
-  // nadadeira dorsal
-  const dorsal = new Geo();
-  const dH = e.forma === 'tubarao' ? 0.2 : 0.09;
-  dorsal.p.push(0, 0.1, 0.12, 0, 0.1 + dH, -0.02, 0, 0.09, -0.18);
-  dorsal.n.push(1, 0, 0, 1, 0, 0, 1, 0, 0);
-  for (let k = 0; k < 3; k++) dorsal.c.push(...back, 0);
-  dorsal.i.push(0, 1, 2);
-  g.add(dorsal); g.add(mirrorX(dorsal));
-  // peitorais
-  for (const s of [-1, 1]) {
-    const pf = new Geo();
-    const w = e.forma === 'tubarao' ? 0.22 : 0.08;
-    pf.p.push(s * 0.05, -0.03, 0.18, s * (0.05 + w), -0.08 - (e.forma === 'tubarao' ? 0.06 : 0), 0.06, s * 0.05, -0.04, 0.04);
-    pf.n.push(0, 1, 0, 0, 1, 0, 0, 1, 0);
-    for (let k = 0; k < 3; k++) pf.c.push(...base, 0);
-    pf.i.push(0, 1, 2);
-    g.add(pf); g.add(flipTri(pf));
+  // ---- corpo: seções elípticas ao longo do comprimento (loft), dorso arqueado e barriga mais reta ----
+  const F = e.forma;
+  const largura = F === 'bagre' ? 1.25 : F === 'tubarao' ? 1.0 : F === 'enguia' ? 0.9 : ({ tilapia: 0.62, pacu: 0.5, tambaqui: 0.55, piranha: 0.6, peixe_lua: 0.38, tetra: 0.55 }[esp] || 0.7);
+  const altura = F === 'bagre' ? 0.8 : F === 'tubarao' ? 0.95 : F === 'enguia' ? 0.55 : ({ pacu: 1.35, tambaqui: 1.25, piranha: 1.3, peixe_lua: 1.6, tilapia: 1.15, tucunare: 1.05, pirarucu: 0.75, traira: 0.8, dourado: 0.95 }[esp] || 1.0);
+  let an;
+  if (F === 'tubarao') an = [[-0.5, 0.004, 0.012, 0.0], [-0.42, 0.016, 0.028, 0.0], [-0.25, 0.05, 0.07, 0.0], [-0.05, 0.085, 0.1, 0.0], [0.12, 0.095, 0.105, 0.0], [0.28, 0.08, 0.085, 0.004], [0.4, 0.055, 0.055, 0.01], [0.47, 0.03, 0.03, 0.016], [0.5, 0.006, 0.008, 0.02]];
+  else if (F === 'enguia') an = [[-0.5, 0.003, 0.01, 0], [-0.4, 0.016, 0.03, 0], [-0.1, 0.032, 0.045, 0], [0.2, 0.036, 0.045, 0], [0.42, 0.03, 0.036, 0.004], [0.5, 0.008, 0.01, 0.006]];
+  else if (F === 'bagre') an = [[-0.5, 0.004, 0.014, 0], [-0.42, 0.016, 0.03, 0], [-0.25, 0.045, 0.06, 0.004], [-0.02, 0.08, 0.08, 0.006], [0.2, 0.1, 0.08, 0.01], [0.38, 0.1, 0.065, 0.016], [0.47, 0.075, 0.04, 0.022], [0.5, 0.02, 0.012, 0.024]];
+  else an = [[-0.5, 0.004, 0.018, 0], [-0.44, 0.012, 0.034, 0], [-0.3, 0.03, 0.07, -0.006], [-0.12, 0.05, 0.112, -0.012], [0.05, 0.058, 0.128, -0.008], [0.22, 0.052, 0.108, 0.004], [0.36, 0.038, 0.074, 0.01], [0.45, 0.022, 0.042, 0.014], [0.5, 0.005, 0.01, 0.018]];
+  an = an.map(([y, a, b, c]) => [y, a * largura * 1.0, b * altura, -c * altura]);
+  const aneis = suavizar(an, detail ? 3 : 2);
+  // alturas do dorso/barriga ao longo do corpo (para assentar as nadadeiras)
+  const perfil = (z) => { let i = 0; while (i < aneis.length - 2 && aneis[i + 1][0] < z) i++; const A = aneis[i], B = aneis[i + 1], t = Math.max(0, Math.min(1, (z - A[0]) / ((B[0] - A[0]) || 1))); const b = A[2] + (B[2] - A[2]) * t, c = -(A[3] + (B[3] - A[3]) * t); return { topo: c + b, base: c - b, meio: c }; };
+  const escamas = (x, y, z) => {
+    let c = col(x, y, z).slice(0, 3);
+    if (F !== 'tubarao' && F !== 'enguia' && F !== 'bagre') { const sc = Math.sin(z * 140 + y * 140) * Math.sin(z * 140 - y * 140); if (sc > 0.55) c = c.map((v) => v * 0.9); }
+    const m = perfil(z).meio;
+    if (Math.abs(y - (m + 0.15 * (perfil(z).topo - m))) < 0.004 && z < 0.28 && z > -0.4) c = c.map((v) => v * 0.75); // linha lateral
+    if (F !== 'tubarao' && Math.abs(z - (0.3 - Math.abs(y - m) * 0.4)) < 0.006) c = c.map((v) => v * 0.7);     // opérculo (tampa da guelra)
+    return [...c, 0];
+  };
+  g.put(loft(aneis, seg + 4), [0, 0, 0], [Math.PI / 2, 0, 0], 1, (x, y, z) => escamas(x, y, z));
+  // ---- nadadeiras: membranas finas (dos dois lados) com raios mais escuros ----
+  const finCor = mix(back, base, 0.35), raio = back.map((v) => v * 0.7);
+  const nad = (pts, raios = true) => {
+    // pts: contorno [x,y,z] a partir da base; triangula em leque a partir do primeiro ponto
+    const fg = new Geo();
+    for (const p of pts) { fg.p.push(...p); fg.n.push(1, 0, 0); fg.c.push(...finCor, 0); }
+    for (let k = 1; k < pts.length - 1; k++) fg.i.push(0, k, k + 1);
+    fg.recomputeNormals();
+    g.add(fg); g.add(flipTri(fg));
+    if (raios && detail) for (let k = 1; k < pts.length - 1; k += 1) g.add(tube([pts[0], pts[k]], 0.0025, 3), null, [...raio, 0]);
+  };
+  if (F === 'tubarao') {
+    nad([[0, 0.0, -0.46], [0, 0.07, -0.56], [0, 0.2, -0.7], [0, 0.15, -0.66], [0, 0.03, -0.56], [0, -0.04, -0.6], [0, -0.1, -0.62], [0, -0.03, -0.5]], false); // cauda heterocerca
+    const pt = perfil(0.05).topo; nad([[0, pt - 0.01, 0.16], [0, pt + 0.06, 0.08], [0, pt + 0.19, -0.02], [0, pt + 0.16, -0.06], [0, pt + 0.02, -0.1]], false); // dorsal alta
+    for (const s2 of [-1, 1]) { const p = perfil(0.18); const f = new Geo(); const P = [[s2 * 0.06, p.base + 0.03, 0.22], [s2 * 0.3, p.base - 0.06, 0.04], [s2 * 0.27, p.base - 0.06, -0.02], [s2 * 0.06, p.base + 0.02, 0.06]]; for (const q of P) { f.p.push(...q); f.n.push(0, 1, 0); f.c.push(...base, 0); } f.i.push(0, 1, 2, 0, 2, 3); f.recomputeNormals(); g.add(f); g.add(flipTri(f)); }
+    for (let k = 0; k < 5; k++) for (const s2 of [-1, 1]) g.put(capsule(0.003, 0.05, 4, 2), [s2 * 0.075, -0.005, 0.27 - k * 0.022], [0, 0, 0], 1, [0.22, 0.24, 0.27, 0]); // fendas branquiais
+    g.put(capsule(0.006, 0.07, 6, 3), [0, perfil(0.42).base + 0.012, 0.42], [0, 0, Math.PI / 2], 1, [0.15, 0.12, 0.12, 0]); // boca
+  } else if (F === 'enguia') {
+    const pts = [[0, perfil(-0.4).topo, -0.42]]; for (let z = -0.42; z <= 0.2; z += 0.08) pts.push([0, perfil(z).topo + 0.025, z]); pts.push([0, perfil(0.22).topo, 0.22]);
+    nad(pts, false); nad(pts.map(([x, y, z]) => [x, -y + 2 * perfil(z).meio, z]), false);
+  } else {
+    const pc = perfil(-0.45);
+    nad([[0, pc.meio, -0.44], [0, pc.meio + 0.05, -0.5], [0, pc.meio + 0.13 * altura, -0.62], [0, pc.meio + 0.15 * altura, -0.66], [0, pc.meio + 0.05, -0.6], [0, pc.meio, -0.57], [0, pc.meio - 0.05, -0.6], [0, pc.meio - 0.15 * altura, -0.66], [0, pc.meio - 0.13 * altura, -0.62], [0, pc.meio - 0.05, -0.5]]); // caudal bifurcada
+    const dz0 = F === 'bagre' ? 0.15 : 0.2, dz1 = F === 'bagre' ? 0.0 : -0.3;
+    const dpts = [[0, perfil((dz0 + dz1) / 2).topo - 0.01, (dz0 + dz1) / 2], [0, perfil(dz0).topo - 0.005, dz0]];
+    for (let k = 0; k <= 6; k++) { const z = dz0 + (dz1 - dz0) * (k / 6); dpts.push([0, perfil(z).topo + (0.07 + 0.03 * Math.sin(k)) * altura * (F === 'bagre' ? 1.3 : 1) * (1 - k / 9), z]); }
+    dpts.push([0, perfil(dz1).topo - 0.005, dz1]);
+    nad(dpts); // dorsal com raios
+    if (F === 'bagre') { const z = -0.28; nad([[0, perfil(z).topo - 0.005, z + 0.04], [0, perfil(z).topo + 0.03, z], [0, perfil(z).topo - 0.005, z - 0.07]], false); } // adiposa
+    const az = -0.32; nad([[0, perfil(az).base + 0.005, az + 0.06], [0, perfil(az).base + 0.005, az + 0.1], [0, perfil(az).base - 0.06 * altura, az + 0.02], [0, perfil(az).base - 0.05 * altura, az - 0.05], [0, perfil(az).base + 0.005, az - 0.06]]); // anal
+    for (const s2 of [-1, 1]) {
+      const p = perfil(0.22), wx = 0.6 * an[4][1];
+      const f = new Geo(); const P = [[s2 * wx, p.meio - 0.02, 0.24], [s2 * (wx + 0.03), p.meio - 0.05, 0.12], [s2 * (wx + 0.05), p.meio - 0.07, 0.08], [s2 * wx, p.meio - 0.03, 0.17]];
+      for (const q of P) { f.p.push(...q); f.n.push(0, 1, 0); f.c.push(...finCor, 0); } f.i.push(0, 1, 2, 0, 2, 3); f.recomputeNormals(); g.add(f); g.add(flipTri(f)); // peitoral
+      const pv = perfil(0.0); const f2 = new Geo(); const P2 = [[s2 * 0.012, pv.base + 0.01, 0.04], [s2 * 0.03, pv.base - 0.05 * altura, -0.04], [s2 * 0.012, pv.base + 0.005, -0.03]];
+      for (const q of P2) { f2.p.push(...q); f2.n.push(1, 0, 0); f2.c.push(...finCor, 0); } f2.i.push(0, 1, 2); f2.recomputeNormals(); g.add(f2); g.add(flipTri(f2)); // pélvica
+    }
+    const pb = perfil(0.48); g.put(capsule(0.0035, 0.03 * largura + 0.01, 6, 2), [0, pb.meio - 0.006, 0.495], [0, 0, Math.PI / 2], 1, [0.1, 0.07, 0.07, 0]); // boca
   }
-  // olhos
-  const eyeR = e.forma === 'tubarao' ? 0.014 : 0.025;
-  for (const s of [-1, 1]) {
-    g.put(sphere(eyeR, 8, 6), [s * 0.055 * flatX / 0.55 * 0.6, 0.03, 0.36], [0, 0, 0], 1, [0.92, 0.9, 0.8, 0]);
-    g.put(sphere(eyeR * 0.6, 8, 6), [s * (0.055 * flatX / 0.55 * 0.6 + eyeR * 0.55), 0.03, 0.365], [0, 0, 0], 1, [0.02, 0.02, 0.02, 0]);
+  // olhos: globo, íris dourada e pupila, encaixados na cabeça
+  const eyeR = F === 'tubarao' ? 0.012 : F === 'bagre' ? 0.014 : 0.022;
+  const ez = F === 'bagre' ? 0.4 : 0.38, pe = perfil(ez), ex = (() => { const i = aneis.findIndex((r) => r[0] >= ez); return (aneis[i]?.[1] || 0.03) * 0.92; })();
+  for (const s2 of [-1, 1]) {
+    g.put(sphere(eyeR, 10, 8), [s2 * ex, pe.meio + (pe.topo - pe.meio) * 0.35, ez], [0, 0, 0], [0.6, 1, 1], [0.9, 0.85, 0.6, 0]);
+    g.put(sphere(eyeR * 0.6, 8, 6), [s2 * (ex + eyeR * 0.45), pe.meio + (pe.topo - pe.meio) * 0.35, ez], [0, 0, 0], [0.5, 1, 1], [0.02, 0.02, 0.02, 0]);
   }
-  if (e.forma === 'bagre') for (const s of [-1, 1]) g.add(tube([[s * 0.04, -0.02, 0.48], [s * 0.1, -0.05, 0.52], [s * 0.16, -0.1, 0.5]], 0.006, 4), null, [0.2, 0.2, 0.18, 0]);
-  if (e.forma === 'tubarao') {
-    // boca e guelras (estilizado, nada gráfico)
-    g.put(capsule(0.006, 0.08, 6, 3), [0, -0.05, 0.4], [0, 0, Math.PI / 2], 1, [0.15, 0.12, 0.12, 0]);
-    for (let k = 0; k < 3; k++) for (const s of [-1, 1]) g.put(capsule(0.004, 0.06, 4, 2), [s * 0.085, 0, 0.26 - k * 0.025], [0, 0, 0], 1, [0.25, 0.27, 0.3, 0]);
-  }
+  if (F === 'bagre') for (const s2 of [-1, 1]) for (const k of [0, 1]) g.add(tube([[s2 * 0.05, -0.02 - k * 0.02, 0.49], [s2 * (0.12 + k * 0.05), -0.05 - k * 0.03, 0.53], [s2 * (0.19 + k * 0.06), -0.1 - k * 0.04, 0.49]], 0.004, 4), null, [0.2, 0.2, 0.18, 0]); // barbilhões
   return g;
 }
 function mirrorX(g) { const o = new Geo(); o.p = g.p.map((v, i) => (i % 3 === 0 ? -v : v)); o.n = g.n.map((v, i) => (i % 3 === 0 ? -v : v)); o.c = g.c.slice(); o.i = []; for (let t = 0; t < g.i.length; t += 3) o.i.push(g.i[t], g.i[t + 2], g.i[t + 1]); return o; }

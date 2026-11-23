@@ -85,7 +85,7 @@ async function iniciar(net) {
   $('menu').hidden = true; $('carregando').hidden = false;
   try {
     const g = new Game(net);
-    window.__jogo = g;
+    window.__jogo = g; g._fishNode = fishNode; g._fishCutNode = fishCutNode;
     await g.init();
   } catch (e) {
     console.warn('[menu]', e.message);

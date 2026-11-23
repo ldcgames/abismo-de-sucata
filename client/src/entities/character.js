@@ -3,10 +3,11 @@
 // avança pela distância percorrida.
 import { Geo, sphere, capsule, cylinder, rbox, torus, lathe, tube, box, MAT } from '../engine/geometry.js';
 import { Node } from '../engine/renderer.js';
+import { loft, suavizar, ruido } from '../engine/organico.js';
 import { damp, clamp } from '../engine/math.js';
 import { CORES_JOGADOR } from '../../shared/data.js';
 
-const SKINS = [[0.96, 0.78, 0.64], [0.78, 0.56, 0.4], [0.55, 0.37, 0.25], [0.92, 0.72, 0.55]];
+const SKINS = [[0.7, 0.49, 0.37], [0.58, 0.39, 0.27], [0.38, 0.25, 0.16], [0.66, 0.46, 0.33]];
 const HAIRS = [[0.2, 0.12, 0.07], [0.08, 0.06, 0.05], [0.55, 0.32, 0.15], [0.85, 0.7, 0.4]];
 
 function mesh(R, g, mat = {}) { return R.createMesh(g, { rough: 0.75, texScale: 1, ...mat }); }
@@ -16,126 +17,171 @@ export class Character {
   constructor(R, corIdx = 0, variant = 0) {
     this.R = R;
     const pal = CORES_JOGADOR[corIdx % CORES_JOGADOR.length];
-    const jacket = pal.roupa, jacketDk = jacket.map((c) => c * 0.65);
+    const jacket = pal.roupa.map((c) => c * 0.88 + 0.04), jacketDk = jacket.map((c) => c * 0.62);
     const skin = SKINS[variant % 4], hair = HAIRS[variant % 4];
-    const pants = [0.2, 0.24, 0.3], boots = [0.32, 0.2, 0.12], glove = [0.25, 0.22, 0.2];
+    const skinDk = skin.map((c) => c * 0.86), lip = [skin[0] * 0.9, skin[1] * 0.68, skin[2] * 0.66];
+    const pants = [0.2, 0.25, 0.33], pantsDk = pants.map((c) => c * 0.78), boots = [0.36, 0.23, 0.13], sola = [0.13, 0.11, 0.09];
+    // tecido: leve variação de tom + dobras em volta das juntas (cor no vértice, o relevo fica no loft)
+    const pano = (base, dobraY = null) => (x, y, z) => {
+      const v = 0.94 + ruido(x * 3, y * 7, z * 3) * 0.08;
+      const d = dobraY !== null && Math.abs(y - dobraY) < 0.05 ? 0.88 + 0.12 * Math.abs(Math.sin(y * 140 + x * 30)) : 1;
+      return [base[0] * v * d, base[1] * v * d, base[2] * v * d, 0];
+    };
     this.root = new Node('personagem');
     const hips = this.hips = bone('quadril', 0, 0.92, 0);
     this.root.add(hips);
-    // ---------- pélvis e cinto
+    // ---------- pélvis (calça jeans) e cinto de couro
     const pg = new Geo();
-    pg.put(capsule(0.17, 0.1, 16, 6), [0, 0.0, 0], [0, 0, Math.PI / 2], [1, 1, 0.75], pants);
-    pg.put(torus(0.175, 0.03, 24, 6), [0, 0.07, 0], [0, 0, 0], [1, 1, 0.78], [0.2, 0.14, 0.1]);
-    pg.put(rbox(0.07, 0.055, 0.03, 0.01), [0, 0.07, 0.14], [0, 0, 0], 1, [0.75, 0.65, 0.3]);
+    pg.put(loft(suavizar([[-0.14, 0.12, 0.095, 0.0], [-0.08, 0.162, 0.118, 0.0], [0.0, 0.168, 0.12, -0.005], [0.06, 0.158, 0.112, -0.005], [0.1, 0.15, 0.107, -0.005]]), 20), [0, 0, 0], [0, 0, 0], 1, pano(pants));
+    pg.put(loft([[0.045, 0.162, 0.115, -0.005], [0.085, 0.157, 0.111, -0.005]], 22, { capA: false, capB: false }), [0, 0, 0], [0, 0, 0], [1.02, 1, 1.03], [0.24, 0.15, 0.09]);
+    pg.put(rbox(0.055, 0.04, 0.012, 0.006), [0, 0.065, 0.118], [0, 0, 0], 1, [0.7, 0.62, 0.4]); // fivela
+    for (const s of [-1, 1]) pg.put(box(0.012, 0.05, 0.01), [s * 0.1, 0.06, 0.1], [0, s * 0.6, 0], 1, pantsDk); // passadores
     hips.mesh = mesh(this.R, pg, { kind: MAT.TECIDO });
-    // ---------- tronco (jaqueta acolchoada)
+    // ---------- tronco: jaqueta de trabalho aberta no peito, gola dobrada, bolsos com lapela, camiseta por baixo
     const spine = this.spine = bone('coluna', 0, 0.08, 0); hips.add(spine);
     const chest = this.chest = bone('peito', 0, 0.22, 0); spine.add(chest);
     const tg = new Geo();
-    const torso = lathe([[0.0, -0.24], [0.17, -0.23], [0.19, -0.12], [0.21, 0.02], [0.22, 0.14], [0.19, 0.23], [0.1, 0.28], [0.0, 0.29]], 22);
-    tg.put(torso, [0, 0, 0], [0, 0, 0], [1, 1, 0.74], (x, y, z) => {
-      // costuras horizontais do acolchoado + zíper
-      const quilt = Math.abs(Math.sin(y * 40)) < 0.12 ? 0.82 : 1;
-      if (Math.abs(x) < 0.012 && z > 0) return [0.15, 0.15, 0.15, 0];
-      return [jacket[0] * quilt, jacket[1] * quilt, jacket[2] * quilt, 0];
+    const tronco = suavizar([
+      [-0.25, 0.15, 0.105, -0.005], [-0.16, 0.152, 0.106, 0.0], [-0.06, 0.16, 0.112, 0.005], [0.04, 0.172, 0.12, 0.008],
+      [0.13, 0.18, 0.118, 0.006], [0.19, 0.182, 0.11, 0.0], [0.23, 0.16, 0.096, -0.008], [0.262, 0.11, 0.076, -0.01], [0.285, 0.066, 0.056, -0.005], [0.3, 0.052, 0.05, 0.0],
+    ], 3);
+    tg.put(loft(tronco, 26, { bump: (a, t) => 0.012 * Math.sin(a * 6 + t * 9) * Math.max(0, 0.6 - t) }), [0, 0, 0], [0, 0, 0], 1, (x, y, z) => {
+      // camiseta aparecendo na abertura do peito (V) e costura do zíper
+      if (z > 0.07 && Math.abs(x) < (y - 0.19) * 0.45 && y > 0.19) return [0.5, 0.52, 0.5, 0];
+      if (z > 0.08 && Math.abs(x - 0.002) < 0.006 && y < 0.13) return [0.18, 0.18, 0.18, 0];
+      return pano(jacket)(x, y, z);
     });
-    tg.put(torus(0.11, 0.035, 20, 8), [0, 0.26, 0.0], [0.15, 0, 0], [1, 1, 0.85], jacketDk); // gola
     for (const s of [-1, 1]) {
-      tg.put(rbox(0.09, 0.08, 0.03, 0.012), [s * 0.1, -0.08, 0.155], [0.12, 0, 0], 1, jacketDk); // bolsos
-      tg.put(rbox(0.06, 0.012, 0.035, 0.005), [s * 0.1, -0.035, 0.162], [0.12, 0, 0], 1, jacketDk);
+      tg.put(loft([[0.0, 0.045, 0.005], [0.065, 0.044, 0.005]], 12), [s * 0.09, 0.04, 0.125], [0.12, 0, 0], 1, jacket.map((c) => c * 0.9)); // bolso
+      tg.put(rbox(0.092, 0.026, 0.008, 0.004), [s * 0.09, 0.107, 0.131], [0.15, 0, 0], 1, jacket.map((c) => c * 0.82)); // lapela do bolso
+      tg.put(sphere(0.005, 6, 4), [s * 0.09, 0.098, 0.136], [0, 0, 0], 1, [0.2, 0.2, 0.2]); // botão
+      tg.put(loft([[0, 0.045, 0.012], [0.07, 0.03, 0.01]], 10), [s * 0.05, 0.25, 0.04], [0.2, 0, s * 0.9], 1, jacket.map((c) => c * 0.85)); // gola
+      tg.put(box(0.03, 0.42, 0.012), [s * 0.115, 0.03, -0.12], [0.05, 0, 0], 1, [0.12, 0.12, 0.12]); // alça da mochila
     }
-    // mochila com cilindro de ar
-    tg.put(rbox(0.26, 0.32, 0.12, 0.04), [0, 0.02, -0.2], [0, 0, 0], 1, [0.28, 0.3, 0.25]);
-    tg.put(capsule(0.055, 0.22, 12, 4), [0.07, 0.04, -0.27], [0, 0, 0], 1, [0.8, 0.8, 0.78]);
-    tg.put(capsule(0.055, 0.22, 12, 4), [-0.07, 0.04, -0.27], [0, 0, 0], 1, [0.8, 0.8, 0.78]);
-    tg.put(cylinder(0.025, 0.025, 0.04, 8), [0.07, 0.22, -0.27], [0, 0, 0], 1, [0.3, 0.3, 0.3]);
-    for (const s of [-1, 1]) tg.put(capsule(0.018, 0.34, 6, 3), [s * 0.11, 0.05, 0.05], [0.15, 0, 0], [1, 1, 3.5], [0.2, 0.2, 0.18]);
+    // mochila de lona pequena, com tampa e bolso frontal
+    tg.put(loft(suavizar([[-0.12, 0.11, 0.05, -0.17], [-0.04, 0.125, 0.06, -0.175], [0.08, 0.12, 0.058, -0.17], [0.15, 0.1, 0.045, -0.16]]), 16), [0, 0, 0], [0, 0, 0], 1, pano([0.3, 0.33, 0.27]));
+    tg.put(loft([[-0.08, 0.08, 0.02, -0.225], [0.0, 0.085, 0.022, -0.228]], 12), [0, 0, 0], [0, 0, 0], 1, [0.25, 0.27, 0.22]);
     chest.mesh = mesh(this.R, tg, { rough: 0.85, kind: MAT.TECIDO });
-    // ---------- cabeça
+    // ---------- pescoço e cabeça com proporções naturais (cabeça ~1/7,5 da altura)
     const neck = this.neck = bone('pescoco', 0, 0.3, 0); chest.add(neck);
-    const head = this.head = bone('cabeca', 0, 0.16, 0.0); neck.add(head);
+    const head = this.head = bone('cabeca', 0, 0.148, 0.008); head.sc(1.07); neck.add(head);
     const hg = new Geo();
-    hg.put(cylinder(0.06, 0.065, 0.1, 12), [0, -0.1, 0], [0, 0, 0], 1, skin);
-    hg.put(sphere(0.165, 28, 20), [0, 0.02, 0], [0, 0, 0], [1, 1.03, 0.98], skin);
-    hg.put(sphere(0.12, 20, 14), [0, -0.06, 0.04], [0, 0, 0], [1, 0.8, 1], skin); // maxilar/bochechas
+    hg.put(loft([[-0.17, 0.05, 0.048, -0.005], [-0.11, 0.046, 0.046, 0.0], [-0.06, 0.044, 0.044, -0.005]], 14), [0, 0, 0], [0, 0, 0], 1, skinDk); // pescoço
+    const cranio = suavizar([
+      [-0.108, 0.016, 0.014, 0.066], [-0.102, 0.038, 0.032, 0.06], [-0.086, 0.056, 0.06, 0.038], [-0.06, 0.067, 0.083, 0.018],
+      [-0.03, 0.072, 0.093, 0.01], [0.005, 0.077, 0.099, 0.004], [0.045, 0.079, 0.102, 0.0], [0.085, 0.074, 0.098, -0.006],
+      [0.112, 0.058, 0.08, -0.01], [0.128, 0.03, 0.045, -0.012], [0.133, 0.004, 0.006, -0.012],
+    ], 3);
+    const cabeca = loft(cranio, 28);
+    // linha do cabelo: alta na testa, desce nas têmporas e na nuca
+    const hairline = (x, z) => (z > 0.045 ? 0.072 - Math.abs(x) * 0.25 : z > -0.02 ? 0.03 : -0.06);
+    const gau = (dx, dy, sx, sy) => Math.exp(-((dx / sx) ** 2 + (dy / sy) ** 2));
+    cabeca.displace((x, y, z) => {
+      if (y > hairline(x, z)) return 0.007 + (ruido(x * 9, y * 9, z * 9) - 0.5) * 0.006;
+      if (z < 0.03) return 0;
+      const f = Math.min(1, (z - 0.03) / 0.04);
+      let d = 0;
+      d += 0.024 * gau(x, y + 0.012, 0.011, 0.024) * (y < 0.03 ? 1 : 0.4);   // nariz
+      d += 0.008 * gau(x, y + 0.034, 0.016, 0.008);                         // ponta/asas
+      d += 0.006 * gau(Math.abs(x) - 0.033, y - 0.04, 0.022, 0.008);        // sobrancelha (arco)
+      d -= 0.007 * gau(Math.abs(x) - 0.033, y - 0.016, 0.016, 0.011);       // órbita
+      d += 0.005 * gau(Math.abs(x) - 0.05, y + 0.012, 0.02, 0.02);          // maçã do rosto
+      d += 0.004 * gau(x, y + 0.056, 0.022, 0.009);                         // lábios
+      d += 0.005 * gau(x, y + 0.095, 0.022, 0.012);                         // queixo
+      return d * f;
+    });
+    hg.add(cabeca, null, (x, y, z) => {
+      if (y > hairline(x, z) - 0.004) return [...hair.map((c) => c * (0.85 + ruido(x * 30, y * 30, z * 30) * 0.3)), 0];
+      if (z > 0.07 && Math.abs(x) < 0.024 && y < -0.047 && y > -0.066) return [...lip, 0];                  // boca
+      const barba = variant % 2 === 1 && z > 0.0 && y < -0.035 ? 0.9 : 1;                                     // sombra de barba
+      const bochecha = z > 0.06 ? 1 + 0.05 * Math.exp(-(((Math.abs(x) - 0.05) / 0.02) ** 2 + ((y + 0.02) / 0.02) ** 2)) * 0 : 1;
+      return [skin[0] * barba * bochecha, skin[1] * barba, skin[2] * barba, 0];
+    });
+    // nariz (dorso + ponta + asas), lábios, orelhas, olhos com pálpebras, sobrancelhas
+    hg.put(box(0.03, 0.0015, 0.003), [0, -0.057, 0.106], [0, 0, 0], 1, lip.map((c) => c * 0.5)); // linha da boca
     for (const s of [-1, 1]) {
-      hg.put(sphere(0.038, 12, 8), [s * 0.16, 0.0, 0.0], [0, 0, 0], [0.6, 1, 0.9], skin.map((c) => c * 0.95)); // orelhas
-      hg.put(sphere(0.042, 16, 12), [s * 0.058, 0.03, 0.135], [0, 0, 0], [1, 1.15, 0.55], [0.97, 0.97, 0.95]); // olhos
-      hg.put(sphere(0.024, 12, 8), [s * 0.058, 0.028, 0.155], [0, 0, 0], [1, 1.1, 0.5], [0.25, 0.17, 0.1]); // íris
-      hg.put(sphere(0.013, 10, 6), [s * 0.058, 0.028, 0.165], [0, 0, 0], [1, 1, 0.5], [0.03, 0.03, 0.03]); // pupila
-      hg.put(sphere(0.006, 6, 4), [s * 0.058 + 0.007, 0.038, 0.17], [0, 0, 0], 1, [1, 1, 1]); // brilho
-      hg.put(capsule(0.01, 0.04, 8, 3), [s * 0.06, 0.088, 0.142], [0, 0, Math.PI / 2 + s * 0.15], 1, hair); // sobrancelhas
-      hg.put(sphere(0.028, 10, 6), [s * 0.085, -0.035, 0.12], [0, 0, 0], [1, 0.7, 0.4], [0.95, 0.6, 0.55]); // bochechas
+      hg.put(sphere(0.024, 12, 8), [s * 0.079, 0.005, -0.008], [0, 0, 0], [0.42, 1.25, 0.8], skin); // orelha
+      hg.put(sphere(0.012, 8, 6), [s * 0.082, 0.004, -0.004], [0, 0, 0], [0.4, 1.1, 0.7], skinDk);
+      hg.put(sphere(0.0135, 12, 10), [s * 0.033, 0.018, 0.083], [0, 0, 0], [1.15, 0.9, 1], [0.95, 0.94, 0.92]); // globo ocular
+      hg.put(sphere(0.0072, 10, 8), [s * 0.033, 0.018, 0.0955], [0, 0, 0], [1, 1, 0.4], [0.32, 0.22, 0.12]); // íris
+      hg.put(sphere(0.0036, 8, 6), [s * 0.033, 0.018, 0.0985], [0, 0, 0], [1, 1, 0.4], [0.03, 0.03, 0.03]); // pupila
+      hg.put(sphere(0.0012, 4, 3), [s * 0.033 + 0.002, 0.0205, 0.0995], [0, 0, 0], 1, [1, 1, 1]); // brilho
+      hg.put(sphere(0.0148, 12, 8, ), [s * 0.033, 0.021, 0.084], [-0.35, 0, 0], [1.18, 0.55, 1.02], skin); // pálpebra de cima
+      hg.put(loft([[0, 0.0028, 0.002], [0.028, 0.002, 0.0016]], 6), [s * 0.019, 0.035, 0.1], [0, 0, s * (Math.PI / 2 - 0.1)], 1, hair.map((c) => c * 0.9)); // sobrancelha
     }
-    hg.put(sphere(0.03, 12, 8), [0, -0.01, 0.165], [0, 0, 0], [0.9, 0.8, 1], skin.map((c) => c * 0.93)); // nariz
-    // sorriso (arco de tubo)
-    const smile = []; for (let k = 0; k <= 8; k++) { const a = -0.9 + (k / 8) * 1.8; smile.push([Math.sin(a) * 0.045, -0.065 - Math.cos(a) * 0.012 + 0.012, 0.142 + Math.cos(a) * 0.01]); }
-    hg.add(tube(smile, 0.006, 5), null, [0.45, 0.15, 0.12]);
-    // cabelo + gorro de lã com dobra
-    hg.put(sphere(0.17, 24, 14), [0, 0.035, -0.012], [0, 0, 0], [1.01, 0.95, 1.01], hair);
-    const beanie = lathe([[0.175, 0.0], [0.178, 0.04], [0.165, 0.1], [0.12, 0.16], [0.05, 0.19], [0, 0.195]], 24);
-    hg.put(beanie, [0, 0.06, -0.01], [-0.12, 0, 0], 1, jacket);
-    hg.put(torus(0.172, 0.028, 28, 8), [0, 0.07, -0.005], [-0.12, 0, 0], 1, jacketDk);
-    hg.put(sphere(0.045, 12, 8), [0, 0.27, -0.04], [0, 0, 0], 1, [0.95, 0.95, 0.9]); // pompom
-    head.mesh = mesh(this.R, hg, { rough: 0.6 });
+    // boné na cor do jogador (copa + aba curvada + botão)
+    const bone_ = lathe([[0.088, 0.0], [0.089, 0.03], [0.08, 0.065], [0.055, 0.092], [0.02, 0.105], [0, 0.107]], 26);
+    hg.put(bone_, [0, 0.055, -0.006], [-0.12, 0, 0], [1.0, 1, 1.12], (x, y, z) => [...(Math.abs(Math.atan2(x, z)) % 0.9 < 0.02 ? jacketDk : jacket), 0]);
+    hg.put(loft([[0, 0.075, 0.06, 0.0], [0.006, 0.074, 0.059, 0.0]], 18), [0, 0.06, 0.108], [-0.12, 0, 0], [1, 1, 1], jacketDk);
+    hg.put(sphere(0.008, 6, 4), [0, 0.162, 0.005], [0, 0, 0], 1, jacketDk);
+    head.mesh = mesh(this.R, hg, { rough: 0.6, kind: MAT.PELE });
     // olhos atordoados (X) — escondidos por padrão
     const xg = new Geo();
-    for (const s of [-1, 1]) for (const r of [0.75, -0.75]) xg.put(capsule(0.008, 0.05, 6, 2), [s * 0.058, 0.03, 0.172], [0, 0, r], 1, [0.05, 0.05, 0.05]);
+    for (const s of [-1, 1]) for (const r of [0.75, -0.75]) xg.put(capsule(0.003, 0.02, 6, 2), [s * 0.033, 0.018, 0.1], [0, 0, r], 1, [0.05, 0.05, 0.05]);
     this.xEyes = new Node('olhosX'); this.xEyes.mesh = mesh(this.R, xg); this.xEyes.visible = false; head.add(this.xEyes);
     // estrelinhas girando
     const sg = new Geo();
-    for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; sg.put(sphere(0.035, 6, 4), [Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25], [0, 0, 0], [1, 0.4, 1], [1, 0.9, 0.2]); }
-    this.stars = new Node('estrelas'); this.stars.mesh = mesh(this.R, sg, { emissive: [1, 0.85, 0.2], glow: 1.5, castShadow: false }); this.stars.at(0, 0.32, 0); this.stars.visible = false; head.add(this.stars);
-    // ---------- braços
+    for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; sg.put(sphere(0.025, 6, 4), [Math.cos(a) * 0.17, 0, Math.sin(a) * 0.17], [0, 0, 0], [1, 0.4, 1], [1, 0.9, 0.2]); }
+    this.stars = new Node('estrelas'); this.stars.mesh = mesh(this.R, sg, { emissive: [1, 0.85, 0.2], glow: 1.5, castShadow: false }); this.stars.at(0, 0.22, 0); this.stars.visible = false; head.add(this.stars);
+    // ---------- braços (manga da jaqueta com dobra no cotovelo, mãos de pele com dedos)
     this.arms = [];
     for (const s of [-1, 1]) {
-      const sh = bone('ombro', s * 0.215, 0.17, 0); chest.add(sh);
+      const sh = bone('ombro', s * 0.185, 0.17, 0); chest.add(sh);
       const ug = new Geo();
-      ug.put(sphere(0.075, 14, 10), [0, 0, 0], [0, 0, 0], 1, jacket);
-      ug.put(capsule(0.062, 0.18, 14, 5), [0, -0.13, 0], [0, 0, 0], 1, jacket);
+      ug.put(loft(suavizar([[0.055, 0.012, 0.014, 0, -s * 0.03], [0.04, 0.045, 0.05, 0, -s * 0.012], [0.0, 0.06, 0.062], [-0.08, 0.058, 0.06], [-0.18, 0.052, 0.054], [-0.27, 0.048, 0.05]]), 16, { bump: (a, t) => (t > 0.85 ? 0.04 * Math.sin(a * 5) : 0) }), [0, 0, 0], [0, 0, 0], 1, pano(jacket, -0.26));
       sh.mesh = mesh(this.R, ug, { rough: 0.85, kind: MAT.TECIDO });
       const el = bone('cotovelo', 0, -0.27, 0); sh.add(el);
       const fg = new Geo();
-      fg.put(capsule(0.055, 0.16, 14, 5), [0, -0.11, 0], [0, 0, 0], 1, jacket);
-      fg.put(torus(0.05, 0.018, 16, 6), [0, -0.21, 0], [0, 0, 0], 1, jacketDk); // punho
+      fg.put(loft(suavizar([[0.03, 0.05, 0.051], [-0.05, 0.051, 0.052], [-0.14, 0.045, 0.046], [-0.205, 0.043, 0.044], [-0.225, 0.047, 0.048]]), 16), [0, 0, 0], [0, 0, 0], 1, pano(jacket));
+      fg.put(loft([[-0.2, 0.049, 0.05], [-0.228, 0.05, 0.051]], 16), [0, 0, 0], [0, 0, 0], 1, jacketDk); // punho
+      fg.put(loft([[-0.22, 0.032, 0.036], [-0.25, 0.028, 0.032]], 12), [0, 0, 0], [0, 0, 0], 1, skin); // pulso
       el.mesh = mesh(this.R, fg, { rough: 0.85, kind: MAT.TECIDO });
       const hd = bone('mao', 0, -0.25, 0); el.add(hd);
       const hgg = new Geo();
-      hgg.put(sphere(0.055, 14, 10), [0, -0.04, 0], [0, 0, 0], [0.85, 1, 0.65], glove);
-      hgg.put(capsule(0.022, 0.05, 8, 3), [-s * 0.035, -0.035, 0.03], [0.6, 0, s * 0.6], 1, glove); // polegar
-      for (let k = 0; k < 4; k++) hgg.put(capsule(0.016, 0.045, 6, 3), [-0.024 + k * 0.016, -0.1, 0.005], [0.2, 0, 0], 1, glove);
-      hd.mesh = mesh(this.R, hgg, { rough: 0.9, kind: MAT.BORRACHA, texScale: 6 });
+      // palma (larga no sentido frente/trás, fina no lado), dedos com duas falanges curvadas e polegar
+      hgg.put(loft(suavizar([[0.0, 0.017, 0.03], [-0.035, 0.02, 0.041], [-0.075, 0.019, 0.042], [-0.09, 0.016, 0.038]]), 12), [0, 0, 0], [0, 0, 0], 1, skin);
+      for (let k = 0; k < 4; k++) {
+        const z = 0.028 - k * 0.019, L1 = [0.034, 0.038, 0.036, 0.03][k];
+        const p0 = [0, -0.088, z], p1 = [-s * 0.004, -0.088 - L1, z + 0.006], p2 = [-s * 0.008, -0.088 - L1 - 0.026, z + 0.016];
+        hgg.add(tube([p0, p1, p2], 0.0085, 6, (t) => 0.0095 - t * 0.0025), null, skin);
+        hgg.put(sphere(0.008, 6, 4), p2, [0, 0, 0], 1, skin);
+      }
+      hgg.add(tube([[-s * 0.006, -0.03, 0.035], [-s * 0.012, -0.06, 0.055], [-s * 0.014, -0.085, 0.06]], 0.011, 6, (t) => 0.012 - t * 0.003), null, skin);
+      hgg.put(sphere(0.009, 6, 4), [-s * 0.014, -0.085, 0.06], [0, 0, 0], 1, skin);
+      hd.mesh = mesh(this.R, hgg, { rough: 0.6, kind: MAT.PELE });
       const grip = bone('pegada', 0, -0.08, 0.02); hd.add(grip);
       this.arms.push({ sh, el, hd, grip, s });
     }
     this.handR = this.arms[1].grip; this.handL = this.arms[0].grip;
-    // ---------- pernas
+    // ---------- pernas (jeans com dobra no joelho, bota de couro com cadarço)
     this.legs = [];
     for (const s of [-1, 1]) {
-      const th = bone('coxa', s * 0.095, -0.04, 0); hips.add(th);
+      const th = bone('coxa', s * 0.092, -0.04, 0); hips.add(th);
       const tgg = new Geo();
-      tgg.put(capsule(0.078, 0.26, 14, 5), [0, -0.2, 0], [0, 0, 0], 1, pants);
-      tgg.put(rbox(0.07, 0.09, 0.03, 0.01), [s * 0.075, -0.2, 0.01], [0, 0, 0], 1, pants.map((c) => c * 0.8)); // bolso cargo
+      tgg.put(loft(suavizar([[0.04, 0.084, 0.09, 0.0], [-0.06, 0.086, 0.092, 0.005], [-0.2, 0.075, 0.08, 0.004], [-0.33, 0.064, 0.068, 0.0], [-0.42, 0.06, 0.064, 0.002]]), 16), [0, 0, 0], [0, 0, 0], 1, pano(pants));
+      tgg.put(rbox(0.012, 0.11, 0.08, 0.006), [s * 0.08, -0.2, 0.0], [0, 0, s * 0.06], 1, pantsDk); // bolso cargo
+      for (let k = 0; k < 3; k++) tgg.put(box(0.004, 0.003, 0.1), [s * 0.083, -0.15 - k * 0.04, 0.0], [0, 0, 0], 1, pantsDk); // costura
       th.mesh = mesh(this.R, tgg, { kind: MAT.TECIDO });
       const kn = bone('joelho', 0, -0.41, 0); th.add(kn);
       const sgg = new Geo();
-      sgg.put(capsule(0.068, 0.24, 14, 5), [0, -0.17, 0], [0, 0, 0], 1, pants);
-      sgg.put(sphere(0.06, 10, 8), [0, 0, 0.035], [0, 0, 0], [1, 1, 0.6], pants.map((c) => c * 0.85)); // joelheira
-      // cano da bota (preso à canela) com cadarço
-      sgg.put(cylinder(0.075, 0.08, 0.14, 14), [0, -0.33, 0.0], [0, 0, 0], 1, boots);
-      sgg.put(torus(0.078, 0.012, 16, 4), [0, -0.27, 0], [0, 0, 0], 1, [0.6, 0.55, 0.45]);
-      for (let k = 0; k < 3; k++) sgg.put(box(0.07, 0.008, 0.01), [0, -0.29 - k * 0.03, 0.078], [0, 0, 0], 1, [0.85, 0.8, 0.7]);
+      sgg.put(loft(suavizar([[0.04, 0.06, 0.065, 0.004], [-0.04, 0.058, 0.064, 0.0], [-0.12, 0.06, 0.066, -0.006], [-0.22, 0.054, 0.058, -0.004], [-0.29, 0.058, 0.06, 0.0]]), 16, { bump: (a, t) => (t < 0.18 ? 0.05 * Math.sin(a * 4) : 0) }), [0, 0, 0], [0, 0, 0], 1, pano(pants, -0.02));
+      // cano da bota com bainha da calça por cima e cadarço
+      sgg.put(loft([[-0.26, 0.058, 0.064, 0.0, 0, 2.5], [-0.38, 0.06, 0.066, 0.004, 0, 2.5]], 16), [0, 0, 0], [0, 0, 0], 1, boots);
+      sgg.put(loft([[-0.25, 0.064, 0.068], [-0.285, 0.066, 0.07]], 16), [0, 0, 0], [0, 0, 0], 1, pantsDk);
+      for (let k = 0; k < 4; k++) sgg.put(box(0.05, 0.004, 0.006), [0, -0.3 - k * 0.022, 0.068], [0, 0, (k % 2 ? 0.25 : -0.25)], 1, [0.82, 0.76, 0.62]);
       kn.mesh = mesh(this.R, sgg, { kind: MAT.TECIDO });
       // tornozelo: o pé gira para ficar plano no chão e "rolar" do calcanhar para a ponta
       const an = bone('tornozelo', 0, -0.37, 0); kn.add(an);
       const fgg = new Geo();
-      fgg.put(rbox(0.13, 0.08, 0.24, 0.035), [0, -0.02, 0.045], [0, 0, 0], 1, boots);
-      fgg.put(sphere(0.066, 12, 8), [0, -0.005, 0.15], [0, 0, 0], [1, 0.6, 0.7], boots.map((c) => c * 1.15)); // biqueira
-      fgg.put(rbox(0.135, 0.025, 0.25, 0.01), [0, -0.055, 0.045], [0, 0, 0], 1, [0.12, 0.1, 0.08]); // sola
-      for (let k = 0; k < 5; k++) fgg.put(box(0.12, 0.012, 0.012), [0, -0.068, -0.06 + k * 0.05], [0, 0, 0], 1, [0.08, 0.07, 0.06]); // cravos da sola
+      // pé da bota: loft no eixo Z (do calcanhar à biqueira) com seção arredondada, sola grossa com cravos
+      const pe = loft(suavizar([[-0.07, 0.012, 0.02], [-0.055, 0.05, 0.05], [0.0, 0.058, 0.055], [0.08, 0.06, 0.046], [0.15, 0.054, 0.032], [0.19, 0.035, 0.022], [0.2, 0.01, 0.008]]), 16);
+      fgg.put(pe, [0, -0.03, 0.0], [Math.PI / 2, 0, 0], [1, 1, 1], boots);
+      fgg.put(loft(suavizar([[-0.07, 0.05, 0.004], [0.0, 0.062, 0.004], [0.12, 0.062, 0.004], [0.2, 0.04, 0.004]]), 16), [0, -0.058, 0.0], [Math.PI / 2, 0, 0], [1, 1, 3.2], sola);
+      for (let k = 0; k < 5; k++) fgg.put(box(0.1, 0.008, 0.01), [0, -0.072, -0.04 + k * 0.045], [0, 0, 0], 1, [0.07, 0.06, 0.05]);
       an.mesh = mesh(this.R, fgg, { kind: MAT.BORRACHA, texScale: 4 });
       this.legs.push({ th, kn, an, s });
     }
+
     // cadeira de praia dobrável: aparece quando senta (alumínio + lona listrada)
     {
       const cg = new Geo(), AL = [0.75, 0.77, 0.8], LONA = [jacket[0] * 0.9, jacket[1] * 0.9, jacket[2] * 0.9];
