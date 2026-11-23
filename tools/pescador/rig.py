@@ -293,7 +293,7 @@ flag[np.unique(np.array(tampas,int).ravel()) if tampas else []]=True
 from visib import visibilidade
 _vis,_nd=visibilidade(P.astype(np.float64),np.load('bruto.npz')['P'].astype(np.float64))
 LIMV=int(os.environ.get('LIMV','8'))
-_esc=np.isin(GV,[1,2,6,0,7,5])&(_vis<=LIMV)
+_esc=np.isin(GV,[1,2,6,0,7,5,3,4])&(_vis<=LIMV)
 flag[_esc]=True
 print('vertices escondidos (visibilidade baixa)',int(_esc.sum()))
 # lado de dentro da manga (tecido virado para o braço): aparece quando ele levanta o braço — pinta como a camisa
@@ -348,6 +348,7 @@ conhecido=~flag.copy()
 GVv=np.array(gv)
 for g_ in (1,2): conhecido[(GVv==g_)&(classe>1)]=False
 conhecido[ante&(classe!=0)]=False
+conhecido[np.isin(GVv,[3,4])&(Pva[:,1]>-0.75)&(classe!=3)]=False
 conhecido[(GVv==6)&(classe!=2)&(np.abs(Pva[:,0])>0.2)]=False
 wk2=np.unique(np.round(Pva*1e5).astype(np.int64),axis=0,return_inverse=True)[1].ravel()
 nW=wk2.max()+1
@@ -452,16 +453,38 @@ for g_,sd in ((1,'L'),(2,'R')):
     JJ[mg]=[ORD.index('sh'+sd),ORD.index('el'+sd),ORD.index('hd'+sd),ORD.index('chest')]
     WW[mg]=W4; nref+=len(mg)
 print('pesos de braço contínuos',nref)
-# máscara da camisa (verde) para pintar com a cor do jogador
-TM=1024
+# boia: 100% presa no quadril (nenhum vértice dela segue coxa/perna — eram os espinhos amarelos ao sentar)
+mb_=np.where(GG==6)[0]; JJ[mb_]=[ORD.index('hips'),0,0,0]; WW[mb_]=[1,0,0,0]
+print('boia rígida',len(mb_))
+# pernas com pesos contínuos: a parte de cima (bunda/bolsos) acompanha o quadril e a coxa dobra por baixo dela,
+# em vez da bunda girar junto com a coxa e afundar dentro da boia quando ele senta
+nperna=0
+for g_,sd in ((3,'L'),(4,'R')):
+    mg=np.where(GG==g_)[0]; y=P[mg,1]
+    yh=J['th'+sd][1]; yk=J['kn'+sd][1]; ya=J['an'+sd][1]
+    a_th=_ss((yh+0.07-y)/0.17)          # 0 = quadril, 1 = coxa
+    a_kn=_ss((yk+0.05-y)/0.10)
+    a_an=_ss((ya+0.03-y)/0.06)
+    wq=1-a_th; wt=a_th*(1-a_kn); wk_=a_kn*(1-a_an); wa=a_an
+    W4=np.stack([wq,wt,wk_,wa],1); W4/=W4.sum(1,keepdims=True)
+    JJ[mg]=[ORD.index('hips'),ORD.index('th'+sd),ORD.index('kn'+sd),ORD.index('an'+sd)]
+    WW[mg]=W4; nperna+=len(mg)
+print('pesos de perna contínuos',nperna)
+# máscara da camisa: dentro da área da camisa, tudo que não é pele, logo branco ou amarelo vira camisa
+TM=2048
 texs=cv2.resize(tex,(TM,TM),interpolation=cv2.INTER_AREA); hs=cv2.cvtColor(texs,cv2.COLOR_BGR2HSV)
-camisaV=np.isin(LL,[ORD.index(k) for k in ['spine','chest','neck','shL','shR','elL','elR']])&(P[:,1]>-0.1)&(P[:,1]<0.42)&~(np.isin(np.array(gv),[1,2])&(P[:,1]<0.12))
+camisaV=((np.isin(LL,[ORD.index(k) for k in ['spine','chest','neck','shL','shR','elL','elR']])&(P[:,1]<0.42))|(np.isin(np.array(gv),[0,7,1,2])&(np.abs(P[:,0])>0.2)&(P[:,1]<0.52)))&(P[:,1]>-0.1)&~(np.isin(np.array(gv),[1,2])&(P[:,1]<0.12))
 zona=np.zeros((TM,TM),np.uint8)
 for t in np.where(camisaV[I].sum(1)>=2)[0]:
     q=np.round(UV[I[t]]*TM*4).astype(np.int32); cv2.fillConvexPoly(zona,q,255,shift=2)
 zona=cv2.dilate(zona,np.ones((5,5),np.uint8))
-verde=((hs[:,:,0]>=28)&(hs[:,:,0]<=75)&(hs[:,:,1]>45)).astype(np.uint8)*255
-verde=cv2.morphologyEx(verde,cv2.MORPH_CLOSE,np.ones((3,3),np.uint8))
+H_,S_,V_=hs[:,:,0].astype(int),hs[:,:,1].astype(int),hs[:,:,2].astype(int)
+pele_=(H_>=3)&(H_<=20)&(S_>=50)&(V_>=140)
+branco_=(S_<45)&(V_>150)
+amarelo_=(H_>=18)&(H_<=30)&(S_>120)&(V_>150)
+verde=(~pele_&~branco_&~amarelo_).astype(np.uint8)*255
+verde=cv2.morphologyEx(verde,cv2.MORPH_OPEN,np.ones((2,2),np.uint8))
+verde=cv2.morphologyEx(verde,cv2.MORPH_CLOSE,np.ones((5,5),np.uint8))
 mask=cv2.GaussianBlur(cv2.bitwise_and(zona,verde),(3,3),0)
 cv2.imwrite('mascara.png',mask)
 print('mascara cobertura',(mask>128).mean())
