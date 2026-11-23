@@ -143,3 +143,4 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 - Armas maiores na mão (escala 1,85); cobertura do quiosque em 4 postes; camisa tingida sem pontinhos estourados.
 - v1.5.1: lateral do tronco que tinha ido para o braço voltou para o tronco (acabou a "aba" no cotovelo); ombro/sovaco continua ligado (sem buraco ao levantar o braço); pesos do braço contínuos (cotovelo e ombro dobram lisos); lado de dentro da manga pintado como camisa.
 - v1.5.2: bunda/bolsos seguem o quadril ao sentar (coxa dobra por baixo), sem fiapos entre perna e boia; boia rígida no quadril; ombro todo com a cor da camisa.
+- v1.5.3: lâmpadas acesas na oficina (2) e nas casinhas de tinta, armas e corrida. TESTE: Garrafa PET valendo S$ 1.000.000 (valor normal = 10, em shared/data.js).

@@ -52,7 +52,7 @@ export function vitrineLayout(v) {
   const [w, , d] = t.dims, borda = v?.tipo === 'tanque' ? 0.5 : 0.15;
   return { x: Math.min(1.3, PLACA_X - 2.4 - borda - w / 2), z: VITRINE_FRENTE - borda - d / 2, w, d, t, borda };
 }
-function casinha(g, hx, hz, cor) {
+function casinha(g, hx, hz, cor, luzes) {
   // piso de concreto com degrau
   g.k = MAT.CONCRETO; g.put(rbox(4.6, 0.2, 4.0, 0.04), [hx, 1.62, hz], [0, 0, 0], 1, [0.45, 0.44, 0.42]);
   g.put(rbox(0.35, 0.12, 4.0, 0.03), [hx - 2.45, 1.58, hz], [0, 0, 0], 1, [0.42, 0.41, 0.39]);
@@ -83,10 +83,12 @@ function casinha(g, hx, hz, cor) {
   g.k = MAT.MADEIRA;
   g.put(box(0.05, 0.2, 4.75), [hx - 2.67, yF - 0.04, hz], [0, 0, 0], 1, cor.map((c) => c * 0.85));
   for (const s of [-1, 1]) g.put(box(5.25, 0.16, 0.04), [hx - 0.05, (yF + yT) / 2 - 0.03, hz + s * 2.36], [0, 0, -inc], 1, cor.map((c) => c * 0.85));
-  // luminária de parede e calha no fundo
+  // calha no fundo e luminária pendente presa na viga do meio (a lâmpada acesa é desenhada à parte)
   g.k = MAT.METAL;
   g.put(cylinder(0.08, 0.08, 4.75, 10, false), [hx + 2.62, yT - 0.06, hz], [Math.PI / 2, 0, 0], 1, [0.62, 0.64, 0.66]);
-  g.put(lathe([[0.03, 0], [0.16, -0.1], [0.17, -0.11]], 12), [hx + 1.9, 4.35, hz], [0, 0, 0], 1, [0.18, 0.2, 0.2]);
+  g.put(cylinder(0.008, 0.008, 0.3, 4), [hx + 0.6, 4.37, hz], [0, 0, 0], 1, [0.1, 0.1, 0.1]);
+  g.put(lathe([[0.03, 0], [0.2, -0.12], [0.22, -0.14]], 16), [hx + 0.6, 4.22, hz], [0, 0, 0], 1, [0.18, 0.2, 0.2]);
+  if (luzes) luzes.push([hx + 0.6, 4.1, hz]);
 }
 
 const fishGeoCache = {};
@@ -136,6 +138,7 @@ export class Station {
 
   buildStatic() {
     const R = this.R, g = new Geo();
+    const luzesLoc = []; // lâmpadas acesas dentro da base e das casinhas (coordenadas locais)
     // plataforma de concreto com juntas
     g.k = MAT.CONCRETO;
     const pad = rbox(34, 0.5, 30, 0.12, 10);
@@ -233,7 +236,7 @@ export class Station {
       g.put(cylinder(0.055, 0.055, yg - 1.6, 10), [x1 + lado - 0.15, (yg + 1.6) / 2, zg], [0, 0, 0], 1, [0.7, 0.72, 0.74]);
       g.put(cylinder(0.055, 0.055, 0.35, 10), [x1 + lado - 0.15, 1.68, zg + 0.15], [1.2, 0, 0], 1, [0.7, 0.72, 0.74]);
       // luminárias industriais penduradas
-      for (const x of [sx - 2.7, sx + 2.7]) { const z = sz - 0.5, y = yR(z); g.put(cylinder(0.01, 0.01, 0.6, 4), [x, y - 0.3, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]); g.put(lathe([[0.03, 0], [0.32, -0.18], [0.34, -0.2]], 16), [x, y - 0.6, z], [0, 0, 0], 1, [0.2, 0.32, 0.25]); }
+      for (const x of [sx - 2.7, sx + 2.7]) { const z = sz - 0.5, y = yR(z); g.put(cylinder(0.01, 0.01, 0.6, 4), [x, y - 0.3, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]); g.put(lathe([[0.03, 0], [0.32, -0.18], [0.34, -0.2]], 16), [x, y - 0.6, z], [0, 0, 0], 1, [0.2, 0.32, 0.25]); luzesLoc.push([x, y - 0.74, z]); }
       // painel de ferramentas (madeira perfurada) com ferramentas penduradas
       g.k = MAT.MADEIRA;
       g.put(rbox(4, 1.6, 0.05, 0.01), [sx, 3.6, zb + 0.08], [0, 0, 0], 1, [0.55, 0.42, 0.28]);
@@ -310,7 +313,7 @@ export class Station {
     g.k = MAT.METAL;
     g.put(cylinder(0.06, 0.05, 7, 8), [12, 5, 14], [0, 0, 0], 1, METAL);
     // casinha da fábrica de bolsas de tinta (aberta para o pátio)
-    casinha(g, 13.6, 2.5, [0.48, 0.34, 0.22]);
+    casinha(g, 13.6, 2.5, [0.48, 0.34, 0.22], luzesLoc);
     {
       const hx = 13.6, hz = 2.5;
       // mesa de trabalho encostada na parede do fundo
@@ -324,7 +327,7 @@ export class Station {
     // barraca de armas (mesmo tamanho da casinha de tinta), com computador, balcão e caixas de munição
     {
       const hx = BARRACA_ARMAS.x, hz = BARRACA_ARMAS.z;
-      casinha(g, hx, hz, [0.36, 0.38, 0.32]);
+      casinha(g, hx, hz, [0.36, 0.38, 0.32], luzesLoc);
       g.k = MAT.METAL;
       g.put(rbox(0.9, 0.1, 2.0, 0.02), [hx + 1.55, 2.6, hz + 0.6], [0, 0, 0], 1, [0.32, 0.33, 0.35]); // balcão
       for (const z of [-0.3, 1.5]) for (const x of [-0.35, 0.35]) g.put(box(0.07, 0.95, 0.07), [hx + 1.55 + x, 2.1, hz + z], [0, 0, 0], 1, METAL);
@@ -343,7 +346,7 @@ export class Station {
     // barraca da corrida de submarino (ao lado da loja de armas): troféus na parede e uma bola brilhante no meio
     {
       const hx = BARRACA_CORRIDA.x, hz = BARRACA_CORRIDA.z;
-      casinha(g, hx, hz, [0.22, 0.34, 0.44]);
+      casinha(g, hx, hz, [0.22, 0.34, 0.44], luzesLoc);
       g.k = MAT.MADEIRA;
       g.put(box(0.12, 0.05, 3.2), [hx + 1.92, 3.05, hz], [0, 0, 0], 1, [0.3, 0.2, 0.12]); // prateleira dos troféus
       g.put(box(0.12, 0.05, 3.2), [hx + 1.92, 3.95, hz], [0, 0, 0], 1, [0.3, 0.2, 0.12]);
@@ -400,6 +403,10 @@ export class Station {
     }
     const ent = textQuad(R, ['BOLSAS DE TINTA'], 2.4, 0.42, { px: 512, bg: '#3a2a1c' });
     ent.at(13.6 - 2.36, 4.42, 2.5).rot(0, -Math.PI / 2, 0); this.root.add(ent);
+    // lâmpadas acesas (bulbo brilhante) + luz pontual usada pelo jogo de dia e de noite
+    const lb = new Geo(); for (const l of luzesLoc) lb.put(sphere(0.09, 12, 8), l, [0, 0, 0], 1, [1, 0.92, 0.7]);
+    const lbn = new Node('lampadas_internas'); lbn.mesh = R.createMesh(lb, { emissive: [1, 0.85, 0.55], glow: 2.5, castShadow: false }); this.root.add(lbn);
+    this.luzesInternas = luzesLoc.map((l) => this.toWorld(l[0], l[1] - 0.15, l[2]));
   }
 
   setSign(nome) {
