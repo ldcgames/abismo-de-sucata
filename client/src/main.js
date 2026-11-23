@@ -828,7 +828,7 @@ class Game {
         } else txt = `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b>`;
       } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
-        if (best.id === 'aquario') txt = p.mao ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no ${best.txt}` : `<kbd>E</kbd>${best.txt}: ver peixes e trocar aquário/tanque`;
+        if (best.id === 'aquario') txt = p.mao ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no ${best.txt}` : `<kbd>E</kbd>${best.txt}: ver e pegar os peixes`;
         if (best.id === 'tinta') txt = p.mao && ESPECIES[p.mao.esp].tinta ? `<kbd>E</kbd>Fabricar bolsas com a lula (+2) · você tem ${p.baloes}/10` : `Fábrica de bolsas: traga uma LULA na mão · bolsas ${p.baloes}/10`;
         if (livre && I.hit('KeyE')) this.interagir(best.id);
       } else if (!p.mao && Math.hypot(me.pos[0] - ESTATUA.x, me.pos[2] - ESTATUA.z) < 11) {

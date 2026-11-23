@@ -232,13 +232,15 @@ export class UI {
   }
   aba_aquario(p, naFrente = false) {
     const v = p.vitrine, a = vitrineSpec(v);
-    let h = `<p class="nota">Na estação fica <b>um só</b>: o aquário ou tanque equipado (entre a oficina e a placa com o seu nome). Equipe qualquer um que você já comprou: o outro some e os peixes passam para o novo (os que não couberem vão para a mochila). Para vender, clique em <b>Pegar na mão</b> primeiro.</p>`;
+    let h = naFrente ? '' : `<p class="nota">Na estação fica <b>um só</b>: o aquário ou tanque equipado (entre a oficina e a placa com o seu nome). Equipe qualquer um que você já comprou: o outro some e os peixes passam para o novo (os que não couberem vão para a mochila). Para vender, clique em <b>Pegar na mão</b> primeiro.</p>`;
     h += `<h3>Equipado: ${esc(a.nome)} [${v.peixes.length}/${a.vagas}] · até ${a.maxCm} cm${v.tipo === 'tanque' ? ' · aceita tubarões' : ''}</h3>`;
     if (p.mao && naFrente) {
       const m = cabeNoAquario(p, p.mao);
       h += `<div class="convite">Na mão: ${esc(ESPECIES[p.mao.esp].nome)} (${p.mao.cm} cm) ${this.btn('Colocar aqui', { tipo: 'peixe_aquario' }, !!m, m || '')} ${m ? `<span class="falta">${esc(m)}</span>` : ''}</div>`;
     }
     h += this.listaPeixes(p, 'vitrine') || '<p class="nota">Vazio. Pesque um peixe que caiba e coloque aqui (E na frente dele).</p>';
+    // na frente do aquário/tanque: só os peixes (pegar e colocar). Comprar e equipar é no computador.
+    if (naFrente) return h + '<p class="nota">Para comprar ou trocar o aquário/tanque, use o computador da estação (aba Aquário e tanque).</p>';
     const card = (tipo, i, it, extra, compra) => {
       const tem = (tipo === 'tanque' ? p.tanquesTem : p.aquariosTem).includes(i), eq = v.tipo === tipo && v.nivel === i;
       return `<div class="card"><h3>${esc(it.nome)}</h3><div class="val">${it.vagas} vagas · até <b>${it.maxCm} cm</b>${extra}</div>${tem ? '' : `<div class="custo">${custoTxt(it.custo)}</div>`}
