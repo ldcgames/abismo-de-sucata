@@ -121,13 +121,46 @@ export class Character {
       const sgg = new Geo();
       sgg.put(capsule(0.068, 0.24, 14, 5), [0, -0.17, 0], [0, 0, 0], 1, pants);
       sgg.put(sphere(0.06, 10, 8), [0, 0, 0.035], [0, 0, 0], [1, 1, 0.6], pants.map((c) => c * 0.85)); // joelheira
-      // bota
+      // cano da bota (preso à canela) com cadarço
       sgg.put(cylinder(0.075, 0.08, 0.14, 14), [0, -0.33, 0.0], [0, 0, 0], 1, boots);
-      sgg.put(rbox(0.13, 0.08, 0.24, 0.035), [0, -0.39, 0.045], [0, 0, 0], 1, boots);
-      sgg.put(rbox(0.135, 0.025, 0.25, 0.01), [0, -0.425, 0.045], [0, 0, 0], 1, [0.12, 0.1, 0.08]);
       sgg.put(torus(0.078, 0.012, 16, 4), [0, -0.27, 0], [0, 0, 0], 1, [0.6, 0.55, 0.45]);
+      for (let k = 0; k < 3; k++) sgg.put(box(0.07, 0.008, 0.01), [0, -0.29 - k * 0.03, 0.078], [0, 0, 0], 1, [0.85, 0.8, 0.7]);
       kn.mesh = mesh(this.R, sgg, { kind: MAT.TECIDO });
-      this.legs.push({ th, kn, s });
+      // tornozelo: o pé gira para ficar plano no chão e "rolar" do calcanhar para a ponta
+      const an = bone('tornozelo', 0, -0.37, 0); kn.add(an);
+      const fgg = new Geo();
+      fgg.put(rbox(0.13, 0.08, 0.24, 0.035), [0, -0.02, 0.045], [0, 0, 0], 1, boots);
+      fgg.put(sphere(0.066, 12, 8), [0, -0.005, 0.15], [0, 0, 0], [1, 0.6, 0.7], boots.map((c) => c * 1.15)); // biqueira
+      fgg.put(rbox(0.135, 0.025, 0.25, 0.01), [0, -0.055, 0.045], [0, 0, 0], 1, [0.12, 0.1, 0.08]); // sola
+      for (let k = 0; k < 5; k++) fgg.put(box(0.12, 0.012, 0.012), [0, -0.068, -0.06 + k * 0.05], [0, 0, 0], 1, [0.08, 0.07, 0.06]); // cravos da sola
+      an.mesh = mesh(this.R, fgg, { kind: MAT.BORRACHA, texScale: 4 });
+      this.legs.push({ th, kn, an, s });
+    }
+    // cadeira de praia dobrável: aparece quando senta (alumínio + lona listrada)
+    {
+      const cg = new Geo(), AL = [0.75, 0.77, 0.8], LONA = [jacket[0] * 0.9, jacket[1] * 0.9, jacket[2] * 0.9];
+      const tubo = (a, b, r = 0.016) => cg.add(tube([a, b], r, 8), null, AL);
+      for (const s of [-1, 1]) {
+        tubo([s * 0.25, 0.0, 0.22], [s * 0.25, 0.47, -0.16]); // X lateral
+        tubo([s * 0.25, 0.0, -0.2], [s * 0.25, 0.47, 0.2]);
+        tubo([s * 0.25, 0.47, -0.16], [s * 0.25, 1.02, -0.3]); // encosto
+        tubo([s * 0.25, 0.62, 0.22], [s * 0.25, 0.62, -0.2], 0.014); // braço
+        tubo([s * 0.25, 0.47, 0.2], [s * 0.25, 0.62, 0.22], 0.014);
+        cg.put(rbox(0.07, 0.025, 0.36, 0.01), [s * 0.25, 0.635, 0.01], [0, 0, 0], 1, [0.25, 0.25, 0.27]); // apoio de braço
+        cg.put(cylinder(0.022, 0.022, 0.02, 10), [s * 0.25, 0.01, 0.22], [0, 0, 0], 1, [0.15, 0.15, 0.15]); // pezinhos de borracha
+        cg.put(cylinder(0.022, 0.022, 0.02, 10), [s * 0.25, 0.01, -0.2], [0, 0, 0], 1, [0.15, 0.15, 0.15]);
+      }
+      tubo([-0.25, 0.47, 0.2], [0.25, 0.47, 0.2], 0.014); tubo([-0.25, 0.47, -0.16], [0.25, 0.47, -0.16], 0.014);
+      tubo([-0.25, 1.02, -0.3], [0.25, 1.02, -0.3], 0.014); tubo([-0.25, 0.04, 0.22], [0.25, 0.04, 0.22], 0.012);
+      // assento e encosto de lona (um pouco cedidos), com listras
+      const listra = (x) => (Math.floor((x + 0.3) * 12) % 2 ? LONA : [0.95, 0.93, 0.88]);
+      for (let k = 0; k < 8; k++) {
+        const z0 = 0.18 - k * 0.045;
+        cg.put(box(0.5, 0.012, 0.046), [0, 0.455 - Math.sin((k / 7) * Math.PI) * 0.03, z0], [0, 0, 0], 1, (x) => listra(x));
+      }
+      for (let k = 0; k < 9; k++) { const t = k / 8; cg.put(box(0.5, 0.06, 0.012), [0, 0.5 + t * 0.48, -0.17 - t * 0.12 + Math.sin(t * Math.PI) * 0.025], [-0.25, 0, 0], 1, (x) => listra(x)); }
+      this.cadeira = new Node('cadeira'); this.cadeira.mesh = mesh(this.R, cg, { rough: 0.5, metal: 0.3 }); this.cadeira.at(0, 0, -0.05); this.cadeira.visible = false;
+      this.root.add(this.cadeira);
     }
     this.phase = 0; this.t = 0;
     this.pose = {}; // ângulos suavizados
@@ -147,8 +180,10 @@ export class Character {
     const run = clamp((sp - 2.5) / 2.5, 0, 1), walk = clamp(sp / 1.6, 0, 1);
     const breathe = Math.sin(this.t * 2.2) * 0.02;
     let spin = 0;
+    let hipsYaw = 0;
     let hipsY = 0.92, hipsPitch = 0, hipsRoll = 0, spineP = 0, chestP = 0, chestY = 0, headP = 0, headY = 0;
-    let thigh = [0, 0], knee = [0, 0], shP = [0, 0], shR = [0, 0], elb = [0, 0], shY = [0, 0];
+    let thigh = [0, 0], knee = [0, 0], shP = [0, 0], shR = [0, 0], elb = [0, 0], shY = [0, 0], ank = null;
+    let flip = null; // ângulo do mortal (aplicado direto, sem suavizar)
     const mode = st.mode;
     if (mode === 'sub' || mode === 'guindaste') {
       // sentado pilotando
@@ -156,7 +191,7 @@ export class Character {
       spineP = -0.05;
     } else if (mode === 'nadando') {
       const s = Math.sin(this.t * 2.6);
-      hipsPitch = 1.15; hipsY = 0.3; headP = -0.9;
+      hipsPitch = 1.15; hipsY = 0.3; headP = -0.9; ank = [0.7 + Math.sin(this.t * 6) * 0.2, 0.7 - Math.sin(this.t * 6) * 0.2];
       thigh = [Math.sin(this.t * 6) * 0.35, -Math.sin(this.t * 6) * 0.35]; knee = [0.3, 0.3];
       shP = [-2.2 + s * 0.9, -2.2 + s * 0.9]; shR = [0.5 + s * 0.6, 0.5 + s * 0.6]; elb = [-0.6, -0.6];
     } else {
@@ -170,7 +205,21 @@ export class Character {
       hipsY = 0.92 + Math.abs(Math.cos(ph)) * 0.04 * walk - 0.03 * run;
       spineP = 0.05 * walk + 0.2 * run; chestY = Math.sin(ph) * 0.12 * walk;
       hipsRoll = Math.sin(ph) * 0.03 * walk;
-      if (!st.grounded) { thigh = [0.7, 0.2]; knee = [1.2, 0.6]; shP = [-2.4, -2.4]; shR = [0.4, 0.4]; elb = [-0.3, -0.3]; }
+      // o quadril gira um pouco com a passada e o peito compensa (contrapeso), cabeça estável
+      hipsYaw = Math.sin(ph) * 0.1 * walk; chestY -= hipsYaw * 0.9; headY = -chestY * 0.4;
+      // pé plano no chão na fase de apoio, empurra com a ponta ao sair e entra de calcanhar
+      ank = [0, 1].map((i) => { const p2 = ph + i * Math.PI; return thigh[i] - knee[i] + (Math.max(0, -Math.sin(p2 - 0.5)) * 0.35 - Math.max(0, Math.sin(p2 + 0.4)) * 0.12) * walk; });
+      // parado: respira, transfere o peso de uma perna para a outra e olha em volta
+      const idle = 1 - walk;
+      if (idle > 0.01) {
+        const ws = Math.sin(this.t * 0.55);
+        hipsRoll += ws * 0.035 * idle; knee = [knee[0] + Math.max(0, ws) * 0.12 * idle, knee[1] + Math.max(0, -ws) * 0.12 * idle];
+        thigh = [thigh[0] + Math.max(0, ws) * 0.06 * idle, thigh[1] + Math.max(0, -ws) * 0.06 * idle];
+        ank = [0, 1].map((i) => thigh[i] - knee[i]);
+        headY += (Math.sin(this.t * 0.31) * 0.28 + Math.sin(this.t * 0.83) * 0.08) * idle; headP += Math.sin(this.t * 0.47) * 0.06 * idle;
+        shR = [0.1 + breathe * 0.6, 0.1 + breathe * 0.6]; elb = [-0.18, -0.18]; shP = [0.04 + breathe, 0.04 + breathe];
+      }
+      if (!st.grounded) { thigh = [0.7, 0.2]; knee = [1.2, 0.6]; shP = [-2.4, -2.4]; shR = [0.4, 0.4]; elb = [-0.3, -0.3]; ank = [0.35, 0.35]; }
       chestP = breathe;
     }
     // segurando coisas
@@ -213,25 +262,59 @@ export class Character {
       }
     }
     // gestos e danças (scroll do mouse)
+    const sentado = !!(st.emote && st.emote.i === 2 && !st.escorrega && !(st.atordoado > 0));
+    this.cadeira.visible = sentado;
     if (st.emote && !(st.atordoado > 0)) {
       const t = st.emote.t, w = Math.sin(t * 6), w2 = Math.sin(t * 3);
+      const ocupado = !!(st.segura || a); // pescando/segurando: o sentado mantém os braços da ação
       switch (st.emote.i) {
         case 0: // joinha
           shP[1] = -1.25; elb[1] = -1.5; shR[1] = 0.2; headP = 0.12 * Math.sin(t * 5); spineP = 0.05; break;
-        case 1: // dança: quadril balançando, braços alternando para cima
-          hipsRoll = w2 * 0.12; hipsY = 0.9 + Math.abs(w) * 0.04; chestY = w2 * 0.35;
-          shP = [-2.6 - w * 0.4, -1.0 + w * 0.6]; elb = [-0.6, -1.2]; shR = [0.35, 0.35]; knee = [0.25 + Math.max(0, w) * 0.3, 0.25 + Math.max(0, -w) * 0.3]; thigh = [0.12, 0.12]; break;
-        case 2: // sentado no chão
-          hipsY = 0.36; thigh = [1.45, 1.45]; knee = [1.7, 1.7]; shP = [-0.5, -0.5]; elb = [-0.9, -0.9]; shR = [0.15, 0.15]; spineP = 0.12; headP = 0.05 * w2; break;
+        case 1: { // dança: passo lateral no tempo (120 bpm), 8 tempos: aponta para cima, depois gira os braços
+          const beat = t * 2, fase = Math.floor(beat) % 8, f = beat % 1, bat = Math.sin(beat * Math.PI);
+          const lado = Math.floor(beat) % 2 ? 1 : -1;
+          hipsRoll = bat * 0.13; hipsYaw = lado * 0.12; hipsY = 0.88 + Math.abs(bat) * 0.05;
+          knee = [0.35 + Math.max(0, bat) * 0.35, 0.35 + Math.max(0, -bat) * 0.35]; thigh = [0.18 + Math.max(0, bat) * 0.15, 0.18 + Math.max(0, -bat) * 0.15];
+          ank = [0, 1].map((i) => thigh[i] - knee[i]);
+          chestY = -hipsYaw * 1.4; headP = 0.1 * Math.abs(Math.sin(beat * Math.PI * 2)); headY = lado * 0.15;
+          if (fase < 4) { // aponta alternando para o alto
+            const dir = fase % 2 ? 0 : 1; shP = [-0.9, -0.9]; elb = [-1.3, -1.3]; shR = [0.3, 0.3];
+            shP[dir] = -2.9 + Math.sin(f * Math.PI) * 0.2; elb[dir] = -0.1; shR[dir] = 0.15;
+          } else { // braços girando na frente do peito (rolinho)
+            const r2 = beat * Math.PI * 2;
+            shP = [-1.2 + Math.sin(r2) * 0.35, -1.2 - Math.sin(r2) * 0.35]; elb = [-1.6 + Math.cos(r2) * 0.3, -1.6 - Math.cos(r2) * 0.3]; shR = [0.5, 0.5];
+          }
+          break;
+        }
+        case 2: // sentado na cadeira de praia (dá para pescar sentado)
+          if (st.escorrega) { hipsY = 0.36; thigh = [1.45, 1.45]; knee = [1.7, 1.7]; shP = [-0.5, -0.5]; elb = [-0.9, -0.9]; shR = [0.15, 0.15]; spineP = 0.12; ank = [0.2, 0.2]; break; }
+          hipsY = 0.56; hipsYaw = 0; hipsRoll = 0; thigh = [1.42, 1.36]; knee = [1.36, 1.25]; ank = [0.06, 0.12]; spineP = -0.16; chestP = breathe * 0.6;
+          if (!ocupado) { shP = [-0.42, -0.42]; elb = [-0.75, -0.75]; shR = [0.32, 0.32]; headY = Math.sin(t * 0.3) * 0.25; headP = 0.05 * w2; }
+          break;
         case 3: // aceno
           shP[1] = -2.75; shR[1] = 0.25 + w * 0.35; elb[1] = -0.35 + w * 0.25; headY = 0.15; break;
-        case 4: // dança do robô
-          chestY = Math.round(w2 * 2) / 2 * 0.5; shR = [1.4, 1.4]; elb = [-1.5 * (w > 0 ? 1 : 0.3), -1.5 * (w < 0 ? 1 : 0.3)]; shP = [-0.2, -0.2]; headY = -chestY * 0.6; knee = [0.2, 0.2]; break;
+        case 4: { // dança do robô: poses travadas que trocam no tempo
+          const beat = Math.floor(t * 2.5), q = beat % 4;
+          chestY = [0.5, 0, -0.5, 0][q]; headY = -chestY * 0.8; shR = [1.45, 1.45]; shP = [-0.15, -0.15];
+          elb = [q === 0 || q === 1 ? -1.55 : -0.2, q === 2 || q === 3 ? -1.55 : -0.2]; knee = [0.25 + (q % 2) * 0.15, 0.25 + ((q + 1) % 2) * 0.15]; thigh = [0.12, 0.12];
+          ank = [0, 1].map((i) => thigh[i] - knee[i]); hipsY = 0.9; break;
+        }
         case 5: { // breakdance: entra agachado (0,6 s) e vira de cabeça para baixo girando (headspin)
           if (t < 0.6) { hipsY = 0.55; knee = [1.6, 1.6]; thigh = [1.3, 1.3]; shP = [-0.9, -0.9]; elb = [-0.4, -0.4]; spineP = 0.5; break; }
           hipsPitch = Math.PI; hipsY = 0.93; spin = (t - 0.6) * 9;
           thigh = [0.5 + Math.sin(t * 9) * 0.25, -0.5 - Math.sin(t * 9) * 0.25]; knee = [0.15, 0.15];
-          shP = [-2.9, -2.9]; shR = [0.55, 0.55]; elb = [-0.2, -0.2]; headP = 0.25; break;
+          shP = [-2.9, -2.9]; shR = [0.55, 0.55]; elb = [-0.2, -0.2]; headP = 0.25; ank = [0.5, 0.5]; break;
+        }
+        case 6: { // mortal para trás: agacha, salta girando encolhido e aterrissa
+          const ss = (x) => x * x * (3 - 2 * x);
+          if (t < 0.28) { const k = ss(t / 0.28); hipsY = 0.92 - 0.3 * k; thigh = [1.0 * k, 1.0 * k]; knee = [1.8 * k, 1.8 * k]; spineP = 0.45 * k; shP = [0.8 * k, 0.8 * k]; elb = [-0.2, -0.2]; ank = [0, 1].map((i) => thigh[i] - knee[i]); flip = 0; }
+          else if (t < 0.95) {
+            const u = (t - 0.28) / 0.67, tuck = Math.sin(u * Math.PI);
+            hipsY = 0.75 + Math.sin(u * Math.PI) * 1.05; flip = -Math.PI * 2 * ss(u);
+            thigh = [0.4 + 1.5 * tuck, 0.4 + 1.5 * tuck]; knee = [0.3 + 1.9 * tuck, 0.3 + 1.9 * tuck]; ank = [0.5, 0.5];
+            shP = [-2.6 + 1.4 * tuck, -2.6 + 1.4 * tuck]; elb = [-0.2 - 0.9 * tuck, -0.2 - 0.9 * tuck]; shR = [0.2, 0.2]; headP = 0.3 * tuck; spineP = 0.4 * tuck;
+          } else { const k = 1 - ss(Math.min(1, (t - 0.95) / 0.3)); hipsY = 0.92 - 0.28 * k; thigh = [0.9 * k, 0.9 * k]; knee = [1.6 * k, 1.6 * k]; ank = [0, 1].map((i) => thigh[i] - knee[i]); shP = [-1.4 * k, -1.4 * k]; shR = [1.0 * k, 1.0 * k]; spineP = 0.35 * k; flip = 0; }
+          break;
         }
       }
     }
@@ -239,7 +322,7 @@ export class Character {
     const stun = st.atordoado > 0;
     this.caido = stun ? (this.caido || 0) + dt : 0;
     if (stun) {
-      const noAr = st.grounded === false && mode === 'terra';
+      const noAr = st.grounded === false && mode === 'terra'; ank = null;
       hipsPitch = -1.45; hipsY = 0.2; hipsRoll = 0.08; spineP = 0.05; chestY = 0; headP = -0.25; headY = 0.35;
       shP = [-2.4, -1.9]; shR = [1.05, 0.85]; elb = [-0.35, -0.6];
       thigh = [0.25, -0.05]; knee = [0.55, 0.25];
@@ -252,9 +335,10 @@ export class Character {
     if (stun) this.stars.rot(0, this.t * 6, 0);
     // aplica com suavização
     const r = 14;
-    this.hips.at(0, P('hy', hipsY, stun ? rQueda : r), 0);
+    this.hips.at(0, P('hy', hipsY, stun ? rQueda : flip !== null ? 40 : r), 0);
     // giro do breakdance (direto, sem suavizar para não "desenrolar" o ângulo)
-    this.hips.rot(P('hp', hipsPitch, stun ? rQueda : st.emote?.i === 5 ? 10 : 8), spin, P('hr', hipsRoll, r));
+    if (flip !== null && !stun) { this.pose.hp = flip; this.hips.rot(flip, P('hyw', hipsYaw, r), P('hr', hipsRoll, r)); }
+    else this.hips.rot(P('hp', hipsPitch, stun ? rQueda : st.emote?.i === 5 ? 10 : 8), spin || P('hyw', hipsYaw, r), P('hr', hipsRoll, r));
     this.spine.rot(P('sp', spineP, r), P('cy', chestY, r) * 0.5, 0);
     this.chest.rot(P('cp', chestP, r), P('cy2', chestY, r) * 0.5, 0);
     this.head.rot(P('hdp', headP, r), P('hdy', headY, r), 0);
@@ -262,6 +346,7 @@ export class Character {
       const L = this.legs[i];
       L.th.rot(-P('th' + i, thigh[i], r), 0, 0);
       L.kn.rot(P('kn' + i, knee[i], r), 0, 0);
+      L.an.rot(P('an' + i, ank ? ank[i] : thigh[i] - knee[i], r), 0, 0);
       const A = this.arms[i];
       A.sh.rot(P('shp' + i, shP[i], r), P('shy' + i, shY[i], r), A.s * P('shr' + i, shR[i], r));
       A.el.rot(P('el' + i, elb[i], r), 0, 0);

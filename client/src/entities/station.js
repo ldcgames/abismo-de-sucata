@@ -160,32 +160,114 @@ export class Station {
     // base do guindaste
     g.k = MAT.CONCRETO;
     g.put(cylinder(1.2, 1.4, 2.2, 20), [this.xPivot, 0.8, this.zPivot], [0, 0, 0], 1, CONC);
-    // oficina (galpão aberto) com telhado de chapa ondulada
-    g.k = MAT.PINTADO;
-    const sx = -11, sz = -5;
-    g.put(rbox(11, 4, 0.3, 0.04), [sx, 3.5, sz - 4], [0, 0, 0], 1, [0.6, 0.55, 0.48]);
-    for (const s of [-1, 1]) g.put(rbox(0.3, 4, 8, 0.04), [sx + s * 5.4, 3.5, sz], [0, 0, 0], 1, [0.6, 0.55, 0.48]);
-    g.k = MAT.METAL;
-    for (let k = 0; k < 24; k++) g.put(cylinder(0.11, 0.11, 8.8, 8, false), [sx - 5.8 + k * 0.5, 5.75 + Math.sin(k * Math.PI) * 0, sz], [Math.PI / 2, 0, 0.18], [1, 1, 1], [0.5, 0.52, 0.55]);
-    g.k = MAT.MADEIRA;
-    for (const s of [-1, 1]) g.put(box(0.2, 4.2, 0.2), [sx + s * 5.3, 3.5, sz + 4], [0, 0, 0], 1, WOOD_DK);
-    // painel de ferramentas na parede
-    g.put(box(4, 1.6, 0.05), [sx, 3.6, sz - 3.82], [0, 0, 0], 1, [0.35, 0.28, 0.2]);
-    g.k = MAT.METAL;
-    for (let k = 0; k < 7; k++) g.put(capsule(0.03, 0.4 + (k % 3) * 0.15, 6, 2), [sx - 1.6 + k * 0.5, 3.6, sz - 3.75], [0, 0, (k % 2) * 0.3], 1, k % 2 ? [0.6, 0.15, 0.1] : [0.7, 0.7, 0.72]);
-    // bancada principal
-    g.k = MAT.MADEIRA;
-    g.put(rbox(3.2, 0.12, 1.1, 0.03), [sx, 2.55, sz - 3.0], [0, 0, 0], 1, WOOD);
-    g.k = MAT.METAL;
-    for (const x of [-1.4, 1.4]) for (const z of [-0.4, 0.4]) g.put(box(0.1, 0.95, 0.1), [sx + x, 2.05, sz - 3.0 + z], [0, 0, 0], 1, METAL);
-    g.put(rbox(0.25, 0.2, 0.15, 0.02), [sx - 1, 2.72, sz - 3.0], [0, 0, 0], 1, [0.2, 0.3, 0.6]); // morsa
-    // prateleiras do depósito
-    for (let k = 0; k < 3; k++) g.put(rbox(3, 0.08, 0.9, 0.02), [sx + 3.6, 2.2 + k * 1.0, sz + 1.5], [0, Math.PI / 2, 0], 1, METAL);
-    for (const z of [-1.4, 1.4]) g.put(box(0.08, 3, 0.08), [sx + 3.6, 3.0, sz + 1.5 + z], [0, 0, 0], 1, METAL);
-    // terminal (quiosque de compra e venda)
-    g.k = MAT.PINTADO;
-    g.put(rbox(1.2, 1.6, 0.6, 0.08), [-4, 2.35, 9], [0, 0.4, 0], 1, [0.25, 0.3, 0.35]);
-    g.put(rbox(1.0, 0.7, 0.1, 0.04), [-4, 3.4, 9.15], [-0.25, 0.4, 0], 1, [0.15, 0.16, 0.18]);
+    // oficina (galpão aberto para o pátio): estrutura de aço, fechamento de telha ondulada, mureta de
+    // concreto e telhado de uma água inclinado para a frente, com calha e cano de descida
+    {
+      const sx = -11, sz = -5, x0 = sx - 5.4, x1 = sx + 5.4, zb = sz - 4.05, zf = sz + 4.0;
+      const yB = 6.25, yF = 5.3, yR = (z) => yB + (z - zb) * (yF - yB) / (zf - zb); // altura da face de baixo do telhado
+      const incl = Math.atan2(yB - yF, zf - zb);
+      const ACO = [0.36, 0.38, 0.42], TELHA = [0.8, 0.77, 0.7], TELHA_ESC = [0.72, 0.69, 0.62], MURETA = [0.5, 0.49, 0.46];
+      // mureta de concreto (0,6 m) no fundo e nas laterais
+      g.k = MAT.CONCRETO;
+      g.put(rbox(x1 - x0 + 0.3, 0.6, 0.3, 0.03), [sx, 1.85, zb], [0, 0, 0], 1, MURETA);
+      for (const x of [x0, x1]) g.put(rbox(0.3, 0.6, zf - zb, 0.03), [x, 1.85, (zb + zf) / 2], [0, 0, 0], 1, MURETA);
+      // fechamento em telha ondulada pintada: chapa + ondas verticais (as laterais acompanham a inclinação do telhado)
+      g.k = MAT.PINTADO;
+      const hB = yB - 2.15;
+      g.put(box(x1 - x0, hB, 0.04), [sx, 2.15 + hB / 2, zb], [0, 0, 0], 1, TELHA);
+      for (let x = x0 + 0.12; x < x1 - 0.05; x += 0.24) g.put(cylinder(0.05, 0.05, hB, 6, false), [x, 2.15 + hB / 2, zb + 0.03], [0, 0, 0], [1, 1, 0.55], TELHA_ESC);
+      for (const [x, s] of [[x0, -1], [x1, 1]]) for (let z = zb + 0.12; z < zf - 0.3; z += 0.24) {
+        const h = yR(z) - 2.15; g.put(cylinder(0.05, 0.05, h, 6, false), [x + s * 0.03, 2.15 + h / 2, z], [0, 0, 0], [0.55, 1, 1], (z * 4 | 0) % 2 ? TELHA : TELHA_ESC);
+      }
+      for (const x of [x0, x1]) for (let z = zb; z < zf - 0.3; z += 0.8) { const z2 = Math.min(z + 0.8, zf - 0.3), h = yR((z + z2) / 2) - 2.15; g.put(box(0.04, h, z2 - z), [x, 2.15 + h / 2, (z + z2) / 2], [0, 0, 0], 1, TELHA); }
+      // estrutura de aço pintada: pilares (perfil I), vigas e terças
+      g.k = MAT.PINTADO;
+      const pilar = (x, z) => { const h = yR(z) - 1.55; g.put(box(0.2, h, 0.06), [x, 1.55 + h / 2, z], [0, 0, 0], 1, ACO); for (const d of [-1, 1]) g.put(box(0.2, h, 0.02), [x, 1.55 + h / 2, z + d * 0.09], [0, 0, 0], [1, 1, 1], ACO); g.put(box(0.06, h, 0.2), [x, 1.55 + h / 2, z], [0, 0, 0], 1, ACO); g.put(box(0.34, 0.03, 0.34), [x, 1.57, z], [0, 0, 0], 1, [0.3, 0.3, 0.32]); };
+      for (const x of [x0 + 0.1, sx, x1 - 0.1]) { pilar(x, zb + 0.15); pilar(x, zf - 0.1); }
+      // viga da frente e do fundo
+      g.put(box(x1 - x0 + 0.2, 0.3, 0.16), [sx, yF - 0.15, zf - 0.1], [0, 0, 0], 1, ACO);
+      g.put(box(x1 - x0 + 0.2, 0.3, 0.16), [sx, yB - 0.15, zb + 0.15], [0, 0, 0], 1, ACO);
+      // tesouras inclinadas sobre cada linha de pilares + terças ao longo do galpão
+      const Lr = Math.hypot(zf - zb, yB - yF);
+      for (const x of [x0 + 0.1, sx, x1 - 0.1]) g.put(box(0.12, 0.24, Lr), [x, (yB + yF) / 2 - 0.12, (zb + zf) / 2], [incl, 0, 0], 1, ACO);
+      for (let k = 0; k <= 5; k++) { const z = zb + 0.3 + k * (zf - zb - 0.5) / 5; g.put(box(x1 - x0 + 0.1, 0.1, 0.1), [sx, yR(z) + 0.0, z], [incl, 0, 0], 1, [0.42, 0.43, 0.46]); }
+      // mão-francesa (contraventamento) nos cantos da frente
+      for (const x of [x0 + 0.1, x1 - 0.1]) g.put(box(0.06, 0.06, 1.3), [x, yF - 0.65, zf - 0.6], [-0.75, 0, 0], 1, ACO);
+      g.k = MAT.METAL;
+      // telhado: chapa inclinada + ondas no sentido da caída da água, com beiral na frente e nas laterais
+      const lado = 0.45, beiral = 0.55, Lt = Math.hypot(zf - zb + beiral + 0.2, (yB - yF) * (zf - zb + beiral + 0.2) / (zf - zb));
+      const zc = (zb - 0.2 + zf + beiral) / 2, yc = yR(zc) + 0.1;
+      g.put(box(x1 - x0 + lado * 2, 0.03, Lt), [sx, yc, zc], [incl, 0, 0], 1, [0.6, 0.62, 0.64]);
+      for (let x = x0 - lado + 0.1; x < x1 + lado - 0.05; x += 0.2) g.put(cylinder(0.055, 0.055, Lt, 6, false), [x, yc + 0.02, zc], [Math.PI / 2 + incl, 0, 0], [1, 1, 0.5], ((x * 5) | 0) % 2 ? [0.62, 0.64, 0.66] : [0.57, 0.59, 0.61]);
+      // rufo no fundo, testeiras nas laterais
+      g.put(box(x1 - x0 + lado * 2 + 0.05, 0.18, 0.08), [sx, yB + 0.08, zb - 0.22], [0, 0, 0], 1, [0.45, 0.47, 0.5]);
+      for (const [x, s2] of [[x0 - lado, -1], [x1 + lado, 1]]) g.put(box(0.05, 0.16, Lt), [x + s2 * 0.02, yc - 0.02, zc], [incl, 0, 0], 1, [0.45, 0.47, 0.5]);
+      // calha na frente (meia-cana) e cano de descida no canto
+      const zg = zf + beiral + 0.05, yg = yR(zg) + 0.02;
+      g.put(cylinder(0.11, 0.11, x1 - x0 + lado * 2, 12, false), [sx, yg, zg], [0, 0, Math.PI / 2], [1, 1, 1], [0.7, 0.72, 0.74]);
+      g.put(box(x1 - x0 + lado * 2, 0.02, 0.22), [sx, yg - 0.1, zg], [0, 0, 0], 1, [0.7, 0.72, 0.74]);
+      g.put(cylinder(0.055, 0.055, yg - 1.6, 10), [x1 + lado - 0.15, (yg + 1.6) / 2, zg], [0, 0, 0], 1, [0.7, 0.72, 0.74]);
+      g.put(cylinder(0.055, 0.055, 0.35, 10), [x1 + lado - 0.15, 1.68, zg + 0.15], [1.2, 0, 0], 1, [0.7, 0.72, 0.74]);
+      // luminárias industriais penduradas
+      for (const x of [sx - 2.7, sx + 2.7]) { const z = sz - 0.5, y = yR(z); g.put(cylinder(0.01, 0.01, 0.6, 4), [x, y - 0.3, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]); g.put(lathe([[0.03, 0], [0.32, -0.18], [0.34, -0.2]], 16), [x, y - 0.6, z], [0, 0, 0], 1, [0.2, 0.32, 0.25]); }
+      // painel de ferramentas (madeira perfurada) com ferramentas penduradas
+      g.k = MAT.MADEIRA;
+      g.put(rbox(4, 1.6, 0.05, 0.01), [sx, 3.6, zb + 0.08], [0, 0, 0], 1, [0.55, 0.42, 0.28]);
+      g.k = MAT.METAL;
+      for (let i = 0; i < 18; i++) for (let j = 0; j < 7; j++) g.put(cylinder(0.012, 0.012, 0.01, 4), [sx - 1.85 + i * 0.22, 2.95 + j * 0.22, zb + 0.11], [Math.PI / 2, 0, 0], 1, [0.2, 0.15, 0.1]);
+      const zp = zb + 0.14;
+      g.put(box(0.03, 0.32, 0.02), [sx - 1.6, 3.7, zp], [0, 0, 0.2], 1, [0.65, 0.66, 0.68]); g.put(rbox(0.1, 0.05, 0.05, 0.01), [sx - 1.63, 3.88, zp], [0, 0, 0.2], 1, [0.2, 0.2, 0.22]); // martelo
+      for (let k = 0; k < 5; k++) g.put(cylinder(0.012, 0.012, 0.18 + k * 0.03, 6), [sx - 1.0 + k * 0.12, 3.75, zp], [0, 0, 0], 1, [0.7, 0.7, 0.72]); // chaves de fenda
+      for (let k = 0; k < 5; k++) g.put(cylinder(0.02, 0.02, 0.1, 6), [sx - 1.0 + k * 0.12, 3.92, zp], [0, 0, 0], 1, [[0.8, 0.2, 0.1], [0.2, 0.5, 0.8], [0.9, 0.7, 0.1], [0.2, 0.6, 0.3], [0.1, 0.1, 0.1]][k]);
+      for (let k = 0; k < 6; k++) g.put(box(0.03, 0.22 + k * 0.03, 0.015), [sx + 0.1 + k * 0.13, 3.35, zp], [0, 0, 0.1], 1, [0.72, 0.73, 0.75]); // chaves de boca
+      g.put(torus(0.12, 0.02, 14, 6), [sx + 1.4, 3.8, zp], [Math.PI / 2, 0, 0], 1, [0.85, 0.5, 0.1]); // rolo de cabo
+      g.put(rbox(0.3, 0.22, 0.02, 0.01), [sx + 1.4, 3.25, zp], [0, 0, 0], 1, [0.8, 0.12, 0.1]); // serra
+      // bancada principal: tampo grosso de madeira, pés de aço com travessas, prateleira e gaveteiro
+      g.k = MAT.MADEIRA;
+      const bz = sz - 3.0;
+      g.put(rbox(3.2, 0.08, 1.1, 0.02), [sx, 2.58, bz], [0, 0, 0], 1, [0.6, 0.45, 0.3]);
+      g.put(rbox(3.2, 0.06, 1.0, 0.02), [sx, 1.95, bz], [0, 0, 0], 1, [0.5, 0.38, 0.25]);
+      g.k = MAT.METAL;
+      g.put(box(3.2, 0.06, 0.04), [sx, 2.5, bz + 0.53], [0, 0, 0], 1, [0.3, 0.32, 0.35]);
+      for (const x of [-1.5, 1.5]) for (const z of [-0.45, 0.45]) g.put(box(0.06, 0.95, 0.06), [sx + x, 2.07, bz + z], [0, 0, 0], 1, [0.3, 0.32, 0.35]);
+      for (const x of [-1.5, 1.5]) g.put(box(0.05, 0.05, 0.9), [sx + x, 1.75, bz], [0, 0, 0], 1, [0.3, 0.32, 0.35]);
+      g.k = MAT.PINTADO;
+      g.put(rbox(0.7, 0.55, 0.9, 0.02), [sx + 1.05, 2.25, bz], [0, 0, 0], 1, [0.7, 0.15, 0.12]); // gaveteiro vermelho
+      for (let k = 0; k < 3; k++) { g.put(box(0.64, 0.005, 0.01), [sx + 1.05, 2.07 + k * 0.17, bz + 0.455], [0, 0, 0], 1, [0.3, 0.06, 0.05]); g.put(box(0.2, 0.025, 0.02), [sx + 1.05, 2.12 + k * 0.17, bz + 0.465], [0, 0, 0], 1, [0.8, 0.8, 0.82]); }
+      // morsa (torno de bancada)
+      g.put(rbox(0.22, 0.12, 0.25, 0.02), [sx - 1.1, 2.69, bz + 0.38], [0, 0, 0], 1, [0.15, 0.3, 0.6]);
+      g.put(rbox(0.24, 0.14, 0.05, 0.01), [sx - 1.1, 2.76, bz + 0.25], [0, 0, 0], 1, [0.15, 0.3, 0.6]);
+      g.put(rbox(0.24, 0.14, 0.05, 0.01), [sx - 1.1, 2.76, bz + 0.52], [0, 0, 0], 1, [0.15, 0.3, 0.6]);
+      g.put(cylinder(0.015, 0.015, 0.3, 6), [sx - 1.1, 2.7, bz + 0.65], [0, 0, Math.PI / 2], 1, [0.75, 0.75, 0.77]);
+      g.put(rbox(0.45, 0.2, 0.25, 0.03), [sx + 0.2, 2.72, bz - 0.15], [0, 0.3, 0], 1, [0.85, 0.6, 0.1]); // caixa de ferramentas
+      // estante de aço do depósito: montantes perfurados, 4 prateleiras com caixas e latas
+      const ex = sx + 3.6, ez = sz + 1.5;
+      for (const z of [-1.45, 1.45]) for (const x of [-0.42, 0.42]) g.put(box(0.06, 3.1, 0.06), [ex + x, 3.1, ez + z], [0, 0, 0], 1, [0.25, 0.4, 0.6]);
+      for (let k = 0; k < 4; k++) { g.put(rbox(0.9, 0.04, 3, 0.01), [ex, 1.75 + k * 0.95, ez], [0, 0, 0], 1, [0.55, 0.57, 0.6]); g.put(box(0.9, 0.06, 0.03), [ex, 1.72 + k * 0.95, ez + 1.47], [0, 0, 0], 1, [0.9, 0.5, 0.1]); }
+      for (let k = 0; k < 9; k++) { const sh = k % 3, iz = (k * 0.37) % 1; g.put(rbox(0.5, 0.35, 0.45, 0.02), [ex, 1.95 + sh * 0.95 + 0.0, ez - 1.1 + iz * 2.2], [0, (k % 2) * 0.2, 0], 1, [0.55 + (k % 3) * 0.05, 0.42, 0.28]); }
+      for (let k = 0; k < 6; k++) g.put(cylinder(0.1, 0.1, 0.26, 10), [ex + 0.1, 4.75 - 0.95 + 0.15, ez - 1.2 + k * 0.45], [0, 0, 0], 1, [[0.2, 0.4, 0.7], [0.75, 0.2, 0.1], [0.85, 0.75, 0.2]][k % 3]);
+    }
+    // terminal (quiosque de compra e venda): gabinete de aço com portinha, teclado inclinado, monitor com
+    // moldura, leitor de cartão e uma cobertura
+    {
+      const kg = new Geo(), AZ = [0.2, 0.28, 0.36], AZE = [0.14, 0.19, 0.25];
+      kg.put(rbox(1.3, 0.12, 0.8, 0.03), [0, 0.06, 0], [0, 0, 0], 1, [0.3, 0.3, 0.32]);
+      kg.put(rbox(1.1, 1.0, 0.62, 0.06), [0, 0.62, 0], [0, 0, 0], 1, AZ);
+      kg.put(rbox(0.86, 0.7, 0.03, 0.02), [0, 0.6, 0.31], [0, 0, 0], 1, AZE); // portinha
+      kg.put(rbox(0.04, 0.16, 0.04, 0.01), [0.34, 0.62, 0.335], [0, 0, 0], 1, [0.75, 0.75, 0.78]); // puxador
+      for (const s of [-1, 1]) for (let k = 0; k < 6; k++) kg.put(box(0.01, 0.025, 0.36), [s * 0.555, 0.45 + k * 0.06, 0], [0, 0, 0], 1, [0.08, 0.1, 0.13]); // ventilação
+      kg.put(rbox(1.15, 0.06, 0.45, 0.02), [0, 1.15, 0.24], [0.28, 0, 0], 1, [0.18, 0.2, 0.22]); // apoio do teclado
+      for (let i = 0; i < 12; i++) for (let j = 0; j < 4; j++) kg.put(rbox(0.055, 0.02, 0.05, 0.008), [-0.33 + i * 0.06, 1.19 - j * 0.017, 0.18 + j * 0.06], [0.28, 0, 0], 1, j === 3 && i > 2 && i < 9 ? [0.85, 0.85, 0.85] : [0.88, 0.89, 0.9]);
+      kg.put(rbox(0.16, 0.03, 0.1, 0.01), [0.42, 1.19, 0.3], [0.28, 0, 0], 1, [0.1, 0.1, 0.1]); // leitor de cartão
+      kg.put(box(0.1, 0.005, 0.02), [0.42, 1.21, 0.29], [0.28, 0, 0], 1, [0.2, 0.8, 0.3]);
+      kg.put(box(0.12, 0.45, 0.1), [0, 1.42, -0.12], [0, 0, 0], 1, AZE); // haste
+      kg.put(rbox(1.02, 0.74, 0.14, 0.04), [0, 1.9, -0.05], [-0.22, 0, 0], 1, [0.12, 0.13, 0.15]); // monitor
+      kg.put(rbox(0.6, 0.25, 0.1, 0.03), [0, 1.85, -0.16], [-0.22, 0, 0], 1, [0.1, 0.11, 0.12]); // traseira
+      for (const s of [-1, 1]) kg.put(cylinder(0.03, 0.03, 1.2, 8), [s * 0.6, 1.85, -0.38], [0, 0, 0], 1, [0.4, 0.42, 0.45]); // postes da cobertura
+      kg.put(rbox(1.5, 0.05, 0.9, 0.02), [0, 2.48, -0.02], [-0.12, 0, 0], 1, [0.85, 0.55, 0.1]); // cobertura
+      kg.put(box(1.5, 0.12, 0.03), [0, 2.42, 0.42], [0, 0, 0], 1, [0.85, 0.55, 0.1]);
+      g.k = MAT.PINTADO; g.put(kg, [-4, 1.55, 9], [0, 0.4, 0]);
+    }
     // caixa d'água/postes
     g.k = MAT.MADEIRA;
     g.put(cylinder(0.12, 0.12, 6, 8), [-15.5, 4.5, -11.5], [0, 0, 0], 1, WOOD_DK);
@@ -248,7 +330,8 @@ export class Station {
     const sn = new Node('estrutura'); sn.mesh = R.createMesh(g, { rough: 0.85, metal: 0.05, rust: 0.45 });
     this.root.add(sn);
     // tela do terminal (emissiva)
-    const tg = new Geo(); tg.put(box(0.85, 0.55, 0.02), [-4, 3.42, 9.22], [-0.25, 0.4, 0], 1, [0.2, 0.8, 0.9]);
+    const tg0 = new Geo(); tg0.put(box(0.88, 0.58, 0.01), [0, 1.9, 0.025], [-0.22, 0, 0], 1, [0.2, 0.8, 0.9]);
+    const tg = new Geo(); tg.put(tg0, [-4, 1.55, 9], [0, 0.4, 0]);
     const tn = new Node('tela_terminal'); tn.mesh = R.createMesh(tg, { emissive: [0.25, 0.75, 0.9], glow: 1.4, castShadow: false }); this.root.add(tn);
     // placa da estação
     this.sign = null;
@@ -309,23 +392,57 @@ export class Station {
     const pivot = new Node('guindaste').at(this.xPivot, 1.9, this.zPivot);
     this.root.add(pivot);
     const g = new Geo();
-    g.put(cylinder(0.45, 0.55, 7.5, 14), [0, 3.75, 0], [0, 0, 0], 1, YEL);
-    g.put(rbox(1.4, 1.2, 1.6, 0.1), [0, 7.4, -0.4], [0, 0, 0], 1, YEL);
-    g.put(rbox(0.9, 0.7, 0.05, 0.03), [0, 7.5, 0.42], [0, 0, 0], 1, [0.2, 0.3, 0.35]);
+    // coluna: tubo de aço com anéis de reforço, escada de marinheiro e plataforma giratória
+    g.put(cylinder(0.75, 0.75, 0.12, 24), [0, 0.06, 0], [0, 0, 0], 1, [0.3, 0.3, 0.32]); // flange da base
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; g.put(cylinder(0.05, 0.05, 0.12, 6), [Math.cos(a) * 0.62, 0.16, Math.sin(a) * 0.62], [0, 0, 0], 1, [0.2, 0.2, 0.2]); } // parafusos
+    g.put(cylinder(0.42, 0.52, 7.2, 20), [0, 3.7, 0], [0, 0, 0], 1, YEL);
+    for (const y of [1.5, 3.2, 4.9, 6.6]) g.put(torus(0.47 - y * 0.008, 0.035, 20, 6), [0, y, 0], [0, 0, 0], 1, YEL.map((c) => c * 0.85));
+    for (const sx of [-1, 1]) g.put(cylinder(0.025, 0.025, 6.6, 6), [sx * 0.18, 3.7, -0.52], [0, 0, 0], 1, [0.3, 0.3, 0.32]); // escada
+    for (let y = 0.6; y < 6.9; y += 0.32) g.put(cylinder(0.018, 0.018, 0.36, 6), [0, y, -0.52], [0, 0, Math.PI / 2], 1, [0.3, 0.3, 0.32]);
+    g.put(cylinder(0.75, 0.75, 0.25, 24), [0, 7.35, 0], [0, 0, 0], 1, [0.25, 0.25, 0.27]); // coroa de giro
+    g.put(torus(0.75, 0.04, 24, 6), [0, 7.35, 0], [0, 0, 0], 1, [0.15, 0.15, 0.15]);
     const col = new Node('coluna'); col.mesh = R.createMesh(g, { rough: 0.55, metal: 0.4, kind: MAT.PINTADO, rust: 0.35 }); pivot.add(col);
     const arm = new Node('lanca').at(0, 7.8, 0); pivot.add(arm);
     const ag = new Geo();
-    // treliça da lança
     const L = this.boom;
-    for (const s of [-1, 1]) for (const y of [-0.25, 0.25]) ag.put(cylinder(0.06, 0.06, L, 8), [s * 0.25, y, L / 2], [Math.PI / 2, 0, 0], 1, YEL);
-    for (let k = 0; k < L; k += 0.9) for (const s of [-1, 1]) ag.put(cylinder(0.03, 0.03, 0.62, 6), [s * 0.25, 0, k], [0.0, 0, 0], 1, YEL);
-    ag.put(cylinder(0.25, 0.25, 0.6, 12), [0, 0, L], [0, 0, Math.PI / 2], 1, METAL); // polia
-    ag.put(rbox(0.9, 0.9, 1.4, 0.1), [0, 0.1, -1.0], [0, 0, 0], 1, CONC); // contrapeso
+    // cabine do operador (gira com a lança): janelas, porta, guarda-corpo
+    ag.put(rbox(1.3, 1.1, 1.4, 0.08), [0.9, -0.15, -0.3], [0, 0, 0], 1, YEL);
+    ag.put(box(1.32, 0.5, 1.0), [0.9, 0.05, -0.15], [0, 0, 0], 1, [0.2, 0.32, 0.4]); // vidros
+    for (const z of [-0.55, 0.0, 0.35]) ag.put(box(1.34, 0.52, 0.04), [0.9, 0.05, z], [0, 0, 0], 1, YEL);
+    ag.put(rbox(1.4, 0.08, 1.5, 0.02), [0.9, 0.44, -0.3], [0, 0, 0], 1, [0.2, 0.2, 0.22]); // teto
+    ag.put(cylinder(0.08, 0.08, 0.06, 10), [0.9, 0.5, -0.1], [0, 0, 0], 1, [1, 0.5, 0.1]); // giroflex
+    // treliça da lança: 4 banzos que afinam na ponta, montantes e diagonais em zigue-zague
+    const banzo = (s, y, t) => [s * (0.3 - 0.12 * t), y * (1 - 0.35 * t), t * L];
+    const barra = (p0, p1, r) => ag.add(tube([p0, p1], r, 6), null, YEL);
+    for (const s of [-1, 1]) for (const y of [-0.32, 0.32]) barra(banzo(s, y, 0), banzo(s, y, 1), 0.055);
+    const nSeg = Math.max(4, Math.round(L / 0.9));
+    for (let k = 0; k <= nSeg; k++) {
+      const t = k / nSeg;
+      for (const s of [-1, 1]) barra(banzo(s, -0.32, t), banzo(s, 0.32, t), 0.025);
+      for (const y of [-0.32, 0.32]) barra(banzo(-1, y, t), banzo(1, y, t), 0.025);
+      if (k < nSeg) { const t2 = (k + 1) / nSeg; for (const s of [-1, 1]) barra(banzo(s, k % 2 ? 0.32 : -0.32, t), banzo(s, k % 2 ? -0.32 : 0.32, t2), 0.02); barra(banzo(-1, 0.32, t), banzo(1, 0.32, t2), 0.018); }
+    }
+    // cabeça da lança com polia de verdade (aro + raios)
+    ag.put(rbox(0.5, 0.5, 0.4, 0.05), [0, 0, L], [0, 0, 0], 1, YEL.map((c) => c * 0.9));
+    ag.put(torus(0.22, 0.05, 20, 8), [0, -0.05, L + 0.15], [0, 0, Math.PI / 2], 1, METAL);
+    for (let k = 0; k < 6; k++) ag.put(box(0.02, 0.4, 0.03), [0, -0.05, L + 0.15], [k * Math.PI / 3, 0, 0], 1, METAL);
+    ag.put(cylinder(0.04, 0.04, 0.5, 8), [0, -0.05, L + 0.15], [0, 0, Math.PI / 2], 1, [0.2, 0.2, 0.2]);
+    // contrapeso de concreto com faixas de advertência
+    ag.put(rbox(1.1, 0.9, 1.4, 0.06), [0, 0.0, -1.3], [0, 0, 0], 1, CONC);
+    for (let k = 0; k < 6; k++) ag.put(box(0.2, 0.92, 0.02), [-0.45 + k * 0.18, 0.0, -2.01], [0, 0, 0.6], [1, 1, 1], k % 2 ? [0.1, 0.1, 0.1] : [0.95, 0.75, 0.1]);
+    // cabos tensores do topo até a ponta
+    ag.put(box(0.25, 0.9, 0.25), [0, 0.75, -0.2], [0, 0, 0], 1, YEL); // torre de tensão
+    for (const s of [-1, 1]) { ag.add(tube([[s * 0.08, 1.2, -0.2], [s * 0.15, 0.32, L]], 0.012, 4), null, [0.15, 0.15, 0.15]); ag.add(tube([[s * 0.08, 1.2, -0.2], [s * 0.3, 0.4, -1.9]], 0.012, 4), null, [0.15, 0.15, 0.15]); }
     arm.mesh = R.createMesh(ag, { rough: 0.55, metal: 0.4, kind: MAT.PINTADO, rust: 0.35 });
     const hook = new Node('gancho');
     const hg = new Geo();
-    hg.put(rbox(0.4, 0.4, 0.3, 0.05), [0, 0, 0], [0, 0, 0], 1, METAL);
-    hg.put(torus(0.18, 0.05, 14, 8), [0, -0.38, 0], [0, 0, Math.PI / 2], 1, [0.3, 0.3, 0.3]);
+    // moitão: caixa com polias, olhal giratório e gancho forjado com trava de segurança
+    hg.put(rbox(0.42, 0.46, 0.26, 0.05), [0, 0.05, 0], [0, 0, 0], 1, [0.95, 0.72, 0.1]);
+    for (const s of [-1, 1]) hg.put(cylinder(0.16, 0.16, 0.03, 16), [s * 0.12, 0.12, 0.135], [Math.PI / 2, 0, 0], 1, [0.35, 0.35, 0.37]);
+    hg.put(cylinder(0.05, 0.05, 0.14, 10), [0, -0.24, 0], [0, 0, 0], 1, [0.3, 0.3, 0.32]);
+    const gancho = []; for (let k = 0; k <= 14; k++) { const a = -0.3 + (k / 14) * 4.1; gancho.push([Math.sin(a) * 0.17, -0.48 - Math.cos(a) * 0.17 + (k === 0 ? 0.12 : 0), 0]); }
+    hg.add(tube(gancho, 0.045, 8, (t) => 0.05 - t * 0.022), null, [0.25, 0.25, 0.27]);
+    hg.add(tube([[0.05, -0.33, 0], [0.16, -0.5, 0]], 0.012, 4), null, [0.85, 0.15, 0.1]); // trava
     hook.mesh = R.createMesh(hg, { rough: 0.4, metal: 0.8, kind: MAT.METAL });
     this.root.add(hook);
     const cable = new Node('cabo');
@@ -390,12 +507,34 @@ export class Station {
       g.put(cylinder(0.28, 0.22, 0.45, 14), [bx - 0.1, 1.83, bz - 1.75], [0, 0, 0], 1, [0.25, 0.45, 0.75]); // balde
       g.put(sphere(0.25, 10, 6), [bx - 0.1, 2.02, bz - 1.75], [0, 0, 0], [1, 0.35, 1], [0.9, 0.95, 1]); // gelo
       g.put(rbox(0.06, 0.9, 1.6, 0.02), [bx - 0.6, 3.0, bz], [0, 0, 0], 1, [0.78, 0.8, 0.82]); // espelho de inox atrás
+      g.put(box(0.03, 0.06, 2.6), [bx + 0.55, 2.47, bz], [0, 0, 0], 1, [0.7, 0.72, 0.75]); // borda (aba de escorrer)
+      for (const sx of [-0.45, 0.45]) for (const sz of [-1.15, 1.15]) g.put(cylinder(0.07, 0.07, 0.03, 10), [bx + sx, 1.545, bz + sz], [0, 0, 0], 1, [0.2, 0.2, 0.2]); // sapatas
+      g.put(cylinder(0.025, 0.025, 0.35, 8), [bx - 0.5, 3.1, bz - 0.9], [0, 0, 0], 1, [0.75, 0.77, 0.8]); // torneira
+      g.put(cylinder(0.02, 0.02, 0.2, 8), [bx - 0.42, 3.26, bz - 0.9], [0, 0, Math.PI / 2], 1, [0.75, 0.77, 0.8]);
+      g.put(cylinder(0.03, 0.03, 0.04, 8), [bx - 0.5, 3.3, bz - 0.9], [0, 0, 0], 1, [0.2, 0.4, 0.85]);
+      g.put(rbox(0.25, 0.06, 0.12, 0.02), [bx - 0.35, 2.52, bz - 1.05], [0, 0.2, 0], 1, [0.25, 0.55, 0.3]); // escova
+      for (let k = 0; k < 3; k++) g.put(cylinder(0.012, 0.012, 0.08, 6), [bx - 0.5, 3.2, bz + 0.4 + k * 0.25], [0, 0, Math.PI / 2], 1, [0.3, 0.3, 0.32]); // ganchos
+      g.put(box(0.02, 0.3, 0.05), [bx - 0.46, 3.0, bz + 0.65], [0, 0, 0], 1, [0.85, 0.87, 0.9]); // cutelo pendurado
     }
     if (est?.restauro) {
-      g.put(rbox(2.2, 0.1, 1.0, 0.03), [-13, 2.45, -2.5], [0, Math.PI / 2, 0], 1, [0.5, 0.38, 0.25]);
-      for (const z of [-0.9, 0.9]) g.put(box(0.1, 0.9, 0.9), [-13, 1.95, -2.5 + z], [0, 0, 0], 1, METAL);
-      g.put(cylinder(0.04, 0.04, 0.8, 6), [-13.3, 2.9, -3.2], [0, 0, 0.4], 1, METAL);
-      g.put(lathe([[0, 0], [0.18, 0.02], [0.12, 0.15]], 10), [-13.45, 3.3, -3.2], [Math.PI, 0, 0], 1, [0.8, 0.75, 0.2]);
+      // bancada de restauro: tampo de madeira com cantoneira de aço, pés com travessas, prateleira com latas
+      // de tinta, luminária articulada, pincéis num pote, lixa e um pano
+      const rx = -13, rz = -2.5;
+      g.put(rbox(1.0, 0.09, 2.2, 0.02), [rx, 2.45, rz], [0, 0, 0], 1, [0.56, 0.42, 0.28]);
+      g.put(box(0.04, 0.1, 2.22), [rx + 0.5, 2.44, rz], [0, 0, 0], 1, [0.35, 0.36, 0.38]);
+      for (const x of [-0.42, 0.42]) for (const z of [-0.98, 0.98]) g.put(box(0.07, 0.88, 0.07), [rx + x, 1.98, rz + z], [0, 0, 0], 1, [0.3, 0.32, 0.35]);
+      for (const z of [-0.98, 0.98]) g.put(box(0.84, 0.05, 0.05), [rx, 1.72, rz + z], [0, 0, 0], 1, [0.3, 0.32, 0.35]);
+      g.put(rbox(0.9, 0.04, 2.0, 0.01), [rx, 1.75, rz], [0, 0, 0], 1, [0.5, 0.38, 0.25]);
+      for (let k = 0; k < 4; k++) g.put(cylinder(0.09, 0.09, 0.18, 12), [rx + 0.1, 1.86, rz - 0.6 + k * 0.38], [0, 0, 0], 1, [[0.8, 0.2, 0.15], [0.2, 0.45, 0.8], [0.95, 0.8, 0.2], [0.25, 0.6, 0.3]][k]);
+      // luminária articulada
+      g.put(cylinder(0.09, 0.1, 0.03, 12), [rx - 0.3, 2.51, rz - 0.85], [0, 0, 0], 1, [0.2, 0.2, 0.22]);
+      g.add(tube([[rx - 0.3, 2.52, rz - 0.85], [rx - 0.25, 2.95, rz - 0.7], [rx + 0.05, 3.05, rz - 0.45]], 0.015, 6), null, [0.2, 0.2, 0.22]);
+      g.put(lathe([[0.02, 0], [0.11, -0.1], [0.12, -0.12]], 14), [rx + 0.08, 3.05, rz - 0.42], [0.5, 0, -0.4], 1, [0.85, 0.7, 0.15]);
+      // pote com pincéis, lixa e pano
+      g.put(cylinder(0.06, 0.05, 0.14, 10), [rx - 0.25, 2.56, rz + 0.75], [0, 0, 0], 1, [0.6, 0.6, 0.62]);
+      for (let k = 0; k < 4; k++) g.put(cylinder(0.008, 0.008, 0.24, 5), [rx - 0.25 + (k - 1.5) * 0.02, 2.68, rz + 0.75], [0, 0, (k - 1.5) * 0.12], 1, [0.6, 0.4, 0.2]);
+      g.put(rbox(0.12, 0.04, 0.08, 0.01), [rx + 0.15, 2.52, rz + 0.5], [0, 0.4, 0], 1, [0.75, 0.55, 0.3]);
+      g.put(sphere(0.1, 8, 5), [rx + 0.2, 2.52, rz + 0.1], [0, 0, 0], [1.3, 0.25, 1], [0.85, 0.3, 0.25]);
     }
     if (est?.carregador) g.put(rbox(0.5, 0.3, 0.3, 0.05), [3.2, 3.0, this.zCradle - 1], [0, 0, 0], 1, [0.2, 0.9, 0.4]);
     if (est?.decoracao) {
@@ -536,7 +675,11 @@ export class Station {
       this.aqBox = { x, y: baseY + r * 0.45, z, w: r * 0.9, h: r * 0.7, d: r * 0.9 };
     } else {
       const madeira = est === 'corais' ? [0.15, 0.17, 0.2] : [0.3, 0.22, 0.16];
-      g.put(rbox(w + 0.2, standH, d + 0.15, 0.04), [x, 1.55 + standH / 2, z], [0, 0, 0], 1, madeira);
+      // móvel do aquário: rodapé, duas portinhas com puxador, tampo com friso
+      g.put(rbox(w + 0.2, standH - 0.08, d + 0.15, 0.03), [x, 1.59 + (standH - 0.08) / 2, z], [0, 0, 0], 1, madeira);
+      g.put(rbox(w + 0.14, 0.08, d + 0.09, 0.02), [x, 1.59, z], [0, 0, 0], 1, madeira.map((c) => c * 0.7));
+      g.put(rbox(w + 0.26, 0.05, d + 0.21, 0.02), [x, baseY - 0.025, z], [0, 0, 0], 1, madeira.map((c) => c * 1.2));
+      for (const s2 of [-1, 1]) { g.put(rbox((w + 0.1) / 2 - 0.04, standH - 0.25, 0.02, 0.01), [x + s2 * (w + 0.1) / 4, 1.55 + standH / 2, z + (d + 0.15) / 2 + 0.005], [0, 0, 0], 1, madeira.map((c) => c * 1.12)); g.put(cylinder(0.012, 0.012, 0.1, 6), [x + s2 * 0.06, 1.55 + standH * 0.62, z + (d + 0.15) / 2 + 0.03], [0, 0, 0], 1, [0.75, 0.72, 0.6]); }
       g.put(rbox(w + 0.06, 0.05, d + 0.06, 0.01), [x, baseY + 0.02, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]);
       g.put(rbox(w + 0.06, 0.06, d + 0.06, 0.01), [x, baseY + h + 0.03, z], [0, 0, 0], 1, [0.1, 0.1, 0.1]);
       // fundo: areia clara (corais), substrato escuro (plantado) ou cascalho
@@ -574,7 +717,7 @@ export class Station {
       const gn = new Node('aquario_vidro'); gn.mesh = R.createMesh(gg, { opacity: 0.12, rough: 0.02, castShadow: false, doubleSide: true }); this.dyn.add(gn);
       // etiqueta de capacidade
       const lab = textQuad(R, [`${t.nome} [${aq.peixes.length}/${t.vagas}]`, `até ${t.maxCm} cm`], Math.min(1.8, Math.max(1.1, w)), 0.45, { px: 384 });
-      lab.at(x, 1.55 + standH * 0.55, z + d / 2 + 0.09); this.dyn.add(lab);
+      lab.at(x, 1.55 + standH * 0.55, z + d / 2 + 0.115); this.dyn.add(lab);
       this.aqBox = { x, y: baseY + 0.12, z, w: w - 0.1, h: h * 0.8 - 0.15, d: d - 0.1 };
     }
     for (const f of aq.peixes) {

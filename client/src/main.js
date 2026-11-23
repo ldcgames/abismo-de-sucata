@@ -541,8 +541,9 @@ class Game {
     // gesto/dança: termina ao andar ou depois de um tempo (sentado fica até mexer)
     if (this.me.emote) {
       this.me.emote.t += dt;
-      const andando = Math.hypot(this.me.vel[0], this.me.vel[2]) > 0.6 || this.me.modo !== 'terra' || this.pesca.estado !== 'off' || this.me.mirando;
-      if (andando || (this.me.emote.i !== 2 && this.me.emote.t > [2.2, 6, 0, 2.6, 6, 8][this.me.emote.i])) this.me.emote = null;
+      const sentado = this.me.emote.i === 2; // sentado na cadeira dá para pescar
+      const andando = Math.hypot(this.me.vel[0], this.me.vel[2]) > 0.6 || this.me.modo !== 'terra' || (this.pesca.estado !== 'off' && !sentado) || this.me.mirando || (sentado && (this.perfil.mao || this.me.arma));
+      if (andando || (this.me.emote.i !== 2 && this.me.emote.t > [2.2, 8, 0, 2.6, 6, 8, 1.3][this.me.emote.i])) this.me.emote = null;
     }
     // ação temporizada do personagem
     if (this.me.acao) { this.me.acao.t += dt; if (this.me.acao.t > this.me.acao.dur) this.me.acao = null; }
@@ -554,7 +555,7 @@ class Game {
     ch.root.at(this.me.pos[0], this.me.pos[1], this.me.pos[2]).rot(0, this.me.yaw, 0);
     if (this.me.modo !== 'terra' || p.mao || this.me.arma) this.me.mirandoLixo = false;
     this.me.segura = p.mao ? (ESPECIES[p.mao.esp].pesado ? 'tubarao' : this.me.mirando ? 'mira' : 'peixe') : this.me.mirandoLixo ? 'mira' : p.lixoMao ? 'peixe' : this.pesca.estado !== 'off' ? 'vara' : this.me.arma && (this.me.modo === 'terra') ? 'arma' : null;
-    ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
+    ch.update(dt, { speed: this.me.modo === 'terra' ? speedH : 0, grounded: this.me.modo === 'entrando' ? false : this.me.grounded, mode: this.me.modo === 'entrando' ? 'terra' : this.me.modo, segura: this.me.segura, acao: this.me.acao || (this.pesca.estado === 'brigando' ? { tipo: 'recolher', t: 0 } : null), atordoado: stunned ? 1 : 0, tubarao: this.me.stunTub, emote: this.me.escorrega ? { i: 2, t: this.me.escorrega.t } : this.me.emote, escorrega: !!this.me.escorrega, miraPitch: this.me.vPitch || 0, coice: this.coice || 0 });
     this.coice = damp(this.coice || 0, 0, 14, dt);
     this.updateArmaMao(ch, this.me.modo === 'terra' ? this.me.arma : null);
     this.desenharMira((this.me.mirando && !!this.perfil.mao || this.me.mirandoLixo) && this.me.modo === 'terra');
@@ -1117,7 +1118,7 @@ class Game {
   // ------------------------------------------------------------ roda de emotes
   updateRoda(dt, livre) {
     const R = this.roda, I = this.input, el = $('rodaEmotes');
-    const NOMES = [['👍', 'Joinha'], ['💃', 'Dança'], ['🪑', 'Sentar'], ['👋', 'Acenar'], ['🤖', 'Robô'], ['🌀', 'Breakdance']];
+    const NOMES = [['👍', 'Joinha'], ['💃', 'Dança'], ['🪑', 'Sentar'], ['👋', 'Acenar'], ['🤖', 'Robô'], ['🌀', 'Breakdance'], ['🤸', 'Mortal']];
     const NF = NOMES.length;
     if (!el.dataset.ok) {
       el.dataset.ok = 1;
@@ -1741,7 +1742,7 @@ class Game {
       const segura = r.mao ? (ESPECIES[r.mao.esp]?.pesado ? 'tubarao' : r.anim === 'mira' ? 'mira' : 'peixe') : r.pescaVis ? 'vara' : r.arma && r.modo === 'terra' ? 'arma' : null;
       const em = r.anim === 'escorrega' ? [0, 2] : /^emote(\d)$/.exec(r.anim || '');
       if (em) { if (!r.emote || r.emote.i !== +em[1]) r.emote = { i: +em[1], t: 0 }; r.emote.t += dt; } else r.emote = null;
-      ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote });
+      ch.update(dt, { speed: r.modo === 'terra' ? r.spd : 0, grounded: true, mode: r.modo, segura, acao: null, atordoado: r.atordoado > 0 ? 1 : 0, tubarao: false, emote: r.emote, escorrega: r.anim === 'escorrega' });
       this.updateHeld(ch, r.mao, slot);
       this.updateLixoMao(ch, r.modo === 'terra' ? r.lixo : null);
       this.updateArmaMao(ch, r.modo === 'terra' ? r.arma : null);

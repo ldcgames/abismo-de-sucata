@@ -106,6 +106,16 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v1.0 (modelagem)
+
+- **Sentar** agora abre uma cadeira de praia dobrável (alumínio + lona listrada na cor do jogador). Dá para **pescar sentado**: sente, depois aperte F.
+- Nova dança: **Mortal** (agacha, salta girando encolhido e aterrissa).
+- Animações: pé com tornozelo (rola do calcanhar para a ponta, fica plano no chão), quadril girando com o contrapeso do peito, respiração e troca de peso parado, olhar em volta; dança nova no tempo (120 bpm, 8 tempos); robô com poses travadas.
+- Oficina refeita: mureta de concreto, fechamento em telha ondulada, pilares e tesouras de aço, telhado de uma água inclinado com beiral, rufo, calha e cano de descida, luminárias; painel de ferramentas perfurado, bancada com gaveteiro e morsa, estante de aço com caixas e latas.
+- Computador: quiosque com gabinete, portinha, ventilação, teclado inclinado, leitor de cartão, monitor com moldura e cobertura.
+- Guindaste: flange com parafusos, anéis de reforço, escada, coroa de giro, cabine do operador, lança em treliça que afina na ponta, polia com raios, contrapeso com faixas de advertência, cabos tensores e moitão com gancho forjado.
+- Bancada de restauro e bancada de peixe com mais detalhes; móvel do aquário com portinhas e puxadores.
+
 ## Novidades da v0.9.9
 
 - O lixo atirado com o estilingue **fica onde caiu** (perto da árvore, no chão, no pé do amigo que levou o tiro) e dá para catar de novo. Só some se cair na água (ou acertar o Kraken/tubarão). Esse lixo não gera outro novo quando é catado, então a margem não enche demais.
