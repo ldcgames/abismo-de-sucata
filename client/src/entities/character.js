@@ -4,6 +4,7 @@
 import { Geo, sphere, capsule, cylinder, rbox, torus, lathe, tube, box, MAT } from '../engine/geometry.js';
 import { Node } from '../engine/renderer.js';
 import { loft, suavizar, ruido } from '../engine/organico.js';
+import { vestirPescador } from './pescador.js';
 import { damp, clamp } from '../engine/math.js';
 import { CORES_JOGADOR } from '../../shared/data.js';
 
@@ -209,6 +210,8 @@ export class Character {
       this.root.add(this.cadeira);
     }
     this.phase = 0; this.t = 0;
+    // aparência: o pescador com boia de pato (modelo do usuário)
+    try { vestirPescador(this, R); } catch (e) { console.error('pescador', e); }
     this.pose = {}; // ângulos suavizados
     this.state = { speed: 0, grounded: true, mode: 'idle', action: null, actionT: 0 };
   }
@@ -381,7 +384,7 @@ export class Character {
     if (stun) this.stars.rot(0, this.t * 6, 0);
     // aplica com suavização
     const r = 14;
-    this.hips.at(0, P('hy', hipsY, stun ? rQueda : flip !== null ? 40 : r), 0);
+    this.hips.at(0, P('hy', hipsY * (this.kQuadril || 1), stun ? rQueda : flip !== null ? 40 : r), 0);
     // giro do breakdance (direto, sem suavizar para não "desenrolar" o ângulo)
     if (flip !== null && !stun) { this.pose.hp = flip; this.hips.rot(flip, P('hyw', hipsYaw, r), P('hr', hipsRoll, r)); }
     else this.hips.rot(P('hp', hipsPitch, stun ? rQueda : st.emote?.i === 5 ? 10 : 8), spin || P('hyw', hipsYaw, r), P('hr', hipsRoll, r));

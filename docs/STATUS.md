@@ -1,5 +1,13 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v1.2: personagem pescador
+
+- O boneco agora é o **pescador com boia de pato** (modelo do usuário feito no Meshy AI), com a textura original.
+- Malha reduzida de 1,57 milhão para ~37 mil triângulos e textura de 4K para 2K, para o jogo continuar leve.
+- Esqueleto de 17 ossos ligado às animações do jogo com **pele deformável na GPU** (skinning): anda, corre, dança, robô, breakdance, mortal, senta na cadeira (mais larga, do tamanho dele), pesca, segura peixe e arma, cai quando leva tiro.
+- A boia de pato fica presa no quadril; o chapéu acompanha a cabeça.
+- Pipeline em `tools/pescador/`.
+
 ## Novidades da v1.1 (modelagem natural)
 
 - **Boneco refeito** com formas orgânicas (seções elípticas suavizadas em vez de esferas e cápsulas): proporções de gente de verdade (cabeça ~1/7,5 da altura), rosto com nariz, maçãs, queixo e boca esculpidos na própria cabeça, olhos com pálpebra, orelhas, cabelo curto com fios, boné na cor do jogador, jaqueta de trabalho aberta com camiseta, bolsos e gola, mochila de lona, calça jeans com cinto e bolso cargo, botas de couro com cadarço e sola com cravos, mãos de pele com dedos de verdade. Tons de pele mais naturais.

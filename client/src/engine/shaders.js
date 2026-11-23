@@ -17,6 +17,10 @@ layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(locatio
 #ifdef INST
 layout(location=4) in mat4 aInst; layout(location=8) in vec4 aInstCol;
 #endif
+#ifdef SKIN
+layout(location=9) in vec4 aJoint; layout(location=10) in vec4 aWeight;
+uniform mat4 uBones[24];
+#endif
 uniform mat4 uModel, uViewProj; uniform float uTime, uWind, uSwim;
 out vec3 vW; out vec3 vN; out vec4 vC; out vec3 vL; out vec4 vUv;
 void main(){
@@ -31,6 +35,10 @@ void main(){
     float sw = sin(uTime * (7.0 * uSwim) + p.z * 5.0 + ph) * 0.11 * tail * tail;
     p.x += sw; n.x -= sw * 0.6;
   }
+#ifdef SKIN
+  mat4 Sk = uBones[int(aJoint.x)] * aWeight.x + uBones[int(aJoint.y)] * aWeight.y + uBones[int(aJoint.z)] * aWeight.z + uBones[int(aJoint.w)] * aWeight.w;
+  p = (Sk * vec4(p, 1.)).xyz; n = mat3(Sk) * n;
+#endif
   vec4 w = M * vec4(p, 1.);
   if (uWind > 0.) {
     float k = col.a; // peso do vento no alfa do vértice
@@ -45,7 +53,7 @@ void main(){
 export const STD_FS = /* glsl */`#version 300 es
 ${COMMON}
 in vec3 vW; in vec3 vN; in vec4 vC; in vec3 vL; in vec4 vUv;
-uniform sampler2D uNoise, uBark, uBarkN, uLeaf, uWood; uniform float uKind, uRust, uTexScale;
+uniform sampler2D uNoise, uBark, uBarkN, uLeaf, uWood, uAlbedo; uniform float uKind, uRust, uTexScale, uHasTex;
 uniform vec3 uColor, uEmissive; uniform float uRough, uMetal, uOpacity, uTime, uExpo, uDouble, uCaust, uGlow, uVE;
 uniform vec3 uCamPos, uSunDir, uSunCol, uSkyAmb, uGndAmb;
 uniform float uUnder; uniform vec3 uWFogCol; uniform float uWFogDen;
@@ -91,6 +99,7 @@ void main(){
   float kind = uKind >= 0. ? uKind : floor(vUv.z + 0.5);
 #endif
   vec3 base = toLin(uColor * vC.rgb);
+  if (uHasTex > 0.5) base = toLin(texture(uAlbedo, vUv.xy).rgb * uColor * vC.rgb);
   vec3 N = normalize(vN);
   if ((uDouble > .5 || kind > 8.5 && kind < 9.5) && !gl_FrontFacing) N = -N;
   vec3 V = normalize(uCamPos - vW);

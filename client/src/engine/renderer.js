@@ -24,6 +24,8 @@ export class Node {
   worldPos(o = [0, 0, 0]) { o[0] = this.world[12]; o[1] = this.world[13]; o[2] = this.world[14]; return o; }
 }
 
+const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
 export class Renderer {
   constructor(canvas, opts = {}) {
     this.canvas = canvas;
@@ -72,7 +74,12 @@ export class Renderer {
     return { p, loc: (n) => { if (!locs.has(n)) locs.set(n, gl.getUniformLocation(p, n)); return locs.get(n); } };
   }
   // programa especializado por material (sem ramificações no shader); compilado sob demanda
-  stdProg(inst, kind) {
+  stdProg(inst, kind, skin = false) {
+    if (skin) {
+      const nome = skin === 'depth' ? 'depthS' : 'stdS';
+      if (!this.progs[nome]) this.progs[nome] = this.program(S.STD_VS.replace('#version 300 es', '#version 300 es\n#define SKIN\n'), (skin === 'depth' ? S.DEPTH_FS : S.STD_FS).replace('#version 300 es', '#version 300 es\n#define SKIN\n'));
+      return nome;
+    }
     if (kind === undefined || kind === null || kind < 0) return inst ? 'stdI' : 'std';
     const nome = (inst ? 'stdI_k' : 'std_k') + kind;
     if (!this.progs[nome]) {
@@ -99,6 +106,7 @@ export class Renderer {
     mesh.bufs.c = buf(new Float32Array(geo.c), 2, 4);
     const uvSrc = geo.u && geo.u.length ? geo.u : geo.uv && geo.uv.length ? geo.uv : null;
     mesh.bufs.uv = buf(uvSrc ? new Float32Array(uvSrc) : new Float32Array((geo.p.length / 3) * 4), 3, 4);
+    if (geo.j && geo.w) { mesh.bufs.j = buf(geo.j, 9, 4); mesh.bufs.w = buf(geo.w, 10, 4); mesh.skinned = true; }
     const big = geo.p.length / 3 > 65535;
     const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, big ? new Uint32Array(geo.i) : new Uint16Array(geo.i), opts.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
@@ -299,6 +307,7 @@ export class Renderer {
     gl.uniform1f(pr.loc('uShadowOn'), this.shadowActive ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
     gl.uniform1i(pr.loc('uShadow'), 0);
+    gl.uniform1i(pr.loc('uAlbedo'), 8);
     this.bindMatTex(pr);
   }
   bindMatTex(pr) {
@@ -311,9 +320,20 @@ export class Renderer {
   drawItem(it, depthOnly = false) {
     const gl = this.gl, me = it.me, mt = me.mat;
     const inst = !!me.inst;
-    const pr = this.use(depthOnly ? (inst ? 'depthI' : 'depth') : this.stdProg(inst, mt.kind));
+    const sk = me.skinned && it.n.skin;
+    const pr = this.use(sk ? this.stdProg(false, null, depthOnly ? 'depth' : true) : depthOnly ? (inst ? 'depthI' : 'depth') : this.stdProg(inst, mt.kind));
     if (pr !== this.lastStd) { this.lastStd = pr; if (depthOnly) { gl.uniformMatrix4fv(pr.loc('uViewProj'), false, this.lightVP); gl.uniform1f(pr.loc('uTime'), this.env.time); this.bindMatTex(pr); } else this.setStdUniforms(pr, this.env); }
-    gl.uniformMatrix4fv(pr.loc('uModel'), false, it.n.world);
+    if (sk) {
+      // ossos: mundo do osso × inversa da pose de ligação (a malha está no espaço da raiz)
+      const S = it.n.skin, M = S.mats || (S.mats = new Float32Array(S.bones.length * 16)), t = this._skT || (this._skT = m4.create());
+      for (let i = 0; i < S.bones.length; i++) { m4.mul(t, S.bones[i].world, S.invBind[i]); M.set(t, i * 16); }
+      gl.uniformMatrix4fv(pr.loc('uBones[0]'), false, M);
+      gl.uniformMatrix4fv(pr.loc('uModel'), false, IDENT);
+    } else gl.uniformMatrix4fv(pr.loc('uModel'), false, it.n.world);
+    if (!depthOnly) {
+      if (mt.tex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, mt.tex); gl.uniform1i(pr.loc('uAlbedo'), 8); gl.uniform1f(pr.loc('uHasTex'), 1); }
+      else gl.uniform1f(pr.loc('uHasTex'), 0);
+    }
     gl.uniform1f(pr.loc('uWind'), mt.wind || 0); gl.uniform1f(pr.loc('uSwim'), mt.swim || 0);
     gl.uniform1f(pr.loc('uKind'), mt.kind ?? -1); gl.uniform1f(pr.loc('uRust'), mt.rust ?? 0.5); gl.uniform1f(pr.loc('uTexScale'), mt.texScale ?? 1);
     if (!depthOnly) {
