@@ -660,7 +660,8 @@ test('bancada de peixe (S$ 2.000): só peixe na mão de mais de 2 kg; tábua (E)
   p.mochila.push({ uid: 'm', esp: 'tucunare', cm: 70 });
   assert.match(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.msg, /na mão/, 'na mochila não vale');
   p.mao = { uid: 'pq', esp: 'lambari', cm: 12 };
-  assert.match(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.msg, /pequeno/, 'menos de 2 kg não corta');
+  assert.equal(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.ok, true, 'qualquer peixe corta, até lambari');
+  r.action('N', { tipo: 'peixaria_cortar' }, T0); r.action('N', { tipo: 'peixaria_pegar' }, T0); assert.equal(p.mao.cortado, true); p.mao = null;
   p.mao = null; r.action('N', { tipo: 'mochila_tirar', uid: 'm' }, T0);
   assert.equal(r.action('N', { tipo: 'peixaria_colocar' }, T0).res.ok, true); assert.equal(p.mao, null);
   assert.equal(r.action('N', { tipo: 'peixaria_pegar' }, T0).res.ok, false, 'precisa cortar antes');
@@ -701,4 +702,27 @@ test('só um aquário OU tanque na estação: comprar equipa, Equipar troca, pei
   const velho = migrateProfile({ ...np('w'), vitrine: undefined, aquario: { nivel: 3, peixes: [{ uid: 'x', esp: 'tetra', cm: 4 }] }, tanque: { nivel: 1, peixes: [{ uid: 'y', esp: 'pacu', cm: 60 }] } });
   assert.equal(velho.vitrine.tipo, 'tanque'); assert.equal(velho.vitrine.nivel, 1); assert.equal(velho.vitrine.peixes.length, 2);
   assert.deepEqual(velho.tanquesTem, [0, 1]); assert.ok(velho.aquariosTem.includes(3));
+});
+
+import { valorPeixe as vpx } from '../shared/data.js';
+import { BANCADA_PEIXE as BPX } from '../shared/world.js';
+test('cortar todos (mochila), restaurar todos e vender tudo de uma vez', () => {
+  const r = mkRoom(); r.join(np('n'), 'N', T0); const pl = r.players.get('N'), p = pl.profile;
+  const st = stationById('N'); p.dinheiro = 1e5;
+  pl.sub.pos = [st.launch[0], -0.5, st.launch[1]]; pl.modo = 'sub';
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'peixaria' }, T0).res.ok, true);
+  assert.equal(r.action('N', { tipo: 'comprar', cat: 'estacao', chave: 'restauro' }, T0).res.ok, true);
+  p.carga = [{ uid: 'c1', tipo: 'lata' }, { uid: 'c2', tipo: 'pneu' }]; p.saco = [{ uid: 's1', tipo: 'garrafa_pet' }];
+  assert.equal(r.action('N', { tipo: 'restaurar_tudo' }, T0).res.ok, true);
+  assert.ok(p.carga.every((x) => x.rest) && p.saco[0].rest);
+  p.mochila = [{ uid: 'a', esp: 'lambari', cm: 10 }, { uid: 'b', esp: 'tucunare', cm: 60 }];
+  const b = estacaoParaMundo(st, BPX.x, BPX.z); pl.modo = 'terra'; pl.pos = [b[0], 1.6, b[1]];
+  assert.equal(r.action('N', { tipo: 'peixaria_cortar_tudo' }, T0).res.ok, true);
+  assert.ok(p.mochila.every((f) => f.cortado));
+  const esperado = (vpx('lambari', 10) + vpx('tucunare', 60)) * 2 + (SUCATA.lata.valor + SUCATA.pneu.valor + SUCATA.garrafa_pet.valor) * 2;
+  pl.pos = [st.pad[0], 1.6, st.pad[1]];
+  p.missoes.ativas = []; const d0 = p.dinheiro, res = r.action('N', { tipo: 'vender_tudo' }, T0).res;
+  assert.equal(res.ok, true, res.msg);
+  assert.equal(p.dinheiro - d0, esperado);
+  assert.equal(p.mochila.length + p.saco.length + p.carga.length, 0);
 });

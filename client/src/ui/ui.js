@@ -2,7 +2,7 @@
 // Todo botão envia uma AÇÃO para o servidor (ou servidor local); nada muda saldo/inventário só na tela.
 import {
   SUB_UP, SUB_ORDEM, VARA, PESADO, AQUARIOS, TANQUES, ESTACAO, DEPOSITO, EXTRAS, CONTRATOS, SUCATA, RESTAURO, ESPECIES,
-  COMPONENTES, CORES_JOGADOR, valorPeixe, valorPeixeItem, valorItem, nomeItem, PEIXARIA, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
+  COMPONENTES, CORES_JOGADOR, valorPeixe, valorPeixeItem, valorItem, nomeItem, PEIXARIA, RESTAURO_TUDO_S, CAIXA_TERMICA, MOCHILA, ARMAS, ARMAS_ORDEM, ARMAS_LOJA, MUNICAO_MAX, ESTATUA_PECAS, LIXO,
 } from '../../shared/data.js';
 import { subStats, varaStats, cargaUso, faltando, contratoEstado, cabeNoAquario, vitrineSpec, depositoVagas, multDinheiro } from '../../shared/rules.js';
 import { STATIONS } from '../../shared/world.js';
@@ -174,6 +174,9 @@ export class UI {
       await this.g.acao(a);
       this.render();
     }));
+    corpo.querySelectorAll('[data-trabalho]').forEach((b) => (b.onclick = () => {
+      this.g.trabalhoBancada('Restaurando', RESTAURO_TUDO_S, { tipo: 'restaurar_tudo' }); this.fechar();
+    }));
     corpo.querySelectorAll('[data-sair]').forEach((b) => (b.onclick = () => this.g.sairParaMenu()));
     corpo.querySelectorAll('[data-escolher]').forEach((b) => (b.onclick = () => { const s = b.dataset.escolher, sel = this.g.corridaSel; if (sel.has(s)) sel.delete(s); else sel.add(s); this.render(); }));
     corpo.querySelectorAll('[data-chamar]').forEach((b) => (b.onclick = async () => { b.disabled = true; await this.g.chamarCorrida(); if (this.aberto) this.render(); }));
@@ -276,7 +279,11 @@ export class UI {
   aba_vender(p) {
     // tudo o que dá para vender num lugar só: peixes (mão, mochila, aquário, tanque), lixo catado e a carga do submarino
     const peixes = this.peixesVenda(p);
-    let h = this.sacoVenda(p) + (peixes || '<p class="nota">🐟 Nenhum peixe para vender (pesque, ou guarde na mochila com Z). Peixe do aquário: tire na aba Aquário (Pegar na mão) e venda.</p>');
+    { const m = multDinheiro(p); let tot = 0, n = 0;
+      for (const f of [...(p.mao ? [p.mao] : []), ...p.mochila, ...p.caixaTermica]) { tot += Math.round(valorPeixeItem(f) * m); n++; }
+      for (const it of [...p.saco, ...p.carga.filter((x) => !SUCATA[x.tipo].estatua)]) { tot += Math.round(valorItem(it) * m); n++; }
+      if (n) var topo = `<div class="convite vendeTudo">${this.btn(`💰 Vender tudo (${n} itens) — S$ ${fmt(tot)}`, { tipo: 'vender_tudo' })}<span class="nota">peixes da mão e da mochila, saco de lixo e a carga do submarino</span></div>`; }
+    let h = (topo || '') + this.sacoVenda(p) + (peixes || '<p class="nota">🐟 Nenhum peixe para vender (pesque, ou guarde na mochila com Z). Peixe do aquário: tire na aba Aquário (Pegar na mão) e venda.</p>');
     if (!p.carga.length) return h + '<h3>Carga do submarino</h3><p class="nota">Vazia. Use a garra (E) para recolher sucata no fundo do lago.</p>';
     h += `<h3>Carga do submarino</h3><div class="convite">${this.btn('Guardar tudo no depósito', { tipo: 'guardar', uid: '*' })}</div><div class="lista">`;
     for (const it of p.carga) h += this.linhaItem(it, 'carga', p);
@@ -321,6 +328,11 @@ export class UI {
     const filtro = (it) => (modo === 'restauro' ? !SUCATA[it.tipo].estatua && !it.coop : true);
     let h = '';
     if (modo === 'restauro' && !p.estacao.restauro) return '<p class="nota">Compre a Bancada de restauro no computador (aba Estação).</p>';
+    if (modo === 'restauro') {
+      const n = [...p.carga, ...p.saco, ...p.deposito].filter((it) => !it.rest && !SUCATA[it.tipo].restaurado && !SUCATA[it.tipo].estatua && !it.coop).length;
+      const tr = this.g.trabalho;
+      h += `<div class="convite"><button data-trabalho="restaurar" ${!n || tr ? 'disabled' : ''}>${tr ? `Restaurando… ${Math.max(0, Math.ceil((tr.fim - performance.now()) / 1000))} s` : `Restaurar todos (${n}) — demora ${RESTAURO_TUDO_S} s`}</button></div>`;
+    }
     if (modo === 'restauro') h += `<p class="nota">Restaurar é <b>de graça</b> e funciona com qualquer item: lixo da margem, latas, pneus, peças do fundo… direto do submarino, do depósito ou do saco. O item restaurado vende pelo <b>dobro</b> no computador.</p>`;
     h += `<h3>No submarino (${p.carga.length})</h3><div class="lista">${p.carga.filter(filtro).map((it) => this.linhaItem(it, 'carga', p, modo === 'deposito' ? 'tudo' : modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;
     if (modo === 'restauro') h += `<h3>No saco de lixo (${p.saco.length}/${LIXO.saco})</h3><div class="lista">${p.saco.map((it) => this.linhaItem(it, 'saco', p, modo)).join('') || '<p class="nota">Vazio</p>'}</div>`;

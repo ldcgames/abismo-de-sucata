@@ -106,6 +106,14 @@ No celular aparece um joystick virtual e botões (suporte básico, não testado 
 
 ---
 
+## Novidades da v0.9.8
+
+- Qualquer peixe pode ser cortado (até um lambari): o peixe cortado vale o dobro.
+- **Cortar todos**: na bancada de peixe, com a mão vazia e peixes na mochila, **E** corta todos de uma vez (demora 10 s).
+- **Restaurar todos**: botão na bancada de restauro que restaura tudo do submarino, do saco e do depósito (demora 10 s).
+- **Vender tudo**: botão na aba Vender do computador com o valor total (peixes da mão e da mochila, saco de lixo e carga do submarino; peças da estátua ficam).
+- Na frente do aquário/tanque, o E só mostra os peixes (colocar e pegar); comprar e equipar é só no computador.
+
 ## Novidades da v0.9.7
 
 - **Só um aquário OU tanque na estação** (o equipado), entre a oficina e a placa com o nome. Comprar um novo já equipa e o anterior some. Os peixes passam para o novo; os que não couberem vão para a mochila.

@@ -47,7 +47,8 @@ export const SUCATA = {
 };
 // restaurar (de graça) e cortar peixe (de graça) dobram o valor de venda
 export const RESTAURO_MULT = 2;
-export const PEIXARIA = { minKg: 2, mult: 2 };
+export const PEIXARIA = { minKg: 0, mult: 2, tudoS: 10 }; // qualquer peixe corta; cortar/restaurar todos demora 10 s
+export const RESTAURO_TUDO_S = 10;
 export function valorItem(it) { const t = SUCATA[it.tipo]; return (t?.valor || 0) * (it.rest ? RESTAURO_MULT : 1); }
 export function nomeItem(it) { return SUCATA[it.tipo].nome + (it.rest ? ' (restaurado)' : ''); }
 export function valorPeixeItem(f) { return valorPeixe(f.esp, f.cm) * (f.cortado ? PEIXARIA.mult : 1); }

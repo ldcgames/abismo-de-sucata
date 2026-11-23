@@ -237,6 +237,15 @@ class Game {
     for (let k = 0; k < 6; k++) setTimeout(() => { this.audio.blip(180 + Math.random() * 60, 0.05, 'square', 0.07, -80); this.audio.noise?.(0.05, 2400, 0.05, 1); }, 150 + k * 300);
     setTimeout(async () => { await this.acao({ tipo: 'peixaria_cortar' }); this.cortando = false; }, 1900);
   }
+  // trabalho demorado numa bancada (cortar todos / restaurar todos): animação + barra no aviso, depois a ação
+  trabalhoBancada(txt, s, acao) {
+    if (this.trabalho) return;
+    const fim = performance.now() + s * 1000;
+    this.trabalho = { txt, fim, s };
+    this.me.acao = { tipo: 'bancada', t: 0, dur: s };
+    const som = setInterval(() => { this.audio.blip(170 + Math.random() * 70, 0.05, 'square', 0.06, -80); this.audio.noise?.(0.05, 2400, 0.05, 1); }, 450);
+    setTimeout(async () => { clearInterval(som); await this.acao(acao); this.trabalho = null; this.ui.render(); }, s * 1000);
+  }
   async soltarPeixe() {
     const f = this.perfil.mao; if (!f) return;
     const r = await this.acao({ tipo: 'peixe_soltar' });
@@ -817,15 +826,19 @@ class Game {
           if (livre && I.hit('KeyI') && !this.cortando) this.cortarPeixe();
         } else if (p.mao && !p.mao.cortado) {
           const kg = massaPeixe(p.mao.esp, p.mao.cm);
-          txt = kg > PEIXARIA.minKg ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} na tábua <span class="nota">(${kg.toFixed(1)} kg)</span>` : `Peixe pequeno demais para cortar (${kg.toFixed(1)} kg) — precisa ter mais de ${PEIXARIA.minKg} kg`;
-          if (livre && I.hit('KeyE') && kg > PEIXARIA.minKg) { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.7 }; this.acao({ tipo: 'peixaria_colocar' }); }
+          txt = `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} na tábua <span class="nota">(${kg.toFixed(1)} kg)</span>`;
+          if (livre && I.hit('KeyE')) { this.me.acao = { tipo: 'bancada', t: 0, dur: 0.7 }; this.acao({ tipo: 'peixaria_colocar' }); }
         } else if (p.mao?.cortado) {
           const cheia = p.mochila.length >= MOCHILA.peixes;
           txt = cheia ? `Mochila cheia (${MOCHILA.peixes}/${MOCHILA.peixes}): venda no computador da estação` : `<kbd>E</kbd>Guardar o peixe cortado na mochila <span class="nota">(${p.mochila.length}/${MOCHILA.peixes} · venda tudo depois no computador)</span>`;
           if (livre && I.hit('KeyE') && !cheia) this.acao({ tipo: 'mochila_guardar' });
+        } else if (!p.mao && p.mochila.some((f) => !f.cortado)) {
+          const n = p.mochila.filter((f) => !f.cortado).length;
+          txt = this.trabalho ? `🔪 Cortando todos… ${Math.ceil((this.trabalho.fim - performance.now()) / 1000)} s` : `<kbd>E</kbd>Cortar todos os peixes da mochila (${n}) <span class="nota">· demora ${PEIXARIA.tudoS} s · <kbd>Z</kbd> tira um para cortar na tábua</span>`;
+          if (livre && I.hit('KeyE') && !this.trabalho) this.trabalhoBancada('Cortando', PEIXARIA.tudoS, { tipo: 'peixaria_cortar_tudo' });
         } else if (!p.mao && p.mochila.length) {
           txt = `<kbd>Z</kbd>Tirar ${ESPECIES[p.mochila[p.mochila.length - 1].esp].nome} da mochila para cortar <span class="nota">(${p.mochila.length}/${MOCHILA.peixes})</span>`;
-        } else txt = `Bancada de peixe: traga um peixe de mais de ${PEIXARIA.minKg} kg <b>na mão</b>`;
+        } else txt = `Bancada de peixe: traga um peixe <b>na mão</b> (ou guarde vários na mochila e corte todos)`;
       } else if (best) {
         txt = `<kbd>E</kbd>${best.txt}`;
         if (best.id === 'aquario') txt = p.mao ? `<kbd>E</kbd>Colocar ${ESPECIES[p.mao.esp].nome} no ${best.txt}` : `<kbd>E</kbd>${best.txt}: ver e pegar os peixes`;
@@ -911,6 +924,7 @@ class Game {
     } else if (me.modo === 'sub' || me.modo === 'guindaste') {
       txt = this.subPrompt;
     }
+    if (this.trabalho) txt = `🛠️ ${this.trabalho.txt}… ${Math.max(0, Math.ceil((this.trabalho.fim - performance.now()) / 1000))} s`;
     this.ui.prompt(txt);
   }
   interagir(id) {
