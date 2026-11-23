@@ -2,7 +2,12 @@
 // ambiente submerso abafado, estalos do casco, sonar, respingos, bolhas e efeitos cômicos.
 // Sem arquivos externos: tudo sintetizado, então não há asset quebrado nem licença a checar.
 export class Audio {
-  constructor() { this.ctx = null; this.on = true; this.vol = 0.7; }
+  constructor() { this.ctx = null; this.on = true; this.vol = 0.7; this.volBarulho = 1; }
+  // volume geral e dos barulhos de ambiente (vento, água, bichos) — menu de configurações
+  setVolumes(som, barulho) {
+    this.vol = som; this.volBarulho = barulho;
+    if (this.ctx) { this.master.gain.setTargetAtTime(som, this.ctx.currentTime, 0.05); this.amb.gain.setTargetAtTime(barulho, this.ctx.currentTime, 0.05); }
+  }
   start() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -10,13 +15,14 @@ export class Audio {
     const c = this.ctx = new AC();
     this.master = c.createGain(); this.master.gain.value = this.vol; this.master.connect(c.destination);
     // filtro "debaixo d'água" no barramento de ambiente
-    this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 18000; this.lp.connect(this.master);
+    this.amb = c.createGain(); this.amb.gain.value = this.volBarulho; this.amb.connect(this.master);
+    this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 18000; this.lp.connect(this.amb);
     this.noiseBuf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
     let b = 0; for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = (b + 0.02 * w) / 1.02; d[i] = b * 3.5 + w * 0.08; }
     // vento / água ambiente
     this.wind = this.loopNoise(400, 0.5); this.windG = c.createGain(); this.windG.gain.value = 0; this.wind.out.connect(this.windG); this.windG.connect(this.lp);
-    this.under = this.loopNoise(160, 1.2); this.underG = c.createGain(); this.underG.gain.value = 0; this.under.out.connect(this.underG); this.underG.connect(this.master);
+    this.under = this.loopNoise(160, 1.2); this.underG = c.createGain(); this.underG.gain.value = 0; this.under.out.connect(this.underG); this.underG.connect(this.amb);
     // motor: serra filtrada + ruído
     this.motorOsc = c.createOscillator(); this.motorOsc.type = 'sawtooth'; this.motorOsc.frequency.value = 40;
     this.motorF = c.createBiquadFilter(); this.motorF.type = 'lowpass'; this.motorF.frequency.value = 300;
@@ -60,14 +66,14 @@ export class Audio {
     this.motorF.frequency.setTargetAtTime(under ? 220 + Math.abs(m.thr) * 300 : 400 + Math.abs(m.thr) * 900, t, 0.2);
     // pássaros de dia / grilos à noite (só na superfície)
     if (!under && s.dia > 0.5 && t > this.nextBird) { this.nextBird = t + 2 + Math.random() * 6; this.bird(); }
-    if (!under && s.dia < 0.3 && t > this.nextCricket) { this.nextCricket = t + 0.25 + Math.random() * 0.4; this.blip(4200 + Math.random() * 300, 0.04, 'sine', 0.025); }
+    if (!under && s.dia < 0.3 && t > this.nextCricket) { this.nextCricket = t + 0.25 + Math.random() * 0.4; this.blip(4200 + Math.random() * 300, 0.04, 'sine', 0.025, 0, this.amb); }
     // estalos do casco em profundidade ou sob estresse
     if (m.on && s.camDepth > 60 && t > this.nextCreak) {
       this.nextCreak = t + (s.estresse > 30 ? 0.6 : 5) + Math.random() * 6;
       this.creak(0.12 + s.estresse * 0.003);
     }
   }
-  bird() { const f = 1800 + Math.random() * 1600; for (let k = 0; k < 3; k++) setTimeout(() => this.blip(f + k * 120, 0.09, 'sine', 0.04, 500), k * 120); }
+  bird() { const f = 1800 + Math.random() * 1600; for (let k = 0; k < 3; k++) setTimeout(() => this.blip(f + k * 120, 0.09, 'sine', 0.04, 500, this.amb), k * 120); }
   creak(g = 0.15) { this.noise(0.7, 90 + Math.random() * 60, g, 8); this.blip(70 + Math.random() * 30, 0.6, 'triangle', g * 0.4, -20); }
   sonar() { this.blip(1150, 1.2, 'sine', 0.25); setTimeout(() => this.blip(1150, 0.8, 'sine', 0.06), 600); }
   splash(e = 1) { this.noise(1.2 + e * 0.5, 900, 0.4 * Math.min(1.5, e), 0.7); this.noise(0.5, 2500, 0.15, 1); }

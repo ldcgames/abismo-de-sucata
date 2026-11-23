@@ -197,6 +197,18 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  // muda gráfico com o jogo rodando (menu de configurações)
+  setGrafico({ pixelRatio, msaa, sombra }) {
+    const gl = this.gl;
+    this.pixelRatio = pixelRatio;
+    this.msaa = Math.min(msaa, gl.getParameter(gl.MAX_SAMPLES));
+    this.shadows = sombra > 0;
+    if (sombra > 0 && sombra !== this.shadowSize) {
+      if (this.shadowTex) gl.deleteTexture(this.shadowTex); if (this.shadowFbo) gl.deleteFramebuffer(this.shadowFbo);
+      this.shadowSize = Math.min(sombra, gl.getParameter(gl.MAX_TEXTURE_SIZE)); this.initShadow();
+    }
+    this.w = 0; this.h = 0; // força refazer os alvos de renderização no próximo resize
+  }
   initShadow() {
     const gl = this.gl, s = this.shadowSize;
     this.shadowTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);

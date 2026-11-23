@@ -18,6 +18,7 @@ import { Input } from './systems/input.js';
 import { UI } from './ui/ui.js';
 import { Novidades } from './game/novidades.js';
 import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listarSalas } from './net/net.js';
+import { Pausa, lerConfig, salvarConfig, presetGrafico, limparUrlSala } from './ui/pausa.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
 import { terrainHeight, navSDF, STATIONS, stationById, PLAY_R, SLIDE_R, LAKE_R, depthZone, isNight, hourOfDay, SHAFT_C, CAVES, ESTATUA, chaoEstatua, colidirPedras } from '../shared/world.js';
 import { ESPECIES, SUCATA, CORES_JOGADOR, TROLL, ENERGIA, ARMAS, ARMAS_ORDEM, ESTATUA_PECAS, LIXO, MOCHILA, PEIXARIA, massaPeixe } from '../shared/data.js';
@@ -53,7 +54,7 @@ function setupMenu() {
       const salas = await listarSalas({ nome: nome(), cor: corSel });
       if (!salas.length) { lista.innerHTML = '<p class="nota">Você ainda não tem salas. Crie uma e mande o código para os amigos, ou digite o código que um amigo te passou.</p>'; return; }
       lista.innerHTML = salas.map((x) => `<div class="salaItem">
-        <div><div class="tit">${esc(x.nome)}<code>${x.code}</code></div>
+        <div><div class="tit">${esc(x.nome)}<code>${lerConfig().streamer ? '••••••' : x.code}</code></div>
         <div class="info">${x.souDono ? 'Você é o líder' : 'Líder: ' + esc(x.dono)} · ${x.jogadores} jogador(es)${x.online ? ` · <b>${x.online} online agora</b>` : ''} · sua evolução: <b>${x.progresso}%</b></div></div>
         <div class="acoes"><button data-entrar="${x.code}">Entrar</button><button class="fraco" data-copiar="${x.code}" title="Copiar código">📋</button></div>
         <div class="barra"><i style="width:${x.progresso}%"></i></div></div>`).join('');
@@ -105,12 +106,16 @@ class Game {
   }
   setLoading(t) { $('carregandoTxt').textContent = t; }
   async init() {
-    const q = params.has('q') ? +params.get('q') : this.autoQualidade();
+    const cfg = lerConfig();
+    if (!cfg.grafico) { cfg.grafico = ['baixo', 'medio', 'alto'][clamp(this.autoQualidade(), 0, 2)]; salvarConfig(cfg); }
+    const pg = presetGrafico(cfg.grafico);
+    const q = params.has('q') ? +params.get('q') : pg.qual;
     this.qual = clamp(q, 0, 2);
     this.setLoading('Iniciando renderizador…');
     await frame();
     const canvas = $('gl');
-    this.R = new Renderer(canvas, { msaa: [0, 4, 4][this.qual], shadowSize: [1024, 2048, 2048][this.qual], shadows: this.qual > 0, pixelRatio: Math.min(devicePixelRatio || 1, [1, 1.5, 2][this.qual]), preserve: DEBUG });
+    this.R = params.has('q') ? new Renderer(canvas, { msaa: [0, 4, 4][this.qual], shadowSize: [1024, 2048, 2048][this.qual], shadows: this.qual > 0, pixelRatio: Math.min(devicePixelRatio || 1, [1, 1.5, 2][this.qual]), preserve: DEBUG })
+      : new Renderer(canvas, { msaa: pg.msaa, shadowSize: pg.sombra || 1024, shadows: pg.sombra > 0, pixelRatio: pg.pr(), preserve: DEBUG });
     this.scene = new Node('cena');
     this.setLoading('Modelando o lago e a margem…'); await frame();
     this.terreno = buildTerrain(this.R, this.qual); this.scene.add(this.terreno);
@@ -152,14 +157,39 @@ class Game {
     this.onSnap(r.snap, []);
     $('carregando').hidden = true; $('hud').hidden = false;
     canvas.addEventListener('click', () => { if (!this.ui.aberto) this.input.lock(); this.audio.start(); });
-    addEventListener('keydown', (e) => { if (e.code === 'Escape' && this.ui.aberto) this.ui.fechar(); }, true);
+    // ESC: fecha o que estiver aberto (computador, painel); se não tiver nada aberto, abre o menu de pausa
+    this.pausa = new Pausa(this);
+    if (!params.has('q')) this.aplicarConfig(this.pausa.cfg); else this.aplicarConfig({ ...this.pausa.cfg, grafico: null });
+    addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape') return;
+      if (this.ui.aberto) { this.ui.fechar(); return; }
+      if (performance.now() - (this.pausaAbertaEm || 0) < 400) return; // o mesmo ESC que soltou o mouse
+      if (this.pausa.aberto) { this.pausa.fechar(); this.input.lock(); return; }
+      if (this.roda) return;
+      this.pausa.abrir(); this.pausaAbertaEm = performance.now();
+    }, true);
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement || this.ui.aberto || this.pausa.aberto || this.roda || document.hidden || this.semPausaAuto) return;
+      this.pausa.abrir(); this.pausaAbertaEm = performance.now();
+    });
     addEventListener('resize', () => this.R.resize(innerWidth, innerHeight));
     addEventListener('beforeunload', () => this.net.close());
     this.R.resize(innerWidth, innerHeight);
-    this.ui.aviso(this.net.mode === 'solo' ? 'Modo solo — clique na tela para controlar. Vá ao terminal (E) para ver melhorias.' : `Sala ${this.net.code}: Tab mostra o convite`, 'info', 6000);
+    this.ui.aviso(this.net.mode === 'solo' ? 'Modo solo — clique na tela para controlar. Vá ao terminal (E) para ver melhorias.' : `Sala ${this.codigoVisivel()}: Tab mostra o convite`, 'info', 6000);
     this.ui.aviso(`Sua estação: ${stationById(this.slot).nome}. Seu submarino está no berço — chegue perto e aperte E.`, 'info', 7000);
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
+  }
+  // código da sala como aparece na tela (modo streamer esconde)
+  codigoVisivel() { return this.streamer ? '•••••• (oculto)' : this.net.code; }
+  aplicarConfig(c) {
+    if (c.grafico) { const pg = presetGrafico(c.grafico); this.R.setGrafico({ pixelRatio: pg.pr(), msaa: pg.msaa, sombra: pg.sombra }); this.raioSombra = pg.raio || 45; this.R.resize(innerWidth, innerHeight); }
+    this.R.canvas.style.filter = Math.abs(c.brilho - 1) > 0.01 ? `brightness(${c.brilho})` : '';
+    this.audio.setVolumes(c.som, c.barulho);
+    this.volumeVozes = c.vozes;
+    this.streamer = !!c.streamer;
+    if (this.streamer) limparUrlSala();
+    if (this.ui.aberto === 'sala') this.ui.render();
   }
   autoQualidade() {
     try {
@@ -522,7 +552,7 @@ class Game {
       if (I.hit('KeyJ')) this.ui.abrir('mapa');
       if (I.hit('Tab')) this.ui.abrir('sala');
     } else if (I.hit('KeyI') || I.hit('Tab') || I.hit('KeyJ')) this.ui.fechar();
-    const livre = !this.ui.aberto;
+    const livre = !this.ui.aberto && !this.pausa?.aberto;
     // olhar com o mouse
     const sens = 0.0021 * (this.zoom ? 0.3 : 1);
     if (livre && !this.roda) {
@@ -623,7 +653,7 @@ class Game {
     }
     // HUD
     const zona = this.me.modo === 'terra' ? (estaNaEstacao({ slot: this.slot, modo: 'terra', pos: this.me.pos }) ? stationById(this.slot).nome : 'Margem do lago') : depthZone(-this.sub.pos[1]).nome;
-    this.ui.hud(p, { hora: hourOfDay(this.worldTime), noite: isNight(hourOfDay(this.worldTime)), zona, rede: this.net.mode === 'solo' ? 'Solo (salvo no navegador)' : (this.net.status || ''), fps: DEBUG || params.has('fps') ? this.fps : 0, ranking: this.rankingHtml() });
+    this.ui.hud(p, { hora: hourOfDay(this.worldTime), noite: isNight(hourOfDay(this.worldTime)), zona, rede: this.net.mode === 'solo' ? 'Solo (salvo no navegador)' : (this.streamer ? (this.net.status || '').replace(this.net.code, '••••••') : (this.net.status || '')), fps: DEBUG || params.has('fps') ? this.fps : 0, ranking: this.rankingHtml() });
     this.ui.maoUi(p, this.naEstacao());
     if (this.camOverride) this.setCam(this.camOverride.pos, this.camOverride.alvo, this.camOverride.fov || 1.0);
     this.audio.update(dt, { camDepth: -this.cam.pos[1], vento: 0.3, dia: env ? env.day : 1, motor: { on: this.me.modo === 'sub' && this.crane.estado === 'livre', thr: this.sub.thrust }, estresse: this.sub.estresse });
@@ -1794,7 +1824,7 @@ class Game {
     const focus = this.me.modo === 'terra' || this.me.modo === 'nadando' ? this.me.pos : this.sub.pos;
     env.shadowOn = this.cam.pos[1] > -2 && focus[1] > -10;
     env.shadowCenter = [focus[0], Math.max(0, focus[1]), focus[2]];
-    env.shadowRadius = 45;
+    env.shadowRadius = this.raioSombra || 45;
     env.water = this.cam.pos[1] > -120;
     // recorte grosso: debaixo d'água a névoa esconde a margem e a floresta
     const sub = this.cam.pos[1] < -4, fundo = this.cam.pos[1] < -140;

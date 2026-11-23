@@ -26,7 +26,7 @@ export const Novidades = {
     this.corrida = null;       // corrida em que EU estou: { id, participantes, checkpoints, nos, largaEm, ... }
     this.convite = null;       // convite recebido pendente
     this.corridaSel = new Set(); // amigos escolhidos no painel da barraca
-    this.voz = new Voz(this.net, this.slot);
+    this.voz = new Voz(this.net, this.slot); this.voz.game = this;
     this.vozMsgAte = 0;
     this.atualizarVozHud();
   },

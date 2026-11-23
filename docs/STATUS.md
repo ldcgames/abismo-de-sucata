@@ -144,3 +144,4 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 - v1.5.1: lateral do tronco que tinha ido para o braço voltou para o tronco (acabou a "aba" no cotovelo); ombro/sovaco continua ligado (sem buraco ao levantar o braço); pesos do braço contínuos (cotovelo e ombro dobram lisos); lado de dentro da manga pintado como camisa.
 - v1.5.2: bunda/bolsos seguem o quadril ao sentar (coxa dobra por baixo), sem fiapos entre perna e boia; boia rígida no quadril; ombro todo com a cor da camisa.
 - v1.5.3: lâmpadas acesas na oficina (2) e nas casinhas de tinta, armas e corrida. TESTE: Garrafa PET valendo S$ 1.000.000 (valor normal = 10, em shared/data.js).
+- v1.6: menu do ESC (Continuar, Configurações: gráfico Ultra/Alto/Médio/Baixo/Mínimo, brilho, som, barulhos, voz dos outros; Ocultar código da sala — modo streamer). Garrafa PET voltou a S$ 10.

@@ -386,8 +386,9 @@ export class UI {
       h += `<p><b>Jogo solo.</b> Seu progresso é salvo sozinho <b>neste navegador</b> (a cada ação e a cada 10 s). Para jogar com amigos, saia para o menu e abra <b>Jogar com amigos</b>.</p>`;
     } else {
       const link = `${location.origin}${location.pathname}?sala=${net.code}${new URLSearchParams(location.search).get('servidor') ? '&servidor=' + encodeURIComponent(new URLSearchParams(location.search).get('servidor')) : ''}`;
-      h += `<p><b>${esc(net.salaNome || 'Sala')}</b> · ${esc(net.status)}</p><div class="convite">Código: <code>${net.code}</code><button data-copiar="${net.code}">Copiar código</button></div>
-        <div class="convite"><input readonly value="${esc(link)}"><button data-copiar="${esc(link)}">Copiar link de convite</button></div>
+      const st = g.streamer;
+      h += `<p><b>${esc(net.salaNome || 'Sala')}</b> · ${esc(st ? (net.status || '').replace(net.code, '••••••') : net.status)}</p><div class="convite">Código: <code>${st ? '•••••• (modo streamer)' : net.code}</code><button data-copiar="${net.code}">Copiar código</button></div>
+        <div class="convite"><input readonly value="${st ? 'Link oculto (modo streamer) — use o botão para copiar' : esc(link)}"><button data-copiar="${esc(link)}">Copiar link de convite</button></div>
         <p class="nota">O código desta sala <b>nunca muda</b>. Tudo é salvo sozinho no servidor: quando quiserem parar, é só sair; para continuar, o líder entra e os amigos digitam o mesmo código. Até 5 jogadores; cada um fica sempre com a mesma estação.</p>`;
     }
     h += `<p><button data-sair="1">⏏ Sair do jogo (já está salvo)</button></p>`;

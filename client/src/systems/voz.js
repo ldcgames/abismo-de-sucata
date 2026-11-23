@@ -68,7 +68,7 @@ export class Voz {
       const ip = r.posVoz || r.pos;
       const d = Math.hypot(ip[0] - minhaPos[0], ip[1] - minhaPos[1], ip[2] - minhaPos[2]);
       const perto = VOZ_ALCANCE * 0.45;
-      const vol = d <= perto ? 1 : Math.max(0, 1 - (d - perto) / (VOZ_ALCANCE - perto));
+      const vol = Math.min(1, (d <= perto ? 1 : Math.max(0, 1 - (d - perto) / (VOZ_ALCANCE - perto))) * (this.game?.volumeVozes ?? 1));
       if (Math.abs(p.audio.volume - vol) > 0.01) p.audio.volume = vol;
       p.vol = vol;
     }

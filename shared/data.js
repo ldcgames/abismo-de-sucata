@@ -28,7 +28,7 @@ export const SUCATA = {
   cristal:         { nome: 'Cristal abissal', kg: 6, L: 6, rar: 'raro', valor: 1440, recicla: { cristal: 4 }, zona: [1400, 4500], peso: 3 },
   reliquia:        { nome: 'Relíquia do Abismo', kg: 15, L: 15, rar: 'lendário', valor: 5600, recicla: { cristal: 12 }, restaura: 'reliquia_viva', zona: [3950, 5000], peso: 2 },
   // lixo espalhado na margem (catado a pé, vai para o saco de recicláveis)
-  garrafa_pet:     { nome: 'Garrafa PET', kg: 0.05, L: 2, rar: 'comum', valor: 1000000, /* TESTE: valor normal = 10 */ recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
+  garrafa_pet:     { nome: 'Garrafa PET', kg: 0.05, L: 2, rar: 'comum', valor: 10, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
   latinha:         { nome: 'Latinha de refrigerante', kg: 0.02, L: 0.5, rar: 'comum', valor: 8, recicla: { metal: 1 }, zona: null, peso: 0, terra: true },
   sacola:          { nome: 'Sacola plástica', kg: 0.01, L: 0.5, rar: 'comum', valor: 5, zona: null, peso: 0, terra: true },
   saco_lixo:       { nome: 'Saco de lixo', kg: 2, L: 20, rar: 'comum', valor: 18, recicla: { borracha: 1 }, zona: null, peso: 0, terra: true },
