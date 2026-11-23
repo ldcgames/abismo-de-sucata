@@ -47,6 +47,14 @@ for gg in (1,2,3):
             else: novo.append(v)
         solto=np.array(novo,np.int64)
     print('grupo',gg,'pedaços',nco,'lascas devolvidas',int((cc!=grande).sum()))
+# lateral do tronco que a separação tinha posto no braço (superfície virada para fora, colada no corpo):
+# volta para o tronco — senão ela sai junto com o braço e vira uma "aba" no cotovelo quando ele levanta
+_n0=np.zeros((npnt,3)); _a=Pp[pid[I[:,0]]];_b=Pp[pid[I[:,1]]];_c=Pp[pid[I[:,2]]]; _f=np.cross(_b-_a,_c-_a)
+for k in range(3): np.add.at(_n0,pid[I[:,k]],_f)
+_n0/=np.linalg.norm(_n0,axis=1,keepdims=True)+1e-12
+for gg,sx in ((1,-1),(2,1)):
+    m_=(Gp==gg)&(Pp[:,0]*sx<float(os.environ.get('XTRONCO','0.355')))&(_n0[:,0]*sx>0.15)&(Pp[:,1]<0.3)
+    Gp[m_]=0; print('tronco tirado do braço',gg,int(m_.sum()))
 GD=Gp[pid]
 labp=Ep.argmin(1)
 D=np.full((npnt,len(ORD)),np.inf)
@@ -144,15 +152,18 @@ grupo[boia]=6
 def colado(g1,g2):
     s_={g1,g2}
     if 6 in s_ and s_!={6,5} and len(s_)==2: return True          # boia com qualquer parte que não seja o quadril
-    if s_ & {1,2} and s_ & {5,3,4,7}: return True                  # braço com barriga/quadril/perna
+    if s_ & {1,2} and s_ & {0,5,3,4,7}: return True                  # braço com barriga/quadril/perna
     if s_=={1,2}: return True
     return False
 Pv=list(P); UVv=list(UV); Nv=list(nrm[pid]); Jv=list(top[pid]); Wv=list(tw4[pid]); labv=list(lab[pid]); gv=list(grupo[pid])
 Iout=I.copy(); nmix=0; apagar=[]
+n_orig=len(Pv)
 G3=grupo[pid[I]]
 for t in range(len(I)):
     g=G3[t]
     if g[0]==g[1]==g[2]: continue
+    if set(g)<= {1,0,7} or set(g)<={2,0,7}:
+        if P[I[t]].mean(0)[1]>0.08: continue   # ombro/sovaco: braço e tronco continuam ligados (pele estica, não abre buraco)
     if not (colado(g[0],g[1]) or colado(g[1],g[2]) or colado(g[0],g[2])): continue
     vals,cnt=np.unique(g,return_counts=True); dono=vals[cnt.argmax()]
     if set(g) & {1,2}:
@@ -185,6 +196,7 @@ _d,_i=_kd.query(_P[_out])
 _viz=_arm[_i]
 _dentro=np.zeros(len(_P),bool)
 _dentro[_out]=(_d<0.05)&(np.einsum('ij,ij->i',_P[_out]-_P[_viz],_N[_viz])<-0.002)
+_dentro&=~(np.isin(_G,[0,7])&(_P[:,1]>0.08))   # tronco na altura do sovaco nunca é apagado
 for _sd in 'LR':
     for _k in ('el','hd'):
         _dd=_segd0(_P,J[_k+_sd],FIM[_k+_sd]); _dentro|=(_dd<0.08)&(_G==6)
@@ -198,7 +210,7 @@ Ifill=np.delete(Iout,apagar,axis=0) if len(apagar) else Iout.copy()
 from collections import defaultdict
 GVf=np.array(gv)
 tampas=[]; nbur=0
-n_antes_tampa=len(Pv)
+n_antes_tampa=len(Pv); n_mix=len(Pv)
 _Pf=np.array(Pv); _wk=np.unique(np.round(_Pf*1e5).astype(np.int64),axis=0,return_inverse=True)[1].ravel()
 for g_ in np.unique(GVf[Ifill[:,0]]):
     T=Ifill[GVf[Ifill[:,0]]==g_]
@@ -284,6 +296,13 @@ LIMV=int(os.environ.get('LIMV','8'))
 _esc=np.isin(GV,[1,2,6,0,7,5])&(_vis<=LIMV)
 flag[_esc]=True
 print('vertices escondidos (visibilidade baixa)',int(_esc.sum()))
+# lado de dentro da manga (tecido virado para o braço): aparece quando ele levanta o braço — pinta como a camisa
+for g_,sd in ((1,'L'),(2,'R')):
+    mg=np.where(GV==g_)[0]; a_=np.array(J['sh'+sd]); b_=np.array(J['el'+sd]); ab=b_-a_
+    tt_=np.clip(((P[mg]-a_)@ab)/(ab@ab),0,1); rr=P[mg]-(a_+tt_[:,None]*ab); rr/=np.linalg.norm(rr,axis=1,keepdims=True)+1e-9
+    dentro_=(np.einsum('ij,ij->i',NNa[mg],rr)<-0.2)&(tt_<0.95)
+    flag[mg[dentro_]]=True
+    print('dentro da manga',sd,int(dentro_.sum()))
 flag&=~pulseira
 # classe desejada: a do vizinho visível (não marcado) mais próximo da mesma peça
 alvo=np.full(len(P),-1)
@@ -414,6 +433,25 @@ for g_,sd in ((1,'L'),(2,'R')):
                 JJ[v]=[ok_[int(np.argmin(ds))],0,0,0]; WW[v]=[1,0,0,0]; continue
             WW[v]=w/w.sum()
 print('vertices de braço com peso de fora corrigidos',ncorr)
+# pesos do braço refeitos de forma contínua ao longo do braço (ombro → cotovelo → punho): a dobra do cotovelo e do
+# ombro fica lisa, sem a borda em zigue-zague que rasgava a pele em lascas quando ele levanta o braço
+def _ss(x): x=np.clip(x,0,1); return x*x*(3-2*x)
+nref=0
+for g_,sd in ((1,'L'),(2,'R')):
+    mg=np.where(GG==g_)[0]
+    S=np.array(J['sh'+sd]); E_=np.array(J['el'+sd]); H=np.array(J['hd'+sd])
+    def proj_(p,a,b):
+        ab=b-a; t=((p-a)@ab)/(ab@ab); return t
+    t1=proj_(P[mg],S,E_); t2=proj_(P[mg],E_,H)
+    L1=np.linalg.norm(E_-S); L2=np.linalg.norm(H-E_)
+    s_=np.where(t1<1,t1*L1,L1+np.clip(t2,0,None)*L2)   # posição ao longo do braço
+    b=0.055
+    a_el=_ss((s_-(L1-b))/(2*b)); a_hd=_ss((s_-(L1+L2-0.03))/(0.06)); a_sh=_ss((s_+0.02)/0.10)
+    wc=1-a_sh; wsh=a_sh*(1-a_el); wel=a_el*(1-a_hd); whd=a_hd
+    W4=np.stack([wsh,wel,whd,wc],1); W4/=W4.sum(1,keepdims=True)
+    JJ[mg]=[ORD.index('sh'+sd),ORD.index('el'+sd),ORD.index('hd'+sd),ORD.index('chest')]
+    WW[mg]=W4; nref+=len(mg)
+print('pesos de braço contínuos',nref)
 # máscara da camisa (verde) para pintar com a cor do jogador
 TM=1024
 texs=cv2.resize(tex,(TM,TM),interpolation=cv2.INTER_AREA); hs=cv2.cvtColor(texs,cv2.COLOR_BGR2HSV)
@@ -427,6 +465,7 @@ verde=cv2.morphologyEx(verde,cv2.MORPH_CLOSE,np.ones((3,3),np.uint8))
 mask=cv2.GaussianBlur(cv2.bitwise_and(zona,verde),(3,3),0)
 cv2.imwrite('mascara.png',mask)
 print('mascara cobertura',(mask>128).mean())
-np.savez('rig.npz',P=P,UV=UV,I=I,N=NN,J=JJ,W=WW,lab=LL,G=np.array(gv))
+_tag=np.zeros(len(gv),int); _tag[n_orig:n_mix]=1; _tag[n_mix:]=2
+np.savez('rig.npz',TAG=_tag,P=P,UV=UV,I=I,N=NN,J=JJ,W=WW,lab=LL,G=np.array(gv))
 json.dump({'J':J,'ORD':ORD,'PAI':PAI},open('esqueleto.json','w'))
 print('labels',np.bincount(lab,minlength=len(ORD)))

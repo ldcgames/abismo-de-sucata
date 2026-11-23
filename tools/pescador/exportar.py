@@ -19,6 +19,7 @@ import os
 if os.environ.get('DEBUG'):
     dom=Jb[np.arange(len(Jb)),W.argmax(1)]
     if os.environ.get('DEBUG')=='g': dom=d['G']*2
+    if os.environ.get('DEBUG')=='t': dom=np.array([4,0,3])[d['TAG']]
     cols=np.array([[0,0,255],[0,128,255],[0,255,255],[0,255,0],[255,255,255],[255,0,0],[255,0,255],[128,0,128],[255,255,0],[0,0,128],[0,128,0],[50,50,50],[90,90,90],[130,130,130],[170,170,170],[200,200,200],[220,220,220],[0,0,0]],np.uint8)
     tex=np.zeros((64,64*18,3),np.uint8)
     for k in range(18): tex[:,k*64:(k+1)*64]=cols[k]

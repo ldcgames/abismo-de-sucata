@@ -141,3 +141,4 @@ Lago com metade da largura (mesma profundidade, 5 km no fundo da fenda); água c
 - Braço, boia e corpo separados de verdade; buracos fechados; braço só obedece ossos do braço.
 - Partes que ficavam escondidas (debaixo do braço, contato com a boia) foram repintadas na textura com a cor vizinha.
 - Armas maiores na mão (escala 1,85); cobertura do quiosque em 4 postes; camisa tingida sem pontinhos estourados.
+- v1.5.1: lateral do tronco que tinha ido para o braço voltou para o tronco (acabou a "aba" no cotovelo); ombro/sovaco continua ligado (sem buraco ao levantar o braço); pesos do braço contínuos (cotovelo e ombro dobram lisos); lado de dentro da manga pintado como camisa.
