@@ -6,7 +6,7 @@
 - Botões redondos por situação (Pular/Puxar, Pescar, Armas, Atirar, Luneta, Guardar, Estilingue, Tirar peixe, Dançar) e um botão para cada tecla que aparece na tela (`<kbd>`), em `client/src/ui/celular.js`.
 - Barra em cima: ☰ menu, 🎒 inventário, 🗺️ mapa, 👥 sala, 🎤 voz, ⛶ tela cheia. Tocar no dinheiro mostra mochila e missões.
 - HUD enxuto no celular (CSS `.celular …` em style.css), painéis em tela cheia, aviso para girar o celular, gráfico começa em "baixo".
-- A versão de computador antes disto está na tag `v1.9-computador`.
+- A versão de computador antes disto está guardada no branch `versao-computador` (commit 0628c67).
 - Teste: `tests/e2e_celular.mjs`.
 
 ## Novidades da v1.9: veículos
