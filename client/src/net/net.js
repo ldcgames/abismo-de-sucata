@@ -223,7 +223,7 @@ export class OnlineNet extends Emitter {
 }
 
 // lista as salas do jogador (as que ele criou e as que já entrou), com código fixo e % de evolução
-export function listarSalas({ nome, cor, esquecer } = {}) {
+export function listarSalas({ nome, cor, esquecer, excluir } = {}) {
   return new Promise((resolve, reject) => {
     const url = serverUrl(); if (!url) return reject(new Error('Servidor não configurado'));
     const credKey = 'abismo_cred_' + url;
@@ -237,9 +237,11 @@ export function listarSalas({ nome, cor, esquecer } = {}) {
       if (m.t === 'bemvindo') {
         localStorage.setItem(credKey, JSON.stringify({ id: m.id, token: m.token }));
         if (esquecer) { apagarCopia(url, esquecer); ws.send(JSON.stringify({ t: 'esquecer_sala', code: esquecer })); return; }
+        if (excluir) { apagarCopia(url, excluir); ws.send(JSON.stringify({ t: 'excluir_sala', code: excluir })); return; }
         // o servidor acordou sem alguma sala: devolve a cópia deste aparelho e pede a lista de novo
         if (restaurarFaltando(ws, url, m.salas)) { ws.send(JSON.stringify({ t: 'minhas_salas' })); return; }
         clearTimeout(t); ws.close(); resolve(m.salas || []);
+      } else if (m.t === 'restaurada' && m.excluida) { apagarCopia(url, m.code); // o líder excluiu: esquece a cópia deste aparelho
       } else if (m.t === 'salas') { clearTimeout(t); ws.close(); resolve(m.salas); }
       else if (m.t === 'erro') { clearTimeout(t); ws.close(); reject(new Error(m.msg)); }
     };

@@ -58,10 +58,23 @@ function setupMenu() {
       lista.innerHTML = salas.map((x) => `<div class="salaItem">
         <div><div class="tit">${esc(x.nome)}<code>${lerConfig().streamer ? '••••••' : x.code}</code></div>
         <div class="info">${x.souDono ? 'Você é o líder' : 'Líder: ' + esc(x.dono)} · ${x.jogadores} jogador(es)${x.online ? ` · <b>${x.online} online agora</b>` : ''} · sua evolução: <b>${x.progresso}%</b></div></div>
-        <div class="acoes"><button data-entrar="${x.code}">Entrar</button><button class="fraco" data-copiar="${x.code}" title="Copiar código">📋</button></div>
+        <div class="acoes"><button data-entrar="${x.code}">Entrar</button><button class="fraco lixo" data-excluir="${x.code}" title="${x.souDono ? 'Excluir sala' : 'Tirar da minha lista'}">🗑️</button></div>
         <div class="barra"><i style="width:${x.progresso}%"></i></div></div>`).join('');
       lista.querySelectorAll('[data-entrar]').forEach((b) => (b.onclick = () => iniciar(new OnlineNet({ nome: nome(), cor: corSel, code: b.dataset.entrar }))));
-      lista.querySelectorAll('[data-copiar]').forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.copiar)));
+      lista.querySelectorAll('[data-excluir]').forEach((b) => (b.onclick = async () => {
+        const x = salas.find((y) => y.code === b.dataset.excluir); if (!x) return;
+        const nomeSala = `<b>${esc(x.nome)}</b>`;
+        // duas confirmações: um clique sem querer não apaga nada
+        const p1 = x.souDono ? `Tem certeza que quer excluir a sala ${nomeSala}?` : `Tirar a sala ${nomeSala} da sua lista?`;
+        if (!(await confirmar(p1, 'Sim', 'Não'))) return;
+        const p2 = x.souDono
+          ? `Posso excluir mesmo? A sala ${nomeSala} e o progresso de <b>todos</b> os jogadores nela (${x.jogadores}) serão apagados para sempre. Não tem como desfazer.`
+          : `Posso tirar mesmo? A sala continua existindo para o líder e os amigos; você só volta se alguém te passar o código de novo.`;
+        if (!(await confirmar(p2, x.souDono ? 'Sim, excluir' : 'Sim, tirar', 'Cancelar', true))) return;
+        lista.innerHTML = '<p class="nota">Excluindo…</p>';
+        try { await listarSalas({ nome: nome(), cor: corSel, excluir: x.code }); abrirSalas(); }
+        catch (e) { lista.innerHTML = `<p class="status ruim">${esc(e.message)}</p><button class="fraco" id="btRecarregaSalas">Voltar para a lista</button>`; $('btRecarregaSalas').onclick = abrirSalas; }
+      }));
     } catch (e) { lista.innerHTML = `<p class="status ruim">${esc(e.message)}</p>`; }
   };
   $('btSalas').onclick = abrirSalas;
@@ -80,6 +93,18 @@ function setupMenu() {
       $('btSalas').disabled = true;
       if (sala) st.textContent += ' O link de convite precisa do servidor para funcionar.';
     }
+  });
+}
+// caixinha de confirmação (Sim / Não) por cima do menu; devolve true se clicou em Sim
+function confirmar(html, sim = 'Sim', nao = 'Não', perigo = false) {
+  return new Promise((resolve) => {
+    const fundo = document.createElement('div'); fundo.className = 'confirmaFundo';
+    fundo.innerHTML = `<div class="confirmaCaixa"><p>${html}</p><div class="confirmaBts"><button class="fraco" data-r="0">${nao}</button><button data-r="1" class="${perigo ? 'perigo' : ''}">${sim}</button></div></div>`;
+    const fim = (r) => { fundo.remove(); document.removeEventListener('keydown', tecla, true); resolve(r); };
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fim(false); } };
+    fundo.onclick = (e) => { if (e.target === fundo) fim(false); const r = e.target.dataset?.r; if (r) fim(r === '1'); };
+    document.addEventListener('keydown', tecla, true);
+    document.body.appendChild(fundo); fundo.querySelector('[data-r="0"]').focus();
   });
 }
 function esc(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }

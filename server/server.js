@@ -134,6 +134,7 @@ function agendarCopia(entry, ms = 2000) {
 async function restaurarSala(ws, copia) {
   const erro = copiaValida(copia, SEGREDO); if (erro) return { ok: false, msg: erro };
   const d = copia.dados, code = d.code;
+  if (store.foiExcluida(code)) return { ok: false, code, excluida: true, msg: 'Essa sala foi excluída pelo líder' };
   if (!d.meta.membros?.[ws.conta.id]) return { ok: false, msg: 'Você não faz parte dessa sala' };
   if (await store.salaExiste(code)) {
     const atual = await store.carregarSala(code);
@@ -222,6 +223,26 @@ async function handle(ws, m) {
       if (ws.entry) return send(ws, { t: 'restaurada', ok: false, msg: 'Você já está numa sala' });
       const r = await restaurarSala(ws, m.copia);
       return send(ws, { t: 'restaurada', ...r });
+    }
+    case 'excluir_sala': {
+      // o líder exclui a sala para todos; quem não é líder só tira a sala da própria lista
+      const code = String(m.code || '').toUpperCase();
+      if (!ws.conta.salas.includes(code)) return send(ws, { t: 'erro', msg: 'Essa sala não está na sua lista' });
+      const meta = await store.carregarSala(code);
+      if (meta && meta.dono === ws.conta.id) {
+        if (rooms.get(code)?.clients.size) return send(ws, { t: 'erro', msg: 'Tem gente jogando nessa sala agora. Espere todos saírem para excluir.' });
+        rooms.delete(code);
+        for (const id of Object.keys(meta.membros || {}).concat(ws.conta.id)) {
+          const rec = await store.contaRec(id);
+          if (rec && rec.conta.salas.includes(code)) { rec.conta.salas = rec.conta.salas.filter((c) => c !== code); await store.salvarConta(id); }
+        }
+        await store.excluirSala(code);
+        console.log(`[sala ${code}] excluída pelo líder ${ws.conta.nome}`);
+      } else {
+        ws.conta.salas = ws.conta.salas.filter((c) => c !== code);
+        await store.salvarConta(ws.conta.id);
+      }
+      return send(ws, { t: 'salas', salas: await listaSalas(ws.conta), excluida: code });
     }
     case 'esquecer_sala': {
       // tira a sala da SUA lista (ela continua existindo para os amigos)

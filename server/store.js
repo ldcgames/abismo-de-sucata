@@ -22,6 +22,8 @@ export class Store {
     this.salas = new Map();    // code -> meta
     this.perfis = new Map();   // code/id -> profile
     this.chains = new Map();
+    this.excluidas = new Set(); // códigos de salas que o líder excluiu (uma cópia antiga num aparelho não traz de volta)
+    try { for (const c of JSON.parse(fss.readFileSync(path.join(dir, 'excluidas.json'), 'utf8'))) this.excluidas.add(c); } catch { /* ainda não há */ }
   }
   static hash(token) { return crypto.createHash('sha256').update(String(token)).digest('hex'); }
 
@@ -111,6 +113,16 @@ export class Store {
     try { await fs.access(this.fSala(code)); return true; } catch { return false; }
   }
   salvarSala(code) { return this.gravar(this.fSala(code), () => this.salas.get(code)); }
+  // apaga a sala de vez (arquivos da sala e o progresso de todos nela) e guarda o código como excluído
+  async excluirSala(code) {
+    const pasta = path.dirname(this.fSala(code));
+    await (this.chains.get(this.fSala(code)) || Promise.resolve());
+    this.salas.delete(code);
+    for (const k of [...this.perfis.keys()]) if (k.startsWith(code + '/')) this.perfis.delete(k);
+    await fs.rm(pasta, { recursive: true, force: true });
+    this.excluidas.add(code); await this.gravar(path.join(this.dir, 'excluidas.json'), () => [...this.excluidas]);
+  }
+  foiExcluida(code) { return this.excluidas.has(code); }
 
   // ---------- progresso de um jogador numa sala ----------
   async carregarPerfil(code, conta) {
