@@ -184,8 +184,9 @@ export const Veiculos = {
   dirigir(dt, livre) {
     const C = this.carro, spec = VEICULOS[C.tipo], I = this.input;
     const travado = this.corridaTravada?.() || false;
-    const acel = livre && !travado ? I.axis('KeyS', 'KeyW') : 0;
-    const vir = livre ? I.axis('KeyD', 'KeyA') : 0;
+    const tm = I.touch.active ? I.touch.move : [0, 0]; // joystick do celular
+    const acel = livre && !travado ? clamp(I.axis('KeyS', 'KeyW') + tm[1], -1, 1) : 0;
+    const vir = livre ? clamp(I.axis('KeyD', 'KeyA') - tm[0], -1, 1) : 0;
     const freioMao = livre && I.down('Space');
     // velocidade no sentido do veículo
     const fw = [Math.sin(C.rot), Math.cos(C.rot)];

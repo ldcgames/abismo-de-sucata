@@ -1,5 +1,14 @@
 # ABISMO DE SUCATA — status da v0.9 (22/11/2026)
 
+## Novidades da v2.0: modo celular
+- Celular (tela de toque) abre sozinho com controles de toque; o computador continua igual. `?celular` / `?computador` no link forçam um ou outro.
+- Joystick à esquerda (aparece onde o dedo encosta; empurrar até o fim corre), arrastar à direita olha.
+- Botões redondos por situação (Pular/Puxar, Pescar, Armas, Atirar, Luneta, Guardar, Estilingue, Tirar peixe, Dançar) e um botão para cada tecla que aparece na tela (`<kbd>`), em `client/src/ui/celular.js`.
+- Barra em cima: ☰ menu, 🎒 inventário, 🗺️ mapa, 👥 sala, 🎤 voz, ⛶ tela cheia. Tocar no dinheiro mostra mochila e missões.
+- HUD enxuto no celular (CSS `.celular …` em style.css), painéis em tela cheia, aviso para girar o celular, gráfico começa em "baixo".
+- A versão de computador antes disto está na tag `v1.9-computador`.
+- Teste: `tests/e2e_celular.mjs`.
+
 ## Novidades da v1.9: veículos
 - Loja de carros no canto ao lado do tanque, com vaga "GARAGEM" onde o veículo aparece. Casinhas de tinta/armas/corrida foram para o lado; a bancada de cortar peixe ficou perto da mesa de restauro (com colisão).
 - Veículos (do mais lento ao mais rápido): patinete (grátis, 1 lugar, 1,5× a caminhada), moto (S$ 5.000, 2 lugares), carro (S$ 10.000, 4), carro de som (S$ 15.000, 2, voz do motorista 4×), caminhonete (S$ 20.000, 5), superesportivo (S$ 30.000, 2).

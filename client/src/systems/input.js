@@ -13,6 +13,7 @@ export class Input {
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => this.keys.clear());
     canvas.addEventListener('mousedown', (e) => {
+      if (this.semLock) return; // celular: o toque na tela não é clique (atirar/lançar ficam nos botões)
       if (e.button === 0) { this.mouse.down = true; this.mouse.clicked = true; }
       if (e.button === 2) this.mouse.rdown = true;
     });
@@ -22,7 +23,7 @@ export class Input {
     // Filtro de "flicks": o Chrome às vezes entrega um movementX/Y gigante (primeiro evento após
     // capturar o mouse, troca de janela, queda de FPS). Esses picos viravam giros bruscos da câmera.
     addEventListener('mousemove', (e) => {
-      if (!(this.locked || (e.buttons && e.target === canvas))) return;
+      if (this.semLock || !(this.locked || (e.buttons && e.target === canvas))) return; // no celular quem gira a câmera é o toque
       if (performance.now() < this.ignorarAte) return;
       let mx = e.movementX || 0, my = e.movementY || 0;
       if (Math.abs(mx) > 250 || Math.abs(my) > 250) return; // pico falso: descarta
@@ -34,7 +35,7 @@ export class Input {
     canvas.addEventListener('wheel', (e) => { this.wheel = (this.wheel || 0) + Math.sign(e.deltaY); }, { passive: true });
     this.setupTouch();
   }
-  lock() { if (!this.locked && this.canvas.requestPointerLock) { try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* ignorado */ } } }
+  lock() { if (this.semLock) return; if (!this.locked && this.canvas.requestPointerLock) { try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* ignorado */ } } }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
   down(c) { return this.enabled && this.keys.has(c); }
   hit(c) { return this.enabled && this.pressed.has(c); }

@@ -20,6 +20,7 @@ import { Novidades } from './game/novidades.js';
 import { Veiculos } from './game/veiculos.js';
 import { modeloVeiculo } from './entities/veiculos.js';
 import { SoloNet, OnlineNet, servidorDisponivel, serverUrl, carregarSolo, listarSalas } from './net/net.js';
+import { CELULAR, iniciarCelular, telaCheia } from './ui/celular.js';
 import { Pausa, lerConfig, salvarConfig, presetGrafico, limparUrlSala } from './ui/pausa.js';
 import { subStats, varaStats, estaNaEstacao, cargaUso, multDinheiro } from '../shared/rules.js';
 import { terrainHeight, navSDF, STATIONS, stationById, PLAY_R, SLIDE_R, LAKE_R, depthZone, isNight, hourOfDay, SHAFT_C, CAVES, ESTATUA, chaoEstatua, colidirPedras } from '../shared/world.js';
@@ -110,6 +111,7 @@ function confirmar(html, sim = 'Sim', nao = 'Não', perigo = false) {
 function esc(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
 async function iniciar(net) {
+  telaCheia(true); // celular: tela cheia e deitado (no computador não faz nada)
   $('menu').hidden = true; $('carregando').hidden = false;
   try {
     const g = new Game(net);
@@ -134,7 +136,7 @@ class Game {
   setLoading(t) { $('carregandoTxt').textContent = t; }
   async init() {
     const cfg = lerConfig();
-    if (!cfg.grafico) { cfg.grafico = ['baixo', 'medio', 'alto'][clamp(this.autoQualidade(), 0, 2)]; salvarConfig(cfg); }
+    if (!cfg.grafico) { cfg.grafico = CELULAR ? 'baixo' : ['baixo', 'medio', 'alto'][clamp(this.autoQualidade(), 0, 2)]; salvarConfig(cfg); } // celular começa leve (dá para mudar no ☰ → Configurações)
     const pg = presetGrafico(cfg.grafico);
     const q = params.has('q') ? +params.get('q') : pg.qual;
     this.qual = clamp(q, 0, 2);
@@ -187,6 +189,7 @@ class Game {
     canvas.addEventListener('click', () => { if (!this.ui.aberto) this.input.lock(); this.audio.start(); });
     // ESC: fecha o que estiver aberto (computador, painel); se não tiver nada aberto, abre o menu de pausa
     this.pausa = new Pausa(this);
+    iniciarCelular(this);
     if (!params.has('q')) this.aplicarConfig(this.pausa.cfg); else this.aplicarConfig({ ...this.pausa.cfg, grafico: null });
     addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
@@ -203,8 +206,13 @@ class Game {
     addEventListener('resize', () => this.R.resize(innerWidth, innerHeight));
     addEventListener('beforeunload', () => this.net.close());
     this.R.resize(innerWidth, innerHeight);
-    this.ui.aviso(this.net.mode === 'solo' ? 'Modo solo — clique na tela para controlar. Vá ao terminal (E) para ver melhorias.' : `Sala ${this.codigoVisivel()}: Tab mostra o convite`, 'info', 6000);
-    this.ui.aviso(`Sua estação: ${stationById(this.slot).nome}. Seu submarino está no berço — chegue perto e aperte E.`, 'info', 7000);
+    if (CELULAR) {
+      this.ui.aviso(this.net.mode === 'solo' ? 'Joystick à esquerda anda (empurre até o fim para correr) · arraste à direita para olhar' : `Sala ${this.codigoVisivel()}: toque em 👥 para ver o convite`, 'info', 6000);
+      this.ui.aviso(`Sua estação: ${stationById(this.slot).nome}. Chegue perto das coisas: o botão de usar aparece à direita.`, 'info', 7000);
+    } else {
+      this.ui.aviso(this.net.mode === 'solo' ? 'Modo solo — clique na tela para controlar. Vá ao terminal (E) para ver melhorias.' : `Sala ${this.codigoVisivel()}: Tab mostra o convite`, 'info', 6000);
+      this.ui.aviso(`Sua estação: ${stationById(this.slot).nome}. Seu submarino está no berço — chegue perto e aperte E.`, 'info', 7000);
+    }
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -691,6 +699,7 @@ class Game {
     const zona = this.me.modo === 'terra' ? (estaNaEstacao({ slot: this.slot, modo: 'terra', pos: this.me.pos }) ? stationById(this.slot).nome : 'Margem do lago') : depthZone(-this.sub.pos[1]).nome;
     this.ui.hud(p, { hora: hourOfDay(this.worldTime), noite: isNight(hourOfDay(this.worldTime)), zona, rede: this.net.mode === 'solo' ? 'Solo (salvo no navegador)' : (this.streamer ? (this.net.status || '').replace(this.net.code, '••••••') : (this.net.status || '')), fps: DEBUG || params.has('fps') ? this.fps : 0, ranking: this.rankingHtml() });
     this.ui.maoUi(p, this.naEstacao());
+    this.cel?.atualizar();
     if (this.camOverride) this.setCam(this.camOverride.pos, this.camOverride.alvo, this.camOverride.fov || 1.0);
     this.audio.update(dt, { camDepth: -this.cam.pos[1], vento: 0.3, dia: env ? env.day : 1, motor: { on: this.me.modo === 'sub' && this.crane.estado === 'livre', thr: this.sub.thrust }, estresse: this.sub.estresse });
   }
